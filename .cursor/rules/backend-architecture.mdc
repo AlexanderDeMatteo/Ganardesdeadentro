@@ -1,0 +1,16 @@
+---
+description: Convenciones de arquitectura para backend Flask
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Arquitectura Backend
+
+- Mantener rutas delgadas: parsear request, llamar servicios y devolver respuestas.
+- Colocar logica de negocio en `services`.
+- Mantener modelos y acceso a datos separados de la capa HTTP.
+- Usar respuestas consistentes para exito y error.
+- Evitar dependencias circulares entre rutas, modelos, servicios y configuracion.
+- Centralizar validaciones repetidas en helpers, schemas o servicios.
+- Preparar servicios para tests unitarios usando sesiones inyectables cuando sea util.
+- No mezclar integraciones externas directamente dentro de rutas si pueden aislarse en servicios.

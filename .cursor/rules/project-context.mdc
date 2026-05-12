@@ -1,0 +1,12 @@
+---
+description: Consultar contexto del proyecto FitTrack antes de cambios relevantes
+alwaysApply: true
+---
+
+# Contexto del proyecto
+
+Antes de implementar o modificar **frontend** (`app/`, `components/`, `hooks/`), **backend** (`backend/app/`), **Docker** (`docker-compose.yml`, `Dockerfile*`), **autenticación, roles, permisos, datos sensibles** o **estrategia de pruebas**, lee y ten en cuenta:
+
+- `docs/PROJECT_CONTEXT.md` (raíz del repositorio)
+
+Luego aplica las reglas específicas ya definidas en `.cursor/rules/` (seguridad, auth, calidad Python/TS, testing, accesibilidad, etc.). Este archivo no duplica esas reglas: solo obliga a alinear el trabajo con el estado real del repo descrito en el documento de contexto.

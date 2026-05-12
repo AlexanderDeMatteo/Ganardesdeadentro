@@ -1,0 +1,17 @@
+---
+description: Seguridad para frontend Next, React y TypeScript
+globs: app/**/*.{ts,tsx},components/**/*.{ts,tsx},hooks/**/*.{ts,tsx},lib/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Seguridad Frontend
+
+- No guardar access tokens reales en `localStorage` o `sessionStorage` si puede usarse cookie `HttpOnly`, `Secure` y `SameSite`.
+- No exponer secretos en codigo cliente ni en variables `NEXT_PUBLIC_*` salvo que sean realmente publicas.
+- No confiar en claims, roles o estado local para autorizacion real.
+- Evitar `dangerouslySetInnerHTML`; si es inevitable, sanitizar con una libreria confiable.
+- Manejar 401 y 403 sin filtrar detalles internos.
+- Validar formularios con Zod o herramienta equivalente para UX, pero exigir validacion backend.
+- Evitar logs de tokens, perfiles completos, payloads sensibles o datos personales.
+- Evitar redirects abiertos; usar destinos conocidos o allowlists.
+- Mantener componentes cliente solo cuando requieran estado, eventos o APIs del navegador.

@@ -1,0 +1,16 @@
+---
+description: Reglas generales de ciberseguridad para todo el proyecto
+alwaysApply: true
+---
+
+# Seguridad General
+
+- Nunca hardcodear secretos, API keys, tokens, passwords, JWT secrets, connection strings o claves privadas.
+- Usar variables de entorno para configuracion sensible y mantener valores reales fuera del repositorio.
+- Validar y sanear toda entrada externa en backend, aunque el frontend ya valide.
+- No exponer trazas internas, errores de base de datos ni detalles de infraestructura al cliente.
+- No registrar JWT, refresh tokens, passwords, cookies de sesion ni datos personales sensibles.
+- Aplicar minimo privilegio en roles, permisos, scopes, endpoints y acceso a datos.
+- Preferir configuracion segura por defecto para CORS, cookies, JWT, headers y dependencias.
+- Revisar dependencias nuevas por necesidad real, mantenimiento y vulnerabilidades conocidas.
+- Manejar errores de forma explicita; no usar bloques vacios ni ocultar fallos criticos.

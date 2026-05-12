@@ -1,0 +1,16 @@
+---
+description: Accesibilidad para componentes y paginas frontend
+globs: app/**/*.{tsx,html},components/**/*.{tsx,html}
+alwaysApply: false
+---
+
+# Accesibilidad Frontend
+
+- Formularios con `label` asociado a cada input.
+- Usar botones para acciones y links para navegacion.
+- Mostrar estados de error visibles, entendibles y asociados al campo cuando aplique.
+- Mantener navegacion por teclado en modales, menus, formularios y componentes interactivos.
+- Asegurar foco visible y contraste suficiente.
+- Usar `aria-*` solo cuando el HTML semantico no baste.
+- No usar texto dentro de imagenes como unica fuente de informacion.
+- No bloquear zoom, lectura por screen reader ni navegacion con tab.

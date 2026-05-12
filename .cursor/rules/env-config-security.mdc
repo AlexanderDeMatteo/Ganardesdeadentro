@@ -1,0 +1,16 @@
+---
+description: Manejo seguro de configuracion y variables de entorno
+globs: **/.env.example,**/*.py,**/*.{ts,tsx,js,jsx},next.config.*
+alwaysApply: false
+---
+
+# Variables De Entorno Y Configuracion
+
+- `.env` real no debe versionarse ni copiarse en documentacion.
+- `.env.example` debe contener nombres de variables sin valores sensibles reales.
+- Validar presencia de variables criticas al iniciar backend.
+- Diferenciar variables publicas de frontend y privadas de servidor.
+- No usar defaults inseguros para JWT secrets, database URLs o claves externas en produccion.
+- Documentar variables nuevas cuando se introduzcan.
+- No exponer secretos mediante `NEXT_PUBLIC_*`.
+- Mantener configuraciones de desarrollo separadas de produccion.

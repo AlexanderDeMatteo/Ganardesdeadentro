@@ -1,0 +1,17 @@
+---
+description: Generative Engine Optimization para contenido visible por IA
+globs: app/**/*.{ts,tsx,md,mdx},components/**/*.{ts,tsx},**/*.md,**/*.mdx
+alwaysApply: false
+---
+
+# GEO Para Buscadores Con IA
+
+- Escribir contenido claro, especifico y factual.
+- Responder preguntas importantes de forma directa en paginas publicas.
+- Usar headings descriptivos que expliquen intencion, beneficios y contexto.
+- Incluir FAQs cuando una pagina responda dudas comunes de usuarios.
+- Mencionar entidades relevantes de forma natural: marca, servicio, ubicacion si aplica, publico objetivo y caracteristicas.
+- Evitar claims vagos sin evidencia.
+- Mantener contenido actualizado y consistente entre paginas.
+- Usar datos estructurados schema.org cuando aplique: `Organization`, `WebSite`, `FAQPage`, `Product` o `LocalBusiness`.
+- Hacer explicito que ofrece FitTrack, para quien es, como funciona y por que es confiable.

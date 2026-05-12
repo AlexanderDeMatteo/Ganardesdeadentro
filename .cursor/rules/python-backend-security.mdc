@@ -1,0 +1,19 @@
+---
+description: Seguridad para backend Python, Flask, SQLAlchemy y JWT
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Seguridad Backend Python Y JWT
+
+- Validar JWT con firma, expiracion, issuer, audience y algoritmo esperado.
+- No aceptar tokens con algoritmo `none` ni confiar en el algoritmo enviado por el cliente.
+- No confiar solo en claims del token para autorizacion si el estado real del usuario puede haber cambiado.
+- Separar autenticacion, autorizacion y logica de negocio.
+- Usar ORM seguro o queries parametrizadas; nunca concatenar SQL con input externo.
+- Guardar passwords solo con hashing fuerte como bcrypt o argon2; nunca usar cifrado reversible.
+- Usar errores genericos en login, register, recuperacion de password y validacion de tokens.
+- Evitar devolver `str(e)` o errores internos al cliente.
+- Configurar CORS de forma restrictiva; no usar `*` con credenciales.
+- Considerar rate limiting en login, register, password change y endpoints sensibles.
+- Cerrar sesiones de base de datos de forma consistente.

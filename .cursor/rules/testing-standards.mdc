@@ -1,0 +1,16 @@
+---
+description: Criterios de testing para cambios criticos
+globs: app/**/*.{ts,tsx},components/**/*.{ts,tsx},hooks/**/*.{ts,tsx},lib/**/*.{ts,tsx},backend/**/*.py
+alwaysApply: false
+---
+
+# Testing Y Validacion
+
+- Priorizar tests para autenticacion, autorizacion, validacion, roles, permisos y cambios de password.
+- Incluir casos negativos: token invalido, token expirado, usuario desactivado y permisos insuficientes.
+- Probar servicios backend sin depender siempre de la capa HTTP.
+- No mockear la logica que se quiere validar realmente.
+- Para frontend, probar flujos criticos: login, logout, rutas protegidas y errores de formularios.
+- Cubrir estados de carga, vacio, error y exito cuando el cambio afecte UI.
+- Antes de cerrar cambios importantes, ejecutar `npm run lint` y la suite backend disponible.
+- Si no hay suite automatizada, documentar una prueba manual concreta con pasos y resultado.

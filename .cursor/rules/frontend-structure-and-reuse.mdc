@@ -1,0 +1,25 @@
+---
+description: Estructura frontend y reutilizacion de componentes en Next/React
+globs: app/**/*.{ts,tsx},components/**/*.{ts,tsx},hooks/**/*.{ts,tsx},lib/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Estructura Frontend Y Reutilizacion
+
+- Antes de crear un componente nuevo, buscar si ya existe uno reutilizable en `components/` o en la feature afectada.
+- Separar paginas de componentes: `app/` coordina rutas, datos, layout y composicion; `components/` contiene UI reutilizable o por feature.
+- Usar componentes compartidos para UI generica: botones, formularios, cards, modales, tablas, inputs, estados vacios y loaders.
+- Usar componentes de feature cuando la logica sea especifica de un dominio: auth, admin, metrics, memberships o routines.
+- Evitar componentes casi identicos con nombres diferentes; preferir props o composicion cuando sea claro.
+- No mover componentes a `components/ui` si contienen logica de negocio; `components/ui` debe ser generico.
+- Extraer hooks en `hooks/` cuando haya logica cliente reutilizable entre paginas o componentes.
+- Mantener componentes pequenos, tipados y con props explicitas.
+- Si se crea una pagina nueva, revisar componentes relacionados y explicar que se reutilizo o por que se creo algo nuevo.
+
+```text
+app/feature-name/page.tsx
+components/feature-name/feature-card.tsx
+components/feature-name/feature-form.tsx
+hooks/use-feature-name.ts
+lib/feature-name.ts
+```

@@ -1,0 +1,17 @@
+---
+description: Buenas practicas SEO para paginas Next
+globs: app/**/*.{ts,tsx},components/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# SEO Para Next
+
+- Cada pagina publica importante debe tener title y description claros.
+- Usar metadata de Next en layouts o pages cuando corresponda.
+- Mantener `html lang` correcto segun el idioma principal del sitio.
+- Usar headings jerarquicos con un `h1` claro por pagina principal.
+- Usar HTML semantico: `main`, `section`, `nav`, `article`, `header` y `footer`.
+- Agregar `alt` descriptivo en imagenes relevantes.
+- Evitar contenido duplicado entre paginas publicas.
+- Cuidar rendimiento: imagenes optimizadas, JS innecesario minimo y componentes cliente solo cuando hagan falta.
+- Preparar sitemap, robots y Open Graph cuando existan paginas publicas reales.

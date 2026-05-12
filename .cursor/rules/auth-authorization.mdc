@@ -1,0 +1,16 @@
+---
+description: Reglas para permisos, roles y proteccion de recursos
+globs: backend/app/routes/**/*.py,backend/app/services/**/*.py,app/**/*.tsx,components/**/*.tsx
+alwaysApply: false
+---
+
+# Autorizacion Y Roles
+
+- Cada endpoint protegido debe validar autenticacion y permisos de forma explicita.
+- No depender solo del frontend para restringir pantallas o acciones admin.
+- Verificar permisos por recurso: usuario propietario, admin, trainer asignado u otra relacion real.
+- Centralizar o validar los roles contra valores permitidos.
+- No permitir que el cliente elija roles privilegiados durante registro publico.
+- Las rutas protegidas del frontend son UX; la barrera real debe estar en backend.
+- No exponer campos o acciones admin en respuestas destinadas a usuarios sin permisos.
+- Para cambios de permisos, incluir casos positivos y negativos en la validacion.

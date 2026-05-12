@@ -1,0 +1,16 @@
+---
+description: Calidad de codigo Python para backend
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Calidad Python
+
+- Usar type hints en funciones nuevas o modificadas.
+- Preferir nombres claros, funciones pequenas y responsabilidades simples.
+- No usar `except Exception` salvo en limites controlados y con logging seguro.
+- No ocultar errores criticos ni devolver detalles internos al cliente.
+- Mantener validaciones explicitas para datos externos.
+- Evitar mezclar espanol e ingles en nombres nuevos; seguir la convencion dominante del modulo.
+- Mantener imports ordenados y eliminar codigo muerto.
+- Agregar tests para autenticacion, autorizacion, servicios criticos y errores esperados.

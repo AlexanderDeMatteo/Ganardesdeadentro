@@ -1,0 +1,30 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      ENVIRONMENT: development
+      FLASK_ENV: development
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 5000
+      DATABASE_URL: sqlite:////data/fitness_platform.db
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend_data:/data
+
+volumes:
+  backend_data:

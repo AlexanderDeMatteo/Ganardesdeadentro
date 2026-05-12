@@ -1,0 +1,16 @@
+---
+description: Exige validar con pruebas o verificaciones cada tarea implementada
+alwaysApply: true
+---
+
+# Validacion De Tareas
+
+- Toda tarea implementada debe incluir una validacion explicita antes de considerarse terminada.
+- La validacion debe ser proporcional al cambio: lint, typecheck, build, unit tests, integracion, prueba manual o revision del flujo afectado.
+- Para frontend, validar renderizado, estados de carga, errores, permisos, formularios y navegacion afectada.
+- Para backend, validar endpoints, servicios, autenticacion, autorizacion, errores esperados y persistencia.
+- Si se modifica autenticacion, JWT, permisos, roles o datos sensibles, incluir casos positivos y negativos.
+- Si no existen tests automatizados para el area modificada, documentar una prueba manual concreta.
+- No afirmar que algo funciona sin haberlo validado o sin indicar claramente que no se pudo ejecutar.
+- Al finalizar una tarea, reportar que comandos o verificaciones se ejecutaron y su resultado.
+- Si una validacion falla, corregir el problema o explicar el bloqueo antes de cerrar la tarea.

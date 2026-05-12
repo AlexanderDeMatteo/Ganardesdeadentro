@@ -1,0 +1,16 @@
+---
+description: Seguridad, integridad y diseno de datos
+globs: backend/**/*.py,**/*.sql
+alwaysApply: false
+---
+
+# Base De Datos Y Datos Sensibles
+
+- Usar constraints para integridad: unicidad, relaciones, campos requeridos y valores permitidos.
+- No almacenar passwords, tokens o secretos en texto plano.
+- Considerar soft delete para entidades de negocio sensibles cuando aplique.
+- No borrar datos de usuario sin intencion explicita, trazabilidad y estrategia de recuperacion.
+- Agregar indices para consultas frecuentes y relaciones usadas por autorizacion.
+- Evitar migraciones destructivas sin respaldo, plan de rollback o aprobacion explicita.
+- Registrar auditoria para acciones sensibles: login fallido, cambio de password, acciones admin y cambios de membresia.
+- Evitar exponer datos innecesarios en respuestas API; devolver solo los campos requeridos por el flujo.
