@@ -36,7 +36,11 @@ export function MetricsQuickAccess() {
 
         <div className="rounded-lg bg-background/50 p-3 space-y-1">
           <p className="text-xs font-medium text-muted-foreground">Grasa</p>
-          <p className="text-lg font-bold text-foreground">{latest.bodyFat?.toFixed(1)}%</p>
+          <p className="text-lg font-bold text-foreground">
+            {latest.bodyFat != null
+              ? `${latest.bodyFat.toFixed(1)}%${latest.bodyFatSource === 'estimated' ? ' (est.)' : ''}`
+              : '—'}
+          </p>
           {bodyFatChange && (
             <p className={`text-xs font-semibold ${bodyFatChange < 0 ? 'text-green-500' : 'text-red-500'}`}>
               {bodyFatChange < 0 ? '↓' : '↑'} {Math.abs(bodyFatChange).toFixed(1)}%

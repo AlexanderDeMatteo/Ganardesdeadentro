@@ -18,6 +18,58 @@ const gridStroke = '#374151';
 const tooltipBg = '#1a1d1f';
 const tooltipBorder = '#3f4449';
 
+type ChartRow = {
+  label: string;
+  weight?: number;
+  bodyFat?: number;
+  muscleMass?: number;
+  bodyFatSource?: 'manual' | 'estimated';
+};
+
+type TooltipPayloadItem = {
+  dataKey?: string | number;
+  name?: string;
+  value?: string | number | (string | number)[];
+  payload?: ChartRow;
+};
+
+function BodyProgressTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div
+      style={{
+        backgroundColor: tooltipBg,
+        border: `1px solid ${tooltipBorder}`,
+        borderRadius: 8,
+        color: '#fafafa',
+        padding: '8px 12px',
+        fontSize: 12,
+      }}
+    >
+      <p style={{ color: '#9ca3af', marginBottom: 6 }}>{label}</p>
+      {payload.map((p) => {
+        const row = p.payload;
+        const isEstimatedBodyFat = p.dataKey === 'bodyFat' && row?.bodyFatSource === 'estimated';
+        const suffix = isEstimatedBodyFat ? ' (est.)' : '';
+        return (
+          <p key={String(p.dataKey)} style={{ margin: '2px 0' }}>
+            {p.name}: {p.value}
+            {suffix}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export function FitnessDashboardBodyProgressChart() {
   const { entries, isLoading } = useMetrics();
 
@@ -29,6 +81,7 @@ export function FitnessDashboardBodyProgressChart() {
         weight: e.weight,
         bodyFat: e.bodyFat,
         muscleMass: e.muscleMass,
+        bodyFatSource: e.bodyFatSource,
       }))
       .filter((d) => d.weight != null || d.bodyFat != null || d.muscleMass != null);
   }, [entries]);
@@ -70,15 +123,7 @@ export function FitnessDashboardBodyProgressChart() {
             domain={['auto', 'auto']}
             label={{ value: '% grasa', angle: 90, position: 'insideRight', fill: '#9ca3af', fontSize: 10 }}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: tooltipBg,
-              border: `1px solid ${tooltipBorder}`,
-              borderRadius: 8,
-              color: '#fafafa',
-            }}
-            labelStyle={{ color: '#9ca3af' }}
-          />
+          <Tooltip content={<BodyProgressTooltip />} />
           <Legend wrapperStyle={{ fontSize: 12, color: '#d1d5db' }} />
           <Line
             yAxisId="kg"

@@ -61,7 +61,10 @@ export function MetricsSummary({ variant = 'default' }: { variant?: MetricsSumma
   }
 
   const weight = latest.weight ? `${latest.weight.toFixed(1)} kg` : '—';
-  const bodyFat = latest.bodyFat ? `${latest.bodyFat.toFixed(1)}%` : '—';
+  const bodyFat =
+    latest.bodyFat != null
+      ? `${latest.bodyFat.toFixed(1)}%${latest.bodyFatSource === 'estimated' ? ' (est.)' : ''}`
+      : '—';
   const muscleMass = latest.muscleMass ? `${latest.muscleMass.toFixed(1)} kg` : '—';
 
   const weightChange = getProgressChange('weight');

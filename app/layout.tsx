@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Bebas_Neue, Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/app/context/auth-context'
+import { MetricsProvider } from '@/hooks/use-metrics'
 import { CoachMascot } from '@/components/coach/coach-mascot'
 import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
@@ -54,8 +55,10 @@ export default function RootLayout({
       <body className={`${geist.variable} ${geistMono.variable} ${landingDisplay.variable} font-sans antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
-            {children}
-            <CoachMascot />
+            <MetricsProvider>
+              {children}
+              <CoachMascot />
+            </MetricsProvider>
           </AuthProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

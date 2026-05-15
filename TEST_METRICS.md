@@ -50,10 +50,18 @@ pnpm dev
    - Verifica que aparezca tooltip con fecha y valor
    - Observa puntos azules en cada medición
 
+### Fase 3b: Perfil corporal y estimación de % grasa (opcional)
+1. Ve a **Mi perfil** (`/profile`).
+2. En **Datos para estimaciones**, introduce talla (cm), edad (18+) y sexo; pulsa **Guardar datos corporales**.
+3. Ve a **Métricas** (`/metrics`), abre **Agregar Nueva Medición**, indica **Peso** y pulsa **Estimar a partir de mi perfil** (debe habilitarse si el perfil es válido).
+4. Comprueba que el campo de grasa se rellena con un valor acotado (aprox. 5–50 %) y que, al guardar, en resúmenes y tarjetas aparece **(est.)** junto al % cuando la medición fue estimada.
+5. Opcional: edita a mano el % de grasa y guarda; el marcador **(est.)** no debe mostrarse (valor manual).
+6. En la consola del navegador puedes inspeccionar el perfil: `JSON.parse(localStorage.getItem('fittrack_body_profile'))`.
+
 ### Fase 4: Agregar Nueva Medición
 1. Haz clic en **"Agregar Nueva Medición"**
 2. Se expandirá un formulario con campos para:
-   - Peso, Grasa Corporal, Masa Muscular
+   - Peso, Grasa Corporal (opcional; texto de ayuda y botón de estimación), Masa Muscular
    - Bíceps, Pecho, Cintura, Cadera, Muslos, Pantorrillas
    - Notas opcionales
 
@@ -141,6 +149,8 @@ pnpm dev
 
 ### Funcionalidad
 - [ ] Datos mock cargan correctamente
+- [ ] Perfil corporal (`fittrack_body_profile`) se guarda desde `/profile`
+- [ ] Botón "Estimar a partir de mi perfil" rellena grasa cuando hay perfil + peso
 - [ ] Formulario se abre/cierra sin errores
 - [ ] Nuevas mediciones se guardan
 - [ ] Cambios se calculan correctamente
@@ -202,6 +212,10 @@ JSON.parse(localStorage.getItem('fittrack_metrics'))
 
 // Limpiar métricas
 localStorage.removeItem('fittrack_metrics')
+
+// Ver / limpiar perfil corporal (talla, edad, sexo)
+JSON.parse(localStorage.getItem('fittrack_body_profile'))
+localStorage.removeItem('fittrack_body_profile')
 
 // Agregar métrica de prueba manualmente
 localStorage.setItem('fittrack_metrics', JSON.stringify([

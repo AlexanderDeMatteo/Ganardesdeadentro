@@ -1,12 +1,24 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
+
+export type BodyFatSource = 'manual' | 'estimated';
 
 export interface MetricEntry {
   id: string;
   date: string;
   weight?: number;
   bodyFat?: number;
+  /** Present when bodyFat was set explicitly (manual scale/trainer) vs app formula. */
+  bodyFatSource?: BodyFatSource;
   muscleMass?: number;
   biceps?: number;
   chest?: number;
@@ -19,18 +31,32 @@ export interface MetricEntry {
 
 const STORAGE_KEY = 'fittrack_metrics';
 
-export function useMetrics() {
+export type MetricsContextValue = {
+  entries: MetricEntry[];
+  isLoading: boolean;
+  addEntry: (entry: Omit<MetricEntry, 'id'>) => MetricEntry;
+  getLatestEntry: () => MetricEntry | null;
+  getProgressChange: (metric: keyof MetricEntry) => number | null;
+  getChartData: (metric: keyof MetricEntry) => Array<{
+    date: string;
+    value: number | undefined;
+    fullDate: string;
+    bodyFatSource?: BodyFatSource;
+  }>;
+};
+
+const MetricsContext = createContext<MetricsContextValue | null>(null);
+
+function useMetricsStore(): MetricsContextValue {
   const [entries, setEntries] = useState<MetricEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load metrics from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         setEntries(JSON.parse(stored));
       } else {
-        // Initialize with mock data
         const mockData: MetricEntry[] = [
           {
             id: '1',
@@ -100,43 +126,51 @@ export function useMetrics() {
       ...entry,
       id: Date.now().toString(),
     };
-
-    const updated = [...entries, newEntry];
-    setEntries(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setEntries((prev) => {
+      const updated = [...prev, newEntry];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
     return newEntry;
-  }, [entries]);
+  }, []);
 
   const getLatestEntry = useCallback(() => {
     if (entries.length === 0) return null;
     return entries[entries.length - 1];
   }, [entries]);
 
-  const getProgressChange = useCallback((metric: keyof MetricEntry) => {
-    if (entries.length < 2) return null;
+  const getProgressChange = useCallback(
+    (metric: keyof MetricEntry) => {
+      if (entries.length < 2) return null;
 
-    const latest = entries[entries.length - 1];
-    const previous = entries[entries.length - 2];
+      const latest = entries[entries.length - 1];
+      const previous = entries[entries.length - 2];
 
-    const latestValue = latest[metric as keyof MetricEntry];
-    const previousValue = previous[metric as keyof MetricEntry];
+      const latestValue = latest[metric as keyof MetricEntry];
+      const previousValue = previous[metric as keyof MetricEntry];
 
-    if (typeof latestValue !== 'number' || typeof previousValue !== 'number') {
-      return null;
-    }
+      if (typeof latestValue !== 'number' || typeof previousValue !== 'number') {
+        return null;
+      }
 
-    return latestValue - previousValue;
-  }, [entries]);
+      return latestValue - previousValue;
+    },
+    [entries],
+  );
 
-  const getChartData = useCallback((metric: keyof MetricEntry) => {
-    return entries
-      .filter((entry) => entry[metric] !== undefined)
-      .map((entry) => ({
-        date: new Date(entry.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
-        value: entry[metric],
-        fullDate: entry.date,
-      }));
-  }, [entries]);
+  const getChartData = useCallback(
+    (metric: keyof MetricEntry) => {
+      return entries
+        .filter((entry) => entry[metric] !== undefined)
+        .map((entry) => ({
+          date: new Date(entry.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
+          value: entry[metric] as number | undefined,
+          fullDate: entry.date,
+          ...(metric === 'bodyFat' ? { bodyFatSource: entry.bodyFatSource } : {}),
+        }));
+    },
+    [entries],
+  );
 
   return {
     entries,
@@ -146,4 +180,18 @@ export function useMetrics() {
     getProgressChange,
     getChartData,
   };
+}
+
+/** Fuente única de métricas (localStorage) para toda la app. Debe envolver el árbol donde se use `useMetrics`. */
+export function MetricsProvider({ children }: { children: ReactNode }) {
+  const value = useMetricsStore();
+  return createElement(MetricsContext.Provider, { value }, children);
+}
+
+export function useMetrics(): MetricsContextValue {
+  const ctx = useContext(MetricsContext);
+  if (!ctx) {
+    throw new Error('useMetrics debe usarse dentro de MetricsProvider');
+  }
+  return ctx;
 }
