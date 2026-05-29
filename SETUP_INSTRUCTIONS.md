@@ -138,6 +138,22 @@ Para mejorar la aplicación:
 - Prueba diferentes resoluciones para ver el responsive design
 - Los componentes de UI están en `/components/ui`
 
+## 🧪 Tests backend (pytest)
+
+Desde `backend/` con Python 3.12+:
+
+```powershell
+pip install -r requirements.txt
+$env:ENVIRONMENT='testing'
+python -m pytest tests/ -v
+```
+
+Con Docker (si el daemon está activo):
+
+```powershell
+docker compose -p fittrack run --rm -e ENVIRONMENT=testing backend python -m pytest tests/ -v
+```
+
 ## ✨ Disfruta la aplicación!
 
 Esta es una plataforma moderna y hermosa construida con Next.js 16, Tailwind CSS v4 y shadcn/ui. Perfecta para comenzar a transformar vidas a través del fitness. 💪

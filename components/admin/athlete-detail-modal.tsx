@@ -2,14 +2,21 @@
 
 import { AthleteProfile } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
-import { X, Mail, Cake, Ruler, Weight, Calendar } from 'lucide-react';
+import { X, Mail, Cake, Ruler, Weight, Calendar, UtensilsCrossed } from 'lucide-react';
+import Link from 'next/link';
 
 interface AthleteDetailModalProps {
   athlete: AthleteProfile | null;
   onClose: () => void;
+  /** Base path for nutrition editor, e.g. /admin/athletes or /trainer/athletes */
+  nutritionBasePath?: string;
 }
 
-export function AthleteDetailModal({ athlete, onClose }: AthleteDetailModalProps) {
+export function AthleteDetailModal({
+  athlete,
+  onClose,
+  nutritionBasePath = '/admin/athletes',
+}: AthleteDetailModalProps) {
   if (!athlete) return null;
 
   return (
@@ -118,7 +125,13 @@ export function AthleteDetailModal({ athlete, onClose }: AthleteDetailModalProps
           </div>
         </div>
 
-        <div className="border-t border-secondary/20 px-8 py-4 flex justify-end">
+        <div className="border-t border-secondary/20 px-8 py-4 flex flex-wrap justify-end gap-2">
+          <Button asChild variant="outline">
+            <Link href={`${nutritionBasePath}/${athlete.id}/nutrition`} onClick={onClose}>
+              <UtensilsCrossed className="mr-2 size-4" aria-hidden />
+              Nutrición
+            </Link>
+          </Button>
           <Button onClick={onClose} className="bg-gradient-to-r from-primary to-secondary">
             Cerrar
           </Button>

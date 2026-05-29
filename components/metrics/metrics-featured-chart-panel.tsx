@@ -15,6 +15,9 @@ const FEATURED_METRICS = [
   { id: 'waist', title: 'Cintura', metric: 'waist' as const, unit: 'cm', color: 'var(--secondary)' },
   { id: 'chest', title: 'Pecho', metric: 'chest' as const, unit: 'cm', color: 'var(--primary)' },
   { id: 'hips', title: 'Cadera', metric: 'hips' as const, unit: 'cm', color: 'var(--chart-4)' },
+  { id: 'bicepsAvg', title: 'Bíceps (prom.)', metric: 'bicepsAvg' as const, unit: 'cm', color: 'var(--chart-2)' },
+  { id: 'thighAvg', title: 'Muslos (prom.)', metric: 'thighAvg' as const, unit: 'cm', color: 'var(--chart-5)' },
+  { id: 'calfAvg', title: 'Pantorrillas (prom.)', metric: 'calfAvg' as const, unit: 'cm', color: 'var(--chart-1)' },
 ] as const;
 
 export type MetricsFeaturedMetricId = (typeof FEATURED_METRICS)[number]['id'];

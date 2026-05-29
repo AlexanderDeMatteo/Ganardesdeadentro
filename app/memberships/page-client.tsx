@@ -4,15 +4,20 @@ import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Navbar } from '@/components/layout/navbar';
 import { useMemberships } from '@/hooks/use-memberships';
 import { useAuth } from '@/app/context/auth-context';
+import { membershipNameToPlanId } from '@/lib/data/client';
 import { Button } from '@/components/ui/button';
 import { CreditCard, CheckCircle2, ArrowRight } from 'lucide-react';
 
 function MembershipsContent() {
-  const { plans } = useMemberships();
+  const { plans, isLoading } = useMemberships();
   const { user } = useAuth();
 
+  const currentPlanId = user?.membership
+    ? membershipNameToPlanId(user.membership.name)
+    : undefined;
+
   const handleSelectPlan = (planId: string) => {
-    const plan = plans.find(p => p.id === planId);
+    const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
 
     const endDate = new Date();
@@ -41,7 +46,16 @@ function MembershipsContent() {
     amber: 'from-accent to-primary',
   };
 
-  const currentPlanId = user?.membership?.id;
+  if (isLoading) {
+    return (
+      <>
+        <Navbar />
+        <main className="brand-shell min-h-screen px-4 py-12">
+          <p className="text-center text-muted-foreground">Cargando planes…</p>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
@@ -56,19 +70,22 @@ function MembershipsContent() {
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Selecciona el plan que mejor se adapte a tus objetivos de fitness
             </p>
+            {user?.membership && (
+              <p className="text-sm text-primary font-medium">
+                Plan actual: {user.membership.name} · {user.membership.daysRemaining} días restantes
+              </p>
+            )}
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {plans.map((plan, idx) => {
+            {plans.map((plan) => {
               const isCurrentPlan = currentPlanId === plan.id;
 
               return (
                 <div
                   key={plan.id}
                   className={`brand-card brand-card-hover relative rounded-2xl p-8 ${
-                    isCurrentPlan
-                      ? 'border-primary shadow-lg'
-                      : ''
+                    isCurrentPlan ? 'border-primary shadow-lg' : ''
                   }`}
                 >
                   {isCurrentPlan && (
@@ -103,9 +120,7 @@ function MembershipsContent() {
                   <Button
                     onClick={() => handleSelectPlan(plan.id)}
                     className={`w-full h-12 text-base font-semibold transition-all duration-200 ${
-                      isCurrentPlan
-                        ? 'cursor-not-allowed'
-                        : ''
+                      isCurrentPlan ? 'cursor-not-allowed' : ''
                     }`}
                     disabled={isCurrentPlan}
                   >
@@ -121,23 +136,6 @@ function MembershipsContent() {
                 </div>
               );
             })}
-          </div>
-
-          <div className="brand-card mx-auto mt-20 max-w-4xl rounded-2xl p-12">
-            <h2 className="text-2xl font-black uppercase tracking-tight text-foreground mb-4">¿Cambiar de plan?</h2>
-            <p className="text-muted-foreground mb-6">
-              Puedes cambiar tu plan en cualquier momento. El nuevo plan comenzará inmediatamente y el cambio se reflejará en tu dashboard.
-            </p>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <h3 className="font-black uppercase tracking-tight text-foreground">Planes Mensuales</h3>
-                <p className="text-sm text-muted-foreground">Todos nuestros planes se renuevan cada 30 días</p>
-              </div>
-              <div className="space-y-2">
-                <h3 className="font-black uppercase tracking-tight text-foreground">Sin Compromiso</h3>
-                <p className="text-sm text-muted-foreground">Cancela cuando quieras directamente desde tu perfil</p>
-              </div>
-            </div>
           </div>
         </div>
       </main>

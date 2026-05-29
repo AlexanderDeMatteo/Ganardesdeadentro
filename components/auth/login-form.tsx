@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/auth-context';
+import { getHomeRouteForRole } from '@/lib/auth/role-routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
@@ -19,8 +20,8 @@ export function LoginForm() {
     clearError();
 
     try {
-      await login(email, password);
-      router.push('/dashboard');
+      const loggedInUser = await login(email, password);
+      router.push(getHomeRouteForRole(loggedInUser.role));
     } catch (err) {
       console.error('Login error:', err);
     }
@@ -34,7 +35,7 @@ export function LoginForm() {
             <span className="text-2xl font-black text-primary-foreground">FT</span>
           </div>
           <p className="brand-kicker">Entrada a la arena</p>
-          <h1 className="brand-title text-5xl font-black brand-text-gradient">Login</h1>
+          <h1 className="brand-title text-5xl font-black brand-text-gradient">Iniciar sesión</h1>
           <p className="text-base text-muted-foreground">
             Transforma tu entrenamiento con planes personalizados
           </p>
@@ -42,7 +43,11 @@ export function LoginForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4">
+            <div
+              className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
+              role="alert"
+              aria-live="assertive"
+            >
               <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <p className="text-sm font-medium text-destructive">{error}</p>
             </div>
@@ -113,16 +118,20 @@ export function LoginForm() {
           </Button>
         </Link>
 
-        <div className="rounded-xl border border-secondary/20 bg-secondary/10 p-4 backdrop-blur-sm">
-          <p className="text-xs font-semibold text-foreground mb-3">Demo - Credenciales de prueba:</p>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Email:</span>
-              <code className="text-xs font-mono bg-background/50 px-2 py-1 rounded text-primary">test@example.com</code>
+        <div className="rounded-xl border border-secondary/20 bg-secondary/10 p-4 backdrop-blur-sm space-y-3">
+          <p className="text-xs font-semibold text-foreground">Demo — contraseña: password123</p>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Atleta</span>
+              <code className="font-mono text-primary">test@example.com</code>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Contraseña:</span>
-              <code className="text-xs font-mono bg-background/50 px-2 py-1 rounded text-primary">password123</code>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Admin</span>
+              <code className="font-mono text-primary">admin@example.com</code>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Entrenador</span>
+              <code className="font-mono text-primary">trainer@example.com</code>
             </div>
           </div>
         </div>

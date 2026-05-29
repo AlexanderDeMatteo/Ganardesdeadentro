@@ -7,7 +7,9 @@ Documento de referencia para trabajo en frontend, backend, Docker y pruebas. **N
 ## 1. Resumen ejecutivo
 
 - **Frontend:** Next.js 16 (App Router), React 19, Tailwind v4, componentes en `components/ui` (shadcn/Radix). Gran parte del flujo actual es **demo/mock** (usuarios en memoria, `localStorage` para sesión y datos auxiliares).
-- **Backend:** Flask, SQLAlchemy, JWT (`Flask-JWT-Extended`), CORS. **Implementados de forma real:** autenticación (`/api/auth/*`) y ejercicios (`/api/exercises/*`) con caché SQLite e integración ExerciseDB (RapidAPI). **En desarrollo / placeholder:** `users`, `routines`, `memberships`, `metrics` devuelven mensajes genéricos.
+- **Backend:** Flask, SQLAlchemy, JWT (`Flask-JWT-Extended`), CORS, Alembic. **Implementados:** autenticación (`/api/auth/*`), ejercicios (`/api/exercises/*`), usuarios (`/api/users/*`), rutinas (`/api/routines/*`), métricas (`/api/metrics/*`), membresías (`/api/memberships/*`), sesiones (`/api/sessions/*`), nutrición (`/api/nutrition/*`), admin overview (`/api/admin/overview`). Contratos en `docs/API_CONTRACTS.md`.
+- **IA / Coach "Titan":** asistente conversacional servido por **Ollama** (modelo `granite4.1:3b`) mediante rutas Next en `app/api/coach/*` y `app/api/nutrition/titan`. Genera motivación contextual, reseña de sesión de entrenamiento y estimación de calorías/macros. Requiere `ollama serve` local (`OLLAMA_BASE_URL`, default `http://localhost:11434`); incluye *fallbacks* si el modelo no está disponible. Acceso al asistente nutricional gateado a membresías Premium/Pro.
+- **Nutrición:** módulo en `app/nutrition`, `components/nutrition/*`, `hooks/use-nutrition.ts` y `lib/nutrition/*`. Calcula metabolismo (Mifflin-St Jeor: BMR/TDEE), define macros objetivo, gestiona plan de comidas asignado por el entrenador, diario de alimentos, hidratación y adherencia. Persistencia local (`localStorage`).
 - **Datos:** SQLite por defecto; en Docker la URI apunta a un volumen (`/data/fitness_platform.db`).
 - **Objetivo de este documento:** evitar redescubrir la arquitectura en cada tarea y alinear cambios con las reglas en `.cursor/rules/`.
 
@@ -27,14 +29,16 @@ flowchart LR
   end
   subgraph external [External]
     ExerciseDB[ExerciseDB_RapidAPI]
+    Ollama[Ollama_local_granite4.1_3b]
   end
   NextApp --> FE
   FE -->|HTTP_optional_future| BE
+  FE -->|route_handlers_coach_Titan| Ollama
   BE --> Vol
   BE --> ExerciseDB
 ```
 
-Hoy el navegador habla principalmente con Next; el backend está disponible en `localhost:5000` pero **el frontend no consume de forma sistemática la API Flask** (auth y muchas pantallas siguen en modo mock).
+Hoy el navegador habla principalmente con Next; el backend está disponible en `localhost:5000` pero **el frontend no consume de forma sistemática la API Flask** (auth y muchas pantallas siguen en modo mock). Las rutas API de Next (`/api/coach/*`, `/api/nutrition/titan`) hablan directamente con **Ollama** para el coach Titan.
 
 ---
 
@@ -45,8 +49,10 @@ Hoy el navegador habla principalmente con Next; el backend está disponible en `
 | Área | Ruta(s) | Notas |
 |------|---------|--------|
 | Público | `/`, `/login`, `/register` | Login/register contra usuarios mock en `AuthProvider` |
-| Usuario | `/dashboard`, `/routines`, `/metrics`, `/memberships`, `/profile` | Protegidas por `ProtectedRoute` (solo cliente). El dashboard de usuario es la vista FITTRACK en [`components/dashboard/fitness-dashboard-view.tsx`](components/dashboard/fitness-dashboard-view.tsx); `/dashboard-2` y `/dashboard-3` redirigen a `/dashboard`. |
-| Admin | `/admin`, `/admin/*` | Rol `admin` verificado en cliente |
+| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile` | Protegidas por `ProtectedRoute` (solo cliente). El dashboard de usuario es la vista FITTRACK en [`components/dashboard/fitness-dashboard-view.tsx`](components/dashboard/fitness-dashboard-view.tsx); `/dashboard-2` y `/dashboard-3` redirigen a `/dashboard`. |
+| Trainer | `/trainer`, `/trainer/*` | Rol `trainer` (cliente). Gestiona atletas, rutinas, asignaciones, progreso y nutrición asignada (`/trainer/athletes/[athleteId]/nutrition`) |
+| Admin | `/admin`, `/admin/*` | Rol `admin` verificado en cliente. Incluye atletas, entrenadores, rutinas, membresías, asignaciones y nutrición por atleta |
+| API Next (IA) | `/api/coach/titan`, `/api/coach/session-review`, `/api/nutrition/titan` | Route handlers que hablan con Ollama (coach Titan). No dependen de Flask |
 
 ### Backend (prefijo `/api`)
 
@@ -54,7 +60,7 @@ Hoy el navegador habla principalmente con Next; el backend está disponible en `
 |-----------|---------|--------|
 | `auth_bp` | `/api/auth` | Implementado (register, login, JWT, etc.) |
 | `exercises_bp` | `/api/exercises` | Implementado (cache + API externa) |
-| `users_bp`, `routines_bp`, `memberships_bp`, `metrics_bp` | `/api/users`, `/api/routines`, … | Placeholder: respuestas tipo “En desarrollo” |
+| `users_bp`, `routines_bp`, `memberships_bp`, `metrics_bp`, `sessions_bp`, `nutrition_bp`, `admin_bp` | `/api/users`, `/api/routines`, … | Implementados (servicios + autorización JWT) |
 
 Health: `GET /api/health` → `{ "status": "ok" }`.
 
@@ -69,6 +75,11 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 | Admin / datos demo | `hooks/use-admin.ts` |
 | Métricas demo | `hooks/use-metrics.ts` |
 | Membresías demo | `hooks/use-memberships.ts` |
+| Coach IA (estado/orquestación) | `app/context/coach-context.tsx`, `components/coach/coach-mascot.tsx` |
+| Cliente y prompts Ollama | `lib/ollama/client.ts`, `lib/ollama/prompts.ts`, `lib/ollama/types.ts` |
+| Rutas API Titan (Next) | `app/api/coach/titan/route.ts`, `app/api/coach/session-review/route.ts`, `app/api/nutrition/titan/route.ts` |
+| Nutrición (estado/lógica) | `hooks/use-nutrition.ts`, `lib/nutrition/*` (`metabolism.ts`, `types.ts`, `storage.ts`) |
+| Nutrición (UI) | `app/nutrition/*`, `components/nutrition/*` |
 | Factory Flask, CORS, JWT | `backend/app/__init__.py` |
 | Config y env | `backend/app/config.py`, `backend/.env.example` |
 | Modelos ORM | `backend/app/models.py` |
@@ -90,7 +101,9 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 | Protección admin | Solo en cliente | — | Backend debe ser fuente de verdad para roles |
 | API Flask auth + JWT | Sí | — | Registro acepta `role` desde JSON público (revisar reglas de autorización) |
 | API ejercicios | Sí | — | Requiere clave RapidAPI en env |
-| Users / routines / memberships / metrics API | Placeholders | — | Modelos en BD pueden existir; endpoints no son productivos |
+| Users / routines / memberships / metrics / sessions / nutrition API | Implementados | — | Frontend aún usa adaptador `local` por defecto; activar `DATA_SOURCE=api` cuando se conecte |
+| Coach IA "Titan" (rutas Next + Ollama) | Sí | — | Depende de `ollama serve` local y modelo `granite4.1:3b`; sin Ollama usa *fallbacks*. No hay autenticación de servidor en estas rutas |
+| Nutrición (metabolismo, macros, plan, diario) | UI + lógica cliente | Persistencia en `localStorage` | Plan asignado por entrenador (no IA); diario orientativo, no sustituye asesoría profesional |
 | Typecheck en build | `ignoreBuildErrors: true` en Next | — | Deuda técnica; no ocultar en cambios grandes |
 | `.env` en repo | `.gitignore` ignora `.env*.local` | — | `backend/.env` **no** está en el patrón ignorado; conviene no versionar secretos reales |
 
@@ -151,12 +164,43 @@ Las reglas completas están en `.cursor/rules/*.mdc`. Aquí solo se cruza **esta
 1. ¿El cambio toca auth, roles o datos sensibles? → Casos positivo/negativo y revisión de reglas de seguridad.
 2. ¿Nueva variable de entorno? → Documentar en `backend/.env.example` (sin valores secretos).
 3. ¿Nuevo endpoint? → Validación de entrada, respuesta de error consistente, permisos en servidor.
-4. ¿Cambios en frontend (TS/React)? → `pnpm run lint` (o `npm run lint` si instalaste con npm) y prueba manual del flujo afectado. Config: [eslint.config.mjs](../eslint.config.mjs) (ESLint 9 + `eslint-config-next`; reglas experimentales de React Compiler en hooks desactivadas por incompatibilidad con patrones actuales del repo).
+4. ¿Cambios en frontend (TS/React)? → `npm run lint`, `npm run typecheck`, `npm run build` y prueba manual del flujo afectado. Config: [eslint.config.mjs](../eslint.config.mjs) (ESLint 9 + `eslint-config-next`; reglas experimentales de React Compiler en hooks desactivadas por incompatibilidad con patrones actuales del repo).
 5. ¿Docker? → `docker compose -p fittrack config` y arranque local si aplica.
 
 ---
 
-## 10. Mantenimiento de este documento
+## 10. Pendientes (retomar al arrancar backend)
+
+> Items conocidos que **no** se abordan todavía y deben revisarse cuando se inicie el trabajo de backend, junto con el endurecimiento general de seguridad.
+
+- **[Seguridad] Autenticación/autorización en rutas IA de Next.** Las rutas `app/api/coach/titan`, `app/api/coach/session-review` y `app/api/nutrition/titan` hoy **no validan sesión ni rol en el servidor**. Al arrancar el backend, definir cómo se protegen (JWT/sesión), aplicar gating real (p. ej. asistente nutricional solo Premium/Pro, hoy validado solo en cliente vía `hasTitanNutritionAccess`), rate limiting y validación de entrada. Relacionado con `auth-authorization.mdc` y `python-backend-security.mdc`.
+- **[Seguridad] Endurecimiento auth general.** Con `NEXT_PUBLIC_AUTH_SOURCE=api` el frontend usa JWT real vía `lib/auth/auth-client.remote.ts`; en modo `local` (default) persiste sesión mock en `localStorage` a través de `lib/auth/session-store.ts`. Protección de rutas sensibles sigue siendo principalmente en cliente hasta implementar blueprints Flask.
+
+---
+
+## 11. Integración frontend ↔ backend (Fase 5)
+
+Preparación sin activar backend por defecto. Contratos: [API_CONTRACTS.md](./API_CONTRACTS.md).
+
+| Capa | Archivo | Comportamiento |
+|------|---------|----------------|
+| Auth | `lib/auth/auth-client.ts` | Factory `local` (mock) \| `api` (Flask `/api/auth/*`) |
+| Sesión | `lib/auth/session-store.ts` | Punto único para token/usuario; preparado para httpOnly |
+| Datos | `lib/data/client.ts` | Facade → `client.local.ts` \| `client.remote.ts` (stub) |
+| HTTP | `lib/api/http-client.ts` | `fetch` + Bearer desde session-store |
+
+Variables en `.env.local.example`:
+
+- `NEXT_PUBLIC_API_BASE_URL` — base Flask (default `http://localhost:5000`)
+- `NEXT_PUBLIC_AUTH_SOURCE` — `local` \| `api` (default `local`)
+- `NEXT_PUBLIC_DATA_SOURCE` — `local` \| `api` (default `local`)
+
+Validación local: `npm run lint` → `npm run typecheck` → `npm run build`. Prueba manual en modo `local`; con backend levantado, probar login con `AUTH_SOURCE=api` (`test@example.com` en BD).
+
+**Backend (Flask):** blueprints implementados en `backend/app/routes/` con servicios en `backend/app/services/`. Migraciones: `docs/MIGRATIONS.md`. Setup: `backend/README.md`. Tests: `cd backend && python -m pytest` (Python 3.11–3.14; SQLAlchemy ≥ 2.0.49 para 3.14).
+
+
+## 12. Mantenimiento de este documento
 
 Actualiza este archivo cuando:
 
@@ -165,4 +209,4 @@ Actualiza este archivo cuando:
 - cambien puertos, variables de entorno o flujo de despliegue,
 - se introduzcan tests automatizados o se deprecie el modo mock.
 
-Última orientación: tratar **“mock en cliente”** y **“API real en Flask”** como dos capas paralelas hasta que exista un plan de integración explícito y contratos API estables.
+Última orientación: el frontend expone adaptadores (`local` \| `api`) documentados en [API_CONTRACTS.md](./API_CONTRACTS.md). El modo **local** sigue siendo el default para demo; activar `api` cuando los blueprints Flask estén listos.

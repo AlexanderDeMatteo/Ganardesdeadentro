@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useMemo } from 'react';
 import { useAuth } from '@/app/context/auth-context';
 import { FitnessDashboardBodyProgressChart } from '@/components/dashboard/fitness-dashboard-body-progress-chart';
 import { FitnessDashboardWeekConsistency } from '@/components/dashboard/fitness-dashboard-week-consistency';
+import { MyTrainerCard } from '@/components/dashboard/my-trainer-card';
 import { ExpirationAlert } from '@/components/membership/expiration-alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,8 +15,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAthleteData } from '@/hooks/use-athlete-data';
+import { useMetrics } from '@/hooks/use-metrics';
+import { useNutrition } from '@/hooks/use-nutrition';
 import { cn } from '@/lib/utils';
 import type { LucideIcon } from 'lucide-react';
+import { NutritionDashboardCta } from '@/components/nutrition/nutrition-dashboard-cta';
 import {
   Award,
   BarChart3,
@@ -28,48 +34,8 @@ import {
   User,
   Zap,
   Target,
+  Loader2,
 } from 'lucide-react';
-
-const mockRoutines = [
-  { id: 1, title: 'DÍA DE PIERNAS', desc: '6 EJERCICIOS • 60 MIN', level: 'INTERMEDIO', icon: Target },
-  { id: 2, title: 'PECHO Y TRÍCEPS', desc: '5 EJERCICIOS • 45 MIN', level: 'INTERMEDIO', icon: Zap },
-  { id: 3, title: 'ESPALDA Y BÍCEPS', desc: '5 EJERCICIOS • 50 MIN', level: 'INTERMEDIO', icon: Dumbbell },
-] as const;
-
-const mockStats = [
-  {
-    title: 'ENTRENAMIENTOS',
-    value: '4',
-    trend: '+12% vs. la semana pasada',
-    spark: [2, 3, 2, 4, 3, 5, 4],
-    icon: Calendar,
-    highlight: false,
-  },
-  {
-    title: 'CALORÍAS QUEMADAS',
-    value: '1,240',
-    trend: '+5% vs. la semana pasada',
-    spark: [900, 920, 880, 1100, 1050, 1180, 1240],
-    icon: Flame,
-    highlight: false,
-  },
-  {
-    title: 'RACHA',
-    value: '15 DÍAS',
-    trend: 'Igual que el mes pasado',
-    spark: [5, 7, 8, 10, 12, 14, 15],
-    icon: Award,
-    highlight: false,
-  },
-  {
-    title: 'PROGRESO',
-    value: '+8.5%',
-    trend: '+2.1 pts vs. la semana pasada',
-    spark: [4, 4.5, 5, 6, 7, 8, 8.5],
-    icon: TrendingUp,
-    highlight: true,
-  },
-] as const;
 
 function StatSparkline({ values, highlight }: { values: readonly number[]; highlight?: boolean }) {
   const w = 72;
@@ -157,17 +123,98 @@ function RoutineCard({
   );
 }
 
-const PREMIUM_FEATURES = [
-  'Rutinas ilimitadas y seguimiento avanzado',
+const PREMIUM_FEATURES_FALLBACK = [
+  'Rutinas personalizadas y seguimiento avanzado',
   'Métricas corporales y gráficos de progreso',
-  'Recordatorios y prioridad en novedades',
+  'Plan nutricional y coach Titan (según plan)',
 ] as const;
 
 export function FitnessDashboardView() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const {
+    activeRoutine,
+    weekCompletedCount,
+    weeklyPlan,
+    weekSessionLogs,
+    weekStartDate,
+    latestSession,
+    latestMetric,
+    mealPlan,
+    isLoading: athleteLoading,
+  } = useAthleteData();
+  const { getProgressChange, isLoading: metricsLoading } = useMetrics();
+  const { getWeeklyAdherence, isLoading: nutritionLoading } = useNutrition();
+
   const displayName = user?.first_name ?? 'Atleta';
+  const isDataLoading = athleteLoading || metricsLoading || nutritionLoading;
+
+  const weeklyAdherence = getWeeklyAdherence();
+  const adherencePct = weeklyAdherence.adherencePercent;
+
+  const weightChange = getProgressChange('weight');
+  const bodyFatChange = getProgressChange('bodyFat');
+
+  const weekSpark = useMemo(() => {
+    const counts = [0, 0, 0, 0, 0, 0, 0];
+    for (const log of weekSessionLogs) {
+      if (log.sessionOutcome === 'completed' || log.completed) {
+        const d = new Date(log.scheduledDate + 'T12:00:00');
+        const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
+        counts[idx] += 1;
+      }
+    }
+    return counts;
+  }, [weekSessionLogs]);
+
+  const latestSessionBestWeight = useMemo(() => {
+    if (!latestSession?.setLogs?.length) return null;
+    const weights = latestSession.setLogs
+      .map((l) => l.weightKg)
+      .filter((w): w is number => w != null && w > 0);
+    return weights.length > 0 ? Math.max(...weights) : null;
+  }, [latestSession]);
+
+  const stats = [
+    {
+      title: 'ENTRENAMIENTOS',
+      value: isDataLoading ? '—' : String(weekCompletedCount),
+      trend: activeRoutine
+        ? `${weekCompletedCount} esta semana · ${activeRoutine.name}`
+        : 'Sin rutina asignada',
+      spark: weekSpark.length ? weekSpark : [0, 0, 0, 0, 0, 0, 0],
+      icon: Calendar,
+      highlight: false,
+    },
+    {
+      title: 'NUTRICIÓN',
+      value: adherencePct > 0 ? `${adherencePct}%` : '—',
+      trend: mealPlan ? 'Plan asignado activo' : 'Sin plan nutricional',
+      spark: weeklyAdherence.days.map((d) => (d.withinTarget ? 1 : 0)),
+      icon: Flame,
+      highlight: false,
+    },
+    {
+      title: 'ÚLTIMA MÉTRICA',
+      value: latestMetric?.weight != null ? `${latestMetric.weight} kg` : '—',
+      trend: latestMetric?.bodyFat != null ? `${latestMetric.bodyFat}% grasa` : 'Registra tu primera medición',
+      spark: [latestMetric?.weight ?? 0],
+      icon: Award,
+      highlight: false,
+    },
+    {
+      title: 'PROGRESO',
+      value: weightChange != null ? `${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)} kg` : '—',
+      trend:
+        bodyFatChange != null
+          ? `Grasa: ${bodyFatChange > 0 ? '+' : ''}${bodyFatChange.toFixed(1)} pts`
+          : 'Compara en Métricas',
+      spark: [4, 4.5, 5, 6, 7, 8, 8.5],
+      icon: TrendingUp,
+      highlight: true,
+    },
+  ] as const;
 
   const handleLogout = () => {
     logout();
@@ -179,6 +226,8 @@ export function FitnessDashboardView() {
 
   const planName = isAdmin ? 'ADMIN' : (membership?.name ?? 'PREMIUM');
   const planDays = isAdmin ? null : membership ? membership.daysRemaining : 60;
+  const planFeatures =
+    membership?.features?.length ? membership.features : [...PREMIUM_FEATURES_FALLBACK];
 
   const planBarPct = (() => {
     if (isAdmin) return 100;
@@ -219,6 +268,12 @@ export function FitnessDashboardView() {
               <Link href="/routines" className={navLinkClass('/routines')}>
                 Rutinas
               </Link>
+              <Link href="/metrics" className={navLinkClass('/metrics')}>
+                Métricas
+              </Link>
+              <Link href="/nutrition" className={navLinkClass('/nutrition')}>
+                Nutrición
+              </Link>
               <Link href="/memberships" className={navLinkClass('/memberships')}>
                 Membresías
               </Link>
@@ -252,6 +307,16 @@ export function FitnessDashboardView() {
                 <DropdownMenuItem asChild className="cursor-pointer gap-2 md:hidden">
                   <Link href="/routines" className="flex">
                     Rutinas
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer gap-2 md:hidden">
+                  <Link href="/metrics" className="flex">
+                    Métricas
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer gap-2 md:hidden">
+                  <Link href="/nutrition" className="flex">
+                    Nutrición
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer gap-2 md:hidden">
@@ -312,9 +377,16 @@ export function FitnessDashboardView() {
       </header>
 
       <div className="mb-8 grid grid-cols-1 gap-6 sm:mb-10 md:grid-cols-2 lg:grid-cols-4">
-        {mockStats.map((s) => (
-          <StatCard key={s.title} {...s} icon={s.icon} />
-        ))}
+        {isDataLoading ? (
+          <div className="col-span-full flex items-center justify-center py-8 text-[#9ca3af]">
+            <Loader2 className="mr-2 size-5 animate-spin" aria-hidden />
+            Cargando KPIs…
+          </div>
+        ) : (
+          stats.map((s) => (
+            <StatCard key={s.title} {...s} icon={s.icon} />
+          ))
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -337,9 +409,23 @@ export function FitnessDashboardView() {
               </Link>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {mockRoutines.map((r) => (
-                <RoutineCard key={r.id} {...r} icon={r.icon} />
-              ))}
+              {activeRoutine ? (
+                <RoutineCard
+                  title={activeRoutine.name.toUpperCase()}
+                  desc={`${activeRoutine.exercises.length} EJERCICIOS • ${activeRoutine.duration} MIN`}
+                  level={activeRoutine.difficulty.toUpperCase()}
+                  icon={Target}
+                />
+              ) : (
+                <div className="col-span-full rounded-xl border border-dashed border-[#3f4449]/50 bg-[#23272A] p-6 text-center">
+                  <p className="text-sm text-[#9ca3af]">
+                    Tu entrenador aún no te asignó una rutina.
+                  </p>
+                  <Link href="/routines" className="mt-2 inline-block text-sm text-cyan-400 hover:underline">
+                    Ver rutinas
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 
@@ -354,16 +440,7 @@ export function FitnessDashboardView() {
               <h3 className="text-sm font-bold uppercase text-white">Métricas</h3>
               <p className="mt-1 text-xs text-[#9ca3af]">Registrar peso, grasa y medidas.</p>
             </Link>
-            <Link
-              href="/metrics"
-              className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-4 transition-colors hover:border-lime-400/40"
-            >
-              <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-lime-400/15 text-lime-400">
-                <TrendingUp className="size-5" aria-hidden />
-              </div>
-              <h3 className="text-sm font-bold uppercase text-white">Métricas</h3>
-              <p className="mt-1 text-xs text-[#9ca3af]">Ver evolución y gráficos detallados.</p>
-            </Link>
+            <NutritionDashboardCta />
             <Link
               href="/profile"
               className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-4 transition-colors hover:border-[#5c636a]"
@@ -395,7 +472,7 @@ export function FitnessDashboardView() {
             <h3 className="mb-1 text-xs uppercase tracking-widest text-[#9ca3af]">Plan actual</h3>
             <h2 className="mb-4 text-3xl font-bold text-white">{planName}</h2>
             <ul className="mb-6 space-y-2">
-              {PREMIUM_FEATURES.map((line) => (
+              {planFeatures.map((line) => (
                 <li key={line} className="flex gap-2 text-xs text-[#d1d5db]">
                   <Check className="mt-0.5 size-3.5 shrink-0 text-lime-400" aria-hidden />
                   <span>{line}</span>
@@ -439,24 +516,60 @@ export function FitnessDashboardView() {
             </div>
           </div>
 
-          <FitnessDashboardWeekConsistency />
+          <FitnessDashboardWeekConsistency
+            weeklyPlan={weeklyPlan}
+            weekSessionLogs={weekSessionLogs}
+            weekStartDate={weekStartDate}
+          />
+
+          <MyTrainerCard />
 
           <div className="dashboard-v3-panel relative rounded-2xl border border-lime-400/50 p-6">
             <div className="absolute right-0 top-0 rounded-bl-lg bg-amber-500 px-2 py-1 text-xs font-bold text-black">
-              URGENTE
+              {activeRoutine ? 'ACTIVO' : 'PENDIENTE'}
             </div>
             <h2 className="mb-1 text-xl font-bold uppercase text-white">Próximo entrenamiento</h2>
-            <p className="mb-4 text-xs text-lime-400">DENTRO DE 2 HORAS</p>
-            <div className="mb-4 rounded-lg bg-black/30 p-4">
-              <h3 className="font-bold text-white">PECHO Y TRÍCEPS</h3>
-              <p className="text-sm text-[#9ca3af]">5 EJERCICIOS • 45 MIN</p>
-            </div>
-            <Link
-              href="/routines"
-              className="block w-full rounded bg-lime-400 py-3 text-center font-bold text-black shadow-[0_0_15px_rgba(163,230,53,0.3)] transition-colors hover:bg-lime-500"
-            >
-              INICIAR AHORA
-            </Link>
+            {activeRoutine ? (
+              <>
+                <p className="mb-4 text-xs text-lime-400">RUTINA ASIGNADA POR TU ENTRENADOR</p>
+                <div className="mb-4 rounded-lg bg-black/30 p-4">
+                  <h3 className="font-bold text-white">{activeRoutine.name.toUpperCase()}</h3>
+                  <p className="text-sm text-[#9ca3af]">
+                    {activeRoutine.exercises.length} EJERCICIOS • {activeRoutine.duration} MIN
+                  </p>
+                  {latestSession && (
+                    <p className="mt-2 text-xs text-[#9ca3af]">
+                      Última sesión: {latestSession.scheduledDate}
+                      {(latestSession.failedSets ?? 0) > 0 && (
+                        <span className="text-amber-400">
+                          {' '}
+                          · {(latestSession.failedSets ?? 0)} fallos
+                        </span>
+                      )}
+                      {latestSessionBestWeight != null && (
+                        <span className="text-cyan-400"> · Mejor carga: {latestSessionBestWeight} kg</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <Link
+                  href="/routines"
+                  className="block w-full rounded bg-lime-400 py-3 text-center font-bold text-black shadow-[0_0_15px_rgba(163,230,53,0.3)] transition-colors hover:bg-lime-500"
+                >
+                  INICIAR AHORA
+                </Link>
+              </>
+            ) : (
+              <>
+                <p className="mb-4 text-sm text-[#9ca3af]">Esperando asignación de tu entrenador.</p>
+                <Link
+                  href="/routines"
+                  className="block w-full rounded border border-[#4b5563] py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/5"
+                >
+                  VER RUTINAS
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

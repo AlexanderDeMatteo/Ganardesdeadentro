@@ -8,16 +8,39 @@ La sección de **Métricas** de FitTrack te permite registrar y seguir todas las
 
 ### Medidas Principales
 - **Peso (kg)**: Tu peso corporal actual
-- **Grasa Corporal (%)**: Porcentaje de grasa en tu cuerpo
-- **Masa Muscular (kg)**: Cantidad de masa muscular total
+- **Grasa Corporal (%)**: Porcentaje de grasa en tu cuerpo (manual de báscula o estimado por la app)
+- **Masa Muscular (kg)**: Cantidad de masa muscular (manual o estimada a partir del peso y la grasa)
+
+### Composición corporal automática
+
+La app puede **calcular por ti** la grasa corporal y la masa muscular si:
+
+1. Indicas **peso** en la medición.
+2. Tienes el **perfil completo** en [Mi perfil](/profile): talla (cm), edad (18+) y sexo.
+
+**Cómo usarlo**
+
+- Guarda una medición con **peso** y perfil completo.
+- Si dejas grasa/masa vacías, el sistema las completa automáticamente al guardar.
+
+**Fórmulas (estimación orientativa, no diagnóstico médico)**
+
+| Valor | Método |
+|-------|--------|
+| Grasa corporal (%) | Deurenberg: BMI + edad + sexo |
+| Masa muscular (kg) | Masa magra = peso × (1 − %grasa/100); músculo ≈ 50 % de la magra (hombre) o 45 % (mujer) |
+
+Si tu báscula ya muestra % grasa o kg de músculo, introdúcelos manualmente: tienen prioridad sobre el cálculo automático.
+
+En resúmenes y gráficos, los valores estimados aparecen con el sufijo **(est.)**.
 
 ### Medidas Circunferenciales (cm)
-- **Bíceps**: Circunferencia del bíceps
+- **Bíceps (izq/der)**: Circunferencia de ambos brazos
 - **Pecho**: Circunferencia del pecho
 - **Cintura**: Circunferencia de la cintura
 - **Cadera**: Circunferencia de la cadera
-- **Muslos**: Circunferencia de los muslos
-- **Pantorrillas**: Circunferencia de las pantorrillas
+- **Muslos (izq/der)**: Circunferencia de ambas piernas
+- **Pantorrillas (izq/der)**: Circunferencia de ambas pantorrillas
 
 ## Cómo Usar la Sección de Métricas
 
@@ -98,7 +121,7 @@ No necesariamente. Enfócate en las que se alineen con tus objetivos:
 - **Tono general**: Todas
 
 ### ¿Qué hago si cometo un error?
-Puedes simplemente agregar una nueva medición correcta. El sistema siempre usará la más reciente como referencia.
+Puedes corregirlo desde **Historial biométrico** usando **Editar** o **Eliminar** en la fila del registro.
 
 ## Integración con tu Plan de Entrenamiento
 

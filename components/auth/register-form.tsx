@@ -53,7 +53,11 @@ export function RegisterForm() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {displayError && (
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20">
+            <div
+              className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20"
+              role="alert"
+              aria-live="assertive"
+            >
               <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <p className="text-sm font-medium text-destructive">{displayError}</p>
             </div>

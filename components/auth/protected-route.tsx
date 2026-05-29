@@ -1,27 +1,49 @@
 'use client';
 
 import { useAuth } from '@/app/context/auth-context';
-import { useRouter } from 'next/navigation';
+import {
+  canRoleAccessPath,
+  getHomeRouteForRole,
+  getRedirectForWrongRole,
+} from '@/lib/auth/role-routes';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'admin' | 'user';
+  requiredRole?: 'admin' | 'trainer';
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
+  const pathname = usePathname() ?? '';
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
+      return;
+    }
+
+    if (!isLoading && !user) {
+      return;
     }
 
     if (!isLoading && requiredRole && user?.role !== requiredRole) {
-      router.push('/dashboard');
+      router.push(getRedirectForWrongRole(user!.role));
+      return;
     }
-  }, [isLoading, isAuthenticated, requiredRole, user, router]);
+
+    if (
+      !isLoading &&
+      isAuthenticated &&
+      user &&
+      !requiredRole &&
+      !canRoleAccessPath(user.role, pathname)
+    ) {
+      router.push(getHomeRouteForRole(user.role));
+    }
+  }, [isLoading, isAuthenticated, requiredRole, user, router, pathname]);
 
   if (isLoading) {
     return (
@@ -38,11 +60,15 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return null;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
+  if (requiredRole && user.role !== requiredRole) {
+    return null;
+  }
+
+  if (!requiredRole && !canRoleAccessPath(user.role, pathname)) {
     return null;
   }
 

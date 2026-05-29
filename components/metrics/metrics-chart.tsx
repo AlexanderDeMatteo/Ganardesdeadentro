@@ -2,11 +2,21 @@
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useMetrics } from '@/hooks/use-metrics';
+import { buildYAxisDomain, filterOutliersByRollingAverage } from '@/lib/metrics-chart-utils';
 import { cn } from '@/lib/utils';
 
 interface MetricsChartProps {
   title: string;
-  metric: 'weight' | 'bodyFat' | 'muscleMass' | 'biceps' | 'chest' | 'waist' | 'hips' | 'thighs' | 'calves';
+  metric:
+    | 'weight'
+    | 'bodyFat'
+    | 'muscleMass'
+    | 'bicepsAvg'
+    | 'chest'
+    | 'waist'
+    | 'hips'
+    | 'thighAvg'
+    | 'calfAvg';
   unit: string;
   color: string;
   /** Altura del área del gráfico en px (por defecto 300). */
@@ -32,7 +42,12 @@ export function MetricsChart({
   variant = 'card',
 }: MetricsChartProps) {
   const { getChartData } = useMetrics();
-  const data = getChartData(metric);
+  const rawData = getChartData(metric);
+  const shouldFilterOutliers = metric === 'weight' || metric === 'bodyFat' || metric === 'muscleMass';
+  const { points: data, hiddenCount } = shouldFilterOutliers
+    ? filterOutliersByRollingAverage(rawData)
+    : { points: rawData, hiddenCount: 0 };
+  const yDomain = buildYAxisDomain(data.map((d) => d.value));
   const emptyH = Math.max(160, Math.min(height, 280));
   const isPlain = variant === 'plain';
 
@@ -97,13 +112,21 @@ export function MetricsChart({
           <YAxis
             stroke={axisStroke}
             style={{ fontSize: '12px' }}
+            domain={yDomain}
             label={{ value: unit, angle: -90, position: 'insideLeft', fill: isPlain ? 'rgba(255,255,255,0.45)' : undefined }}
           />
           <Tooltip
             contentStyle={tooltipContentStyle}
             labelStyle={tooltipLabelStyle}
-            formatter={(value: number | string, name: string, item: { payload?: { bodyFatSource?: string } }) => {
+            formatter={(
+              value: number | string,
+              name: string,
+              item: { payload?: { bodyFatSource?: string; muscleMassSource?: string } },
+            ) => {
               if (metric === 'bodyFat' && item?.payload?.bodyFatSource === 'estimated') {
+                return [`${value} ${unit} (est.)`, name];
+              }
+              if (metric === 'muscleMass' && item?.payload?.muscleMassSource === 'estimated') {
                 return [`${value} ${unit} (est.)`, name];
               }
               return [`${value} ${unit}`, name];
@@ -121,6 +144,11 @@ export function MetricsChart({
           />
         </LineChart>
       </ResponsiveContainer>
+      {hiddenCount > 0 ? (
+        <p className={cn('mt-2 text-xs', isPlain ? 'text-white/50' : 'text-muted-foreground')}>
+          {hiddenCount} valor atípico oculto (puedes corregirlo en Historial).
+        </p>
+      ) : null}
     </div>
   );
 }

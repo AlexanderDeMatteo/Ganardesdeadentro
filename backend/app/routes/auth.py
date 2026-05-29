@@ -6,6 +6,10 @@ from app.database import SessionLocal
 
 auth_bp = Blueprint('auth', __name__)
 
+
+def _role_value(role) -> str:
+    return role.value if hasattr(role, 'value') else str(role)
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
     """Registra un nuevo usuario."""
@@ -19,13 +23,13 @@ def register():
             'required': required_fields
         }, 400
     
-    # Crear usuario
+    # Crear usuario — el rol público siempre es 'user'; no aceptar elevación desde el cliente
     user, error = AuthService.create_user(
         email=data['email'],
         password=data['password'],
         first_name=data['first_name'],
         last_name=data['last_name'],
-        role=data.get('role', 'user')
+        role='user',
     )
     
     if error:
@@ -33,10 +37,10 @@ def register():
     
     # Crear token
     access_token = create_access_token(
-        identity=user.id,
+        identity=str(user.id),
         additional_claims={
             'email': user.email,
-            'role': user.role
+            'role': _role_value(user.role)
         }
     )
     
@@ -44,11 +48,11 @@ def register():
         'message': 'Usuario registrado exitosamente',
         'access_token': access_token,
         'user': {
-            'id': user.id,
+            'id': str(user.id),
             'email': user.email,
             'first_name': user.first_name,
             'last_name': user.last_name,
-            'role': user.role
+            'role': _role_value(user.role)
         }
     }, 201
 
@@ -71,10 +75,10 @@ def login():
     
     # Crear token
     access_token = create_access_token(
-        identity=user.id,
+        identity=str(user.id),
         additional_claims={
             'email': user.email,
-            'role': user.role
+            'role': _role_value(user.role)
         }
     )
     
@@ -82,11 +86,11 @@ def login():
         'message': 'Autenticación exitosa',
         'access_token': access_token,
         'user': {
-            'id': user.id,
+            'id': str(user.id),
             'email': user.email,
             'first_name': user.first_name,
             'last_name': user.last_name,
-            'role': user.role
+            'role': _role_value(user.role)
         }
     }, 200
 
@@ -94,7 +98,7 @@ def login():
 @jwt_required()
 def get_current_user():
     """Obtiene la información del usuario actual."""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     
     user = AuthService.get_user_by_id(user_id)
     
@@ -103,11 +107,11 @@ def get_current_user():
     
     return {
         'user': {
-            'id': user.id,
+            'id': str(user.id),
             'email': user.email,
             'first_name': user.first_name,
             'last_name': user.last_name,
-            'role': user.role,
+            'role': _role_value(user.role),
             'is_active': user.is_active,
             'created_at': user.created_at.isoformat() if user.created_at else None
         }
@@ -117,7 +121,7 @@ def get_current_user():
 @jwt_required()
 def change_password():
     """Cambia la contraseña del usuario."""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     data = request.get_json() or {}
     
     if not data.get('old_password') or not data.get('new_password'):

@@ -375,6 +375,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  overflow: hidden;
 }
 
 @media (min-width: 640px) {
@@ -418,6 +419,35 @@
   color: var(--brand-ink);
 }
 
+.coach-dialog__messageScroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  max-height: min(50vh, 18rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 0.35rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--brand-ink) 35%, transparent) transparent;
+}
+
+.coach-dialog__messageScroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.coach-dialog__messageScroll::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--brand-ink) 30%, transparent);
+}
+
+.coach-dialog__messageScroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--brand-ink) 45%, transparent);
+}
+
+.coach-dialog__messageScroll--review {
+  max-height: min(55vh, 22rem);
+}
+
 .coach-dialog__message {
   margin: 0;
   font-size: 0.875rem;
@@ -426,6 +456,162 @@
   letter-spacing: 0.015em;
   color: color-mix(in srgb, var(--brand-ink) 88%, transparent);
   text-wrap: balance;
+}
+
+.coach-dialog__message--review {
+  text-wrap: pretty;
+}
+
+.coach-dialog__loader-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 1.48em;
+  padding-block: 0.15rem;
+}
+
+.coach-dialog__loader--ring,
+.coach-dialog__loader--dots {
+  align-items: center;
+}
+
+.coach-dialog__loader--ring {
+  display: flex;
+}
+
+.coach-dialog__loader--dots {
+  display: none;
+  gap: 0.5rem;
+}
+
+.coach-dialog__ring {
+  position: relative;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 2px solid color-mix(in srgb, var(--brand-ink) 25%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 12px rgb(0 0 0 / 0.15);
+}
+
+.coach-dialog__ring::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid transparent;
+  border-top-color: var(--brand-lime);
+  border-right-color: var(--brand-lime);
+  border-radius: 50%;
+  animation: coach-ring-arc 2s linear infinite;
+}
+
+.coach-dialog__ring > span {
+  position: absolute;
+  top: calc(50% - 2px);
+  left: 50%;
+  width: 50%;
+  height: 4px;
+  background: transparent;
+  transform-origin: left;
+  animation: coach-ring-arm 2s linear infinite;
+}
+
+.coach-dialog__ring > span::before {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-lime);
+  box-shadow: 0 0 10px var(--brand-lime);
+}
+
+.coach-dialog__loader--dots div {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--brand-lime);
+  animation: coach-grow-shrink 1.5s ease-in-out infinite;
+}
+
+.coach-dialog__loader--dots div:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.coach-dialog__loader--dots div:nth-child(2) {
+  animation-delay: 0.3s;
+}
+
+.coach-dialog__loader--dots div:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+.coach-dialog__cursor {
+  margin-left: 1px;
+  color: var(--brand-lime);
+  font-weight: 700;
+  animation: coach-cursor-blink 0.9s step-end infinite;
+}
+
+.coach-dialog__loader-static {
+  display: none;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+@keyframes coach-ring-arc {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes coach-ring-arm {
+  from {
+    transform: rotate(45deg);
+  }
+  to {
+    transform: rotate(405deg);
+  }
+}
+
+@keyframes coach-grow-shrink {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.5);
+  }
+}
+
+@keyframes coach-cursor-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .coach-dialog__loader--ring {
+    display: none;
+  }
+
+  .coach-dialog__loader--dots {
+    display: flex;
+  }
+}
+
+@media (min-width: 640px) {
+  .coach-dialog__loader--ring {
+    display: flex;
+  }
+
+  .coach-dialog__loader--dots {
+    display: none;
+  }
 }
 
 .coach-dialog__cta {
@@ -712,5 +898,17 @@
 
   .coach-dialog__avatar .coach-avatar__provided {
     transform: scaleX(-1);
+  }
+
+  .coach-dialog__loader-wrap--animated {
+    display: none;
+  }
+
+  .coach-dialog__loader-static {
+    display: inline;
+  }
+
+  .coach-dialog__cursor {
+    display: none;
   }
 }

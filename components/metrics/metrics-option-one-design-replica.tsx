@@ -1,11 +1,14 @@
 'use client';
 
-import { useId, useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { MetricsFeaturedChartPanel } from '@/components/metrics/metrics-featured-chart-panel';
 import { METRICS_REPLICA_PANEL_BG } from '@/components/metrics/metrics-replica-panel-tokens';
 import { useMetrics } from '@/hooks/use-metrics';
-import { Dumbbell, Percent, Scale, Weight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Dumbbell, MoreHorizontal, Percent, Pencil, Scale, Trash2, Weight } from 'lucide-react';
 
 const LIME = '#b8ff00';
 const CYAN = '#42f4ff';
@@ -103,8 +106,17 @@ function ReplicaKpiCard({
 }
 
 export function MetricsOptionOneDesignReplica() {
-  const { entries, getLatestEntry } = useMetrics();
+  const { entries, getLatestEntry, updateEntry, removeEntry, addEntry } = useMetrics();
   const latest = getLatestEntry();
+  const [menuRowId, setMenuRowId] = useState<string | null>(null);
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [draftWeight, setDraftWeight] = useState('');
+  const [draftBodyFat, setDraftBodyFat] = useState('');
+  const [draftMuscleMass, setDraftMuscleMass] = useState('');
+  const [quickWeight, setQuickWeight] = useState('');
+  const [quickBodyFat, setQuickBodyFat] = useState('');
+  const [quickMuscleMass, setQuickMuscleMass] = useState('');
+  const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
 
   const sorted = useMemo(
     () => [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
@@ -122,8 +134,73 @@ export function MetricsOptionOneDesignReplica() {
       .filter((x): x is { v: number } => x != null);
 
   const historialRows = useMemo(() => {
-    return [...sorted].slice(-3).reverse();
+    return [...sorted].slice(-6).reverse();
   }, [sorted]);
+
+  const openEdit = (rowId: string) => {
+    const row = sorted.find((e) => e.id === rowId);
+    if (!row) return;
+    setEditingRowId(rowId);
+    setMenuRowId(null);
+    setDraftWeight(typeof row.weight === 'number' ? row.weight.toString() : '');
+    setDraftBodyFat(typeof row.bodyFat === 'number' ? row.bodyFat.toString() : '');
+    setDraftMuscleMass(typeof row.muscleMass === 'number' ? row.muscleMass.toString() : '');
+  };
+
+  const closeEditModal = () => {
+    setEditingRowId(null);
+  };
+
+  const saveEdit = () => {
+    if (!editingRowId) return;
+    const parse = (raw: string) => {
+      const v = parseFloat(raw.replace(',', '.'));
+      return Number.isFinite(v) ? v : undefined;
+    };
+    updateEntry(editingRowId, {
+      weight: parse(draftWeight),
+      bodyFat: parse(draftBodyFat),
+      muscleMass: parse(draftMuscleMass),
+    });
+    setEditingRowId(null);
+    setMenuRowId(null);
+  };
+
+  const askDelete = (rowId: string) => {
+    setPendingDeleteRowId(rowId);
+    setMenuRowId(null);
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDeleteRowId) return;
+    removeEntry(pendingDeleteRowId);
+    if (editingRowId === pendingDeleteRowId) {
+      setEditingRowId(null);
+    }
+    setPendingDeleteRowId(null);
+  };
+
+  const parseInput = (raw: string): number | undefined => {
+    const v = parseFloat(raw.replace(',', '.'));
+    return Number.isFinite(v) ? v : undefined;
+  };
+
+  const hasQuickData = quickWeight.trim() || quickBodyFat.trim() || quickMuscleMass.trim();
+  const submitQuickAdd = () => {
+    if (!hasQuickData) return;
+    const entry = {
+      date: new Date().toISOString(),
+      weight: parseInput(quickWeight),
+      bodyFat: parseInput(quickBodyFat),
+      muscleMass: parseInput(quickMuscleMass),
+    };
+    const hasAny = typeof entry.weight === 'number' || typeof entry.bodyFat === 'number' || typeof entry.muscleMass === 'number';
+    if (!hasAny) return;
+    addEntry(entry);
+    setQuickWeight('');
+    setQuickBodyFat('');
+    setQuickMuscleMass('');
+  };
 
   const wPct = pctChange(prev?.weight, latest?.weight);
   const bfPct = pctChange(prev?.bodyFat, latest?.bodyFat);
@@ -135,7 +212,10 @@ export function MetricsOptionOneDesignReplica() {
     latest?.bodyFat != null
       ? `${latest.bodyFat.toFixed(1)}%${latest.bodyFatSource === 'estimated' ? ' (est.)' : ''}`
       : '—';
-  const mmVal = latest?.muscleMass != null ? `${latest.muscleMass.toFixed(1)} kg` : '—';
+  const mmVal =
+    latest?.muscleMass != null
+      ? `${latest.muscleMass.toFixed(1)} kg${latest.muscleMassSource === 'estimated' ? ' (est.)' : ''}`
+      : '—';
 
   return (
     <div
@@ -207,41 +287,209 @@ export function MetricsOptionOneDesignReplica() {
               </ul>
             </div>
 
-            <div className="rounded-2xl border border-white/[0.08] p-4 sm:p-5" style={{ background: METRICS_REPLICA_PANEL_BG }}>
-              <h3 className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-white/80">Historial biométrico</h3>
-              <div className="overflow-hidden rounded-lg border border-white/[0.06]">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-white/[0.08] bg-white/[0.04] text-[10px] font-bold uppercase tracking-wider text-white/45">
-                      <th className="px-3 py-2">Fecha</th>
-                      <th className="px-3 py-2">Peso</th>
-                      <th className="px-3 py-2">Grasa</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historialRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-3 py-6 text-center text-white/40">
-                          Sin registros
+            <div className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <h3 className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-foreground">Historial biométrico</h3>
+
+              {/* Mobile cards */}
+              <div className="space-y-3 sm:hidden">
+                <div className="rounded-lg border border-border bg-surface p-4">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Quick add</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Peso (kg)"
+                      value={quickWeight}
+                      onChange={(e) => setQuickWeight(e.target.value)}
+                      className="h-11 rounded-md border border-border/70 bg-black/50 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Grasa (%)"
+                      value={quickBodyFat}
+                      onChange={(e) => setQuickBodyFat(e.target.value)}
+                      className="h-11 rounded-md border border-border/70 bg-black/50 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Músculo (kg)"
+                      value={quickMuscleMass}
+                      onChange={(e) => setQuickMuscleMass(e.target.value)}
+                      className="h-11 rounded-md border border-border/70 bg-black/50 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <Button type="button" className="h-11 w-full" onClick={submitQuickAdd}>
+                      Guardar rápido
+                    </Button>
+                  </div>
+                </div>
+
+                {historialRows.map((row) => (
+                  <div key={`mobile-${row.id}`} className="rounded-lg border border-border bg-surface p-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-foreground">
+                        {new Date(row.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                      </p>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                          onClick={() => setMenuRowId((id) => (id === row.id ? null : row.id))}
+                          aria-label="Abrir acciones del registro"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </button>
+                        {menuRowId === row.id ? (
+                          <div className="absolute right-0 top-12 z-20 w-36 rounded-md border border-border bg-card p-1 shadow-lg">
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-xs text-foreground hover:bg-muted"
+                              onClick={() => openEdit(row.id)}
+                            >
+                              <Pencil className="size-3.5" />
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-xs text-destructive hover:bg-muted"
+                              onClick={() => askDelete(row.id)}
+                            >
+                              <Trash2 className="size-3.5" />
+                              Eliminar
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Peso</p>
+                        <p className="font-semibold text-foreground">{row.weight != null ? `${row.weight.toFixed(1)} kg` : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Grasa</p>
+                        <p className="font-semibold text-secondary">{row.bodyFat != null ? `${row.bodyFat.toFixed(1)}%` : '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Músculo</p>
+                        <p className="font-semibold text-foreground">{row.muscleMass != null ? `${row.muscleMass.toFixed(1)} kg` : '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden sm:block">
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="min-w-[620px] w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <th className="px-3 py-2">Fecha</th>
+                        <th className="px-3 py-2">Peso</th>
+                        <th className="px-3 py-2">Grasa</th>
+                        <th className="px-3 py-2">Músculo</th>
+                        <th className="w-[72px] px-3 py-2 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-b border-border/60 bg-muted/20">
+                        <td className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                          Quick Add
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="text"
+                            placeholder="kg"
+                            value={quickWeight}
+                            onChange={(e) => setQuickWeight(e.target.value)}
+                            className="h-11 w-24 rounded-md border border-border/70 bg-black/50 px-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="text"
+                            placeholder="%"
+                            value={quickBodyFat}
+                            onChange={(e) => setQuickBodyFat(e.target.value)}
+                            className="h-11 w-20 rounded-md border border-border/70 bg-black/50 px-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="text"
+                            placeholder="kg"
+                            value={quickMuscleMass}
+                            onChange={(e) => setQuickMuscleMass(e.target.value)}
+                            className="h-11 w-20 rounded-md border border-border/70 bg-black/50 px-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          <Button type="button" size="sm" className="h-11 px-3" onClick={submitQuickAdd}>
+                            Guardar
+                          </Button>
                         </td>
                       </tr>
-                    ) : (
-                      historialRows.map((row) => (
-                        <tr key={row.id} className="border-b border-white/[0.05] last:border-0">
-                          <td className="px-3 py-2.5 text-white/75">
-                            {new Date(row.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                          </td>
-                          <td className="px-3 py-2.5 font-semibold text-white">
-                            {row.weight != null ? `${row.weight.toFixed(1)} kg` : '—'}
-                          </td>
-                          <td className="px-3 py-2.5 font-semibold" style={{ color: CYAN }}>
-                            {row.bodyFat != null ? `${row.bodyFat.toFixed(1)}%` : '—'}
+
+                      {historialRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                            Sin registros
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        historialRows.map((row) => (
+                          <tr key={row.id} className="border-b border-border/60 last:border-0">
+                            <td className="px-3 py-2.5 text-foreground/90">
+                              {new Date(row.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold text-foreground">
+                              {row.weight != null ? `${row.weight.toFixed(1)} kg` : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold text-secondary">
+                              {row.bodyFat != null ? `${row.bodyFat.toFixed(1)}%` : '—'}
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold text-foreground">
+                              {row.muscleMass != null ? `${row.muscleMass.toFixed(1)} kg` : '—'}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex justify-end">
+                                <div className="relative">
+                                  <button
+                                    type="button"
+                                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                                    onClick={() => setMenuRowId((id) => (id === row.id ? null : row.id))}
+                                    aria-label="Abrir acciones del registro"
+                                  >
+                                    <MoreHorizontal className="size-4" />
+                                  </button>
+                                  {menuRowId === row.id ? (
+                                    <div className="absolute right-0 top-12 z-20 w-36 rounded-md border border-border bg-card p-1 shadow-lg">
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-xs text-foreground hover:bg-muted"
+                                        onClick={() => openEdit(row.id)}
+                                      >
+                                        <Pencil className="size-3.5" />
+                                        Editar
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-xs text-destructive hover:bg-muted"
+                                        onClick={() => askDelete(row.id)}
+                                      >
+                                        <Trash2 className="size-3.5" />
+                                        Eliminar
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -302,6 +550,66 @@ export function MetricsOptionOneDesignReplica() {
           <span>© 2024 Todos los derechos reservados.</span>
         </footer>
       </div>
+
+      <Dialog open={editingRowId != null} onOpenChange={(open) => (!open ? closeEditModal() : undefined)}>
+        <DialogContent className="border-border bg-card text-foreground">
+          <DialogHeader>
+            <DialogTitle>Editar registro biométrico</DialogTitle>
+            <DialogDescription>
+              Ajusta peso, grasa y músculo. Los cambios impactan gráficos y resumen al guardar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Peso (kg)</label>
+              <input
+                type="text"
+                value={draftWeight}
+                onChange={(e) => setDraftWeight(e.target.value)}
+                className="h-11 w-full rounded-md border border-border/70 bg-black/50 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Grasa (%)</label>
+              <input
+                type="text"
+                value={draftBodyFat}
+                onChange={(e) => setDraftBodyFat(e.target.value)}
+                className="h-11 w-full rounded-md border border-border/70 bg-black/50 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Músculo (kg)</label>
+              <input
+                type="text"
+                value={draftMuscleMass}
+                onChange={(e) => setDraftMuscleMass(e.target.value)}
+                className="h-11 w-full rounded-md border border-border/70 bg-black/50 px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={closeEditModal}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={saveEdit}>
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={pendingDeleteRowId !== null}
+        onOpenChange={(open) => !open && setPendingDeleteRowId(null)}
+        title="Eliminar registro biométrico"
+        description="¿Eliminar este registro? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

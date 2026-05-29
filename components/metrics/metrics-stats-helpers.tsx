@@ -42,6 +42,10 @@ export function buildPrimaryStats(
       ? `${latest.bodyFat.toFixed(1)} % (est.)`
       : bodyFat.value;
   const muscleMass = getMetricDisplay('muscleMass', 'kg');
+  const muscleMassValueDisplay =
+    latest?.muscleMass != null && latest.muscleMassSource === 'estimated'
+      ? `${latest.muscleMass.toFixed(1)} kg (est.)`
+      : muscleMass.value;
 
   return [
     {
@@ -62,7 +66,7 @@ export function buildPrimaryStats(
     },
     {
       label: 'Masa Muscular',
-      value: muscleMass.value,
+      value: muscleMassValueDisplay,
       change: muscleMass.change,
       isPositive: muscleMass.isPositive,
       icon: TrendingUp,

@@ -1,0 +1,233 @@
+'use client';
+
+import { useAuth } from '@/app/context/auth-context';
+import {
+  getCoachNutritionDraft,
+  getMealPlan,
+  publishMealPlan,
+  saveCoachNutritionDraft,
+} from '@/lib/data/client';
+import { createDefaultCoachDraft } from '@/lib/nutrition/assigned-storage';
+import { computeMetabolism, GOAL_ADJUSTMENTS } from '@/lib/nutrition/metabolism';
+import { findAthleteById } from '@/lib/nutrition/resolve-athlete-id';
+import type {
+  AssignedNutritionPlan,
+  CoachNutritionDraft,
+  MacroTargets,
+  MealPlan,
+  MealSlotTimes,
+  MetabolismInput,
+  MetabolismResult,
+} from '@/lib/nutrition/types';
+import { canCoachEditAthlete } from '@/lib/auth/guards';
+import { isProMember as checkProMember } from '@/lib/auth/titan';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
+export { canCoachEditAthlete };
+
+export function useCoachNutrition(athleteId: string, metabolismInput: MetabolismInput | null) {
+  const { user } = useAuth();
+  const athlete = useMemo(() => findAthleteById(athleteId), [athleteId]);
+  const canEdit = useMemo(
+    () => canCoachEditAthlete(user?.role, user?.trainer_id, athlete?.trainerId),
+    [user?.role, user?.trainer_id, athlete?.trainerId],
+  );
+
+  const [draft, setDraft] = useState<CoachNutritionDraft>(createDefaultCoachDraft);
+  const [assigned, setAssigned] = useState<AssignedNutritionPlan | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const isProMember = checkProMember(user) || user?.role === 'trainer' || user?.role === 'admin';
+  const maxPlans = isProMember ? Infinity : 1;
+  const canAddMealPlan = isProMember || draft.mealPlans.length < maxPlans;
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [loadedDraft, loadedPlan] = await Promise.all([
+        getCoachNutritionDraft(athleteId),
+        getMealPlan(athleteId),
+      ]);
+      if (!cancelled) {
+        setDraft(loadedDraft);
+        setAssigned(loadedPlan);
+        setIsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [athleteId]);
+
+  const persistDraft = useCallback(
+    async (next: CoachNutritionDraft) => {
+      setDraft(next);
+      await saveCoachNutritionDraft(athleteId, next);
+    },
+    [athleteId],
+  );
+
+  const updateDraft = useCallback(
+    (updater: (prev: CoachNutritionDraft) => CoachNutritionDraft) => {
+      setDraft((prev) => {
+        const next = updater(prev);
+        void saveCoachNutritionDraft(athleteId, next);
+        return next;
+      });
+    },
+    [athleteId],
+  );
+
+  const saveSettings = useCallback(
+    (patch: Partial<Pick<CoachNutritionDraft, 'activityLevel' | 'goal' | 'calorieAdjustment'>>) => {
+      updateDraft((prev) => {
+        const goal = patch.goal ?? prev.goal;
+        let calorieAdjustment = patch.calorieAdjustment ?? prev.calorieAdjustment;
+        if (patch.goal && patch.calorieAdjustment === undefined) {
+          calorieAdjustment = GOAL_ADJUSTMENTS[goal].defaultAdjustment;
+        }
+        return { ...prev, ...patch, goal, calorieAdjustment };
+      });
+    },
+    [updateDraft],
+  );
+
+  const setMacroTargets = useCallback(
+    (targets: MacroTargets | null) => {
+      updateDraft((prev) => ({ ...prev, macroTargets: targets }));
+    },
+    [updateDraft],
+  );
+
+  const setSlotTimes = useCallback(
+    (slotTimes: MealSlotTimes) => {
+      updateDraft((prev) => ({ ...prev, slotTimes }));
+    },
+    [updateDraft],
+  );
+
+  const upsertMealPlan = useCallback(
+    (plan: MealPlan) => {
+      updateDraft((prev) => {
+        const exists = prev.mealPlans.some((p) => p.id === plan.id);
+        const mealPlans = exists
+          ? prev.mealPlans.map((p) => (p.id === plan.id ? plan : p))
+          : [...prev.mealPlans, plan];
+        return {
+          ...prev,
+          mealPlans,
+          activeMealPlanId: prev.activeMealPlanId ?? plan.id,
+        };
+      });
+    },
+    [updateDraft],
+  );
+
+  const deleteMealPlan = useCallback(
+    (id: string) => {
+      updateDraft((prev) => ({
+        ...prev,
+        mealPlans: prev.mealPlans.filter((p) => p.id !== id),
+        activeMealPlanId: prev.activeMealPlanId === id ? null : prev.activeMealPlanId,
+      }));
+    },
+    [updateDraft],
+  );
+
+  const setActiveMealPlan = useCallback(
+    (id: string | null) => {
+      updateDraft((prev) => ({ ...prev, activeMealPlanId: id }));
+    },
+    [updateDraft],
+  );
+
+  const getMetabolism = useCallback(
+    (input: MetabolismInput | null): MetabolismResult | null => {
+      if (!input) return null;
+      return computeMetabolism(input, draft.activityLevel, draft.calorieAdjustment);
+    },
+    [draft.activityLevel, draft.calorieAdjustment],
+  );
+
+  const publish = useCallback(
+    async (options?: { macroTargets?: MacroTargets | null }) => {
+      if (!canEdit) {
+        toast.error('No tienes permiso para publicar el plan de este atleta.');
+        return false;
+      }
+      const activePlan =
+        draft.mealPlans.find((p) => p.id === draft.activeMealPlanId) ?? draft.mealPlans[0] ?? null;
+      if (!activePlan) {
+        toast.error('Crea o selecciona un plan de alimentación antes de publicar.');
+        return false;
+      }
+      const macroTargets = options?.macroTargets ?? draft.macroTargets;
+      if (!macroTargets) {
+        toast.error('Define y aplica los macros objetivo antes de publicar.');
+        return false;
+      }
+
+      const publishedBy =
+        user?.role === 'trainer' ? (user.trainer_id ?? user.id) : (user?.id ?? 'admin');
+
+      const plan: AssignedNutritionPlan = {
+        athleteId,
+        macroTargets,
+        mealPlan: activePlan,
+        slotTimes: draft.slotTimes,
+        activityLevel: draft.activityLevel,
+        goal: draft.goal,
+        calorieAdjustment: draft.calorieAdjustment,
+        publishedAt: new Date().toISOString(),
+        publishedBy,
+      };
+
+      const published = await publishMealPlan(plan);
+      setAssigned(published);
+      toast.success('Plan nutricional publicado para el atleta.');
+      return true;
+    },
+    [athleteId, canEdit, draft, user],
+  );
+
+  const state = useMemo(
+    () => ({
+      activityLevel: draft.activityLevel,
+      goal: draft.goal,
+      calorieAdjustment: draft.calorieAdjustment,
+      macroTargets: draft.macroTargets,
+      mealPlans: draft.mealPlans,
+      activeMealPlanId: draft.activeMealPlanId,
+      foodLog: [] as never[],
+      waterByDate: {} as Record<string, number>,
+      waterGoalMl: 2500,
+      updatedAt: draft.updatedAt,
+    }),
+    [draft],
+  );
+
+  return {
+    athlete,
+    canEdit,
+    draft,
+    assigned,
+    state,
+    slotTimes: draft.slotTimes,
+    isLoading,
+    isProMember,
+    canAddMealPlan,
+    saveSettings,
+    setMacroTargets,
+    setSlotTimes,
+    upsertMealPlan,
+    deleteMealPlan,
+    setActiveMealPlan,
+    getMetabolism,
+    publish,
+    persistDraft,
+    metabolismInput,
+  };
+}
+
+export type CoachNutritionContextValue = ReturnType<typeof useCoachNutrition>;

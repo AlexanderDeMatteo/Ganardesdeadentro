@@ -9,25 +9,28 @@ import Link from 'next/link';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { ATHLETE_NAV_ITEMS, navItemActive } from '@/lib/auth/role-routes';
 import { cn } from '@/lib/utils';
 import {
+  Apple,
   BarChart3,
   CreditCard,
   Dumbbell,
   LayoutDashboard,
   LogOut,
   Menu,
-  Settings,
   Shield,
   User,
+  UserCircle,
 } from 'lucide-react';
 
-function navItemActive(pathname: string, href: string) {
-  if (href === '/dashboard') {
-    return pathname === '/dashboard' || pathname.startsWith('/dashboard-');
-  }
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
+const ATHLETE_NAV_ICONS = {
+  '/dashboard': LayoutDashboard,
+  '/routines': Dumbbell,
+  '/metrics': BarChart3,
+  '/nutrition': Apple,
+  '/memberships': CreditCard,
+} as const;
 
 export function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -41,12 +44,14 @@ export function Navbar() {
     router.push('/');
   };
 
-  const mainNav = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/routines', label: 'Rutinas', icon: Dumbbell },
-    { href: '/metrics', label: 'Métricas', icon: BarChart3 },
-    { href: '/memberships', label: 'Membresías', icon: CreditCard },
-  ] as const;
+  const isTrainer = user?.role === 'trainer';
+
+  const mainNav = ATHLETE_NAV_ITEMS.map((item) => ({
+    ...item,
+    icon: ATHLETE_NAV_ICONS[item.href as keyof typeof ATHLETE_NAV_ICONS],
+  }));
+
+  const trainerNav = [{ href: '/trainer', label: 'Panel Entrenador', icon: UserCircle }] as const;
 
   return (
     <>
@@ -75,7 +80,7 @@ export function Navbar() {
                   <p className="text-xs font-medium text-muted-foreground">FitTrack</p>
                 </SheetHeader>
                 <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                  {mainNav.map(({ href, label, icon: Icon }) => {
+                  {(isTrainer ? trainerNav : mainNav).map(({ href, label, icon: Icon }) => {
                     const active = navItemActive(pathname, href);
                     return (
                       <Link
@@ -111,20 +116,12 @@ export function Navbar() {
                   )}
                   <Separator className="my-2" />
                   <Link
-                    href="/profile"
+                    href={isTrainer ? '/trainer/profile' : '/profile'}
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex min-h-12 items-center gap-3 rounded-lg px-3 text-xs font-extrabold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                   >
                     <User className="size-5 shrink-0 opacity-90" aria-hidden />
                     Mi perfil
-                  </Link>
-                  <Link
-                    href="/settings"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex min-h-12 items-center gap-3 rounded-lg px-3 text-xs font-extrabold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-                  >
-                    <Settings className="size-5 shrink-0 opacity-90" aria-hidden />
-                    Configuración
                   </Link>
                   <button
                     type="button"
@@ -151,23 +148,37 @@ export function Navbar() {
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-6">
           {isAuthenticated ? (
             <>
-              <div className="hidden items-center gap-5 lg:gap-6 md:flex">
-                <Link href="/dashboard" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
-                  Dashboard
-                </Link>
-                <Link href="/routines" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
-                  Rutinas
-                </Link>
-                <Link href="/metrics" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
-                  Métricas
-                </Link>
-                <Link href="/memberships" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
-                  Membresías
-                </Link>
-                {user?.role === 'admin' && (
-                  <Link href="/admin" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
-                    Admin
+              <div className="hidden items-center gap-5 md:flex lg:gap-6">
+                {isTrainer ? (
+                  <Link
+                    href="/trainer"
+                    className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    Panel Entrenador
                   </Link>
+                ) : (
+                  <>
+                    <Link href="/dashboard" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+                      Dashboard
+                    </Link>
+                    <Link href="/routines" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+                      Rutinas
+                    </Link>
+                    <Link href="/metrics" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+                      Métricas
+                    </Link>
+                    <Link href="/nutrition" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+                      Nutrición
+                    </Link>
+                    <Link href="/memberships" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+                      Membresías
+                    </Link>
+                    {user?.role === 'admin' && (
+                      <Link href="/admin" className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+                        Admin
+                      </Link>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -185,15 +196,9 @@ export function Navbar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild className="cursor-pointer gap-2">
-                    <Link href="/profile" className="flex">
+                    <Link href={isTrainer ? '/trainer/profile' : '/profile'} className="flex">
                       <User className="h-4 w-4" />
                       <span>Mi Perfil</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild className="cursor-pointer gap-2">
-                    <Link href="/settings" className="flex">
-                      <Settings className="h-4 w-4" />
-                      <span>Configuración</span>
                     </Link>
                   </DropdownMenuItem>
                   <div className="my-2 border-t border-border" />

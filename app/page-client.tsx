@@ -32,13 +32,17 @@ const programs = [
   },
 ];
 
-export default function HomePage() {
+export default function HomePage({
+  faqItems = [],
+}: {
+  faqItems?: Array<{ question: string; answer: string }>;
+}) {
   const { isAuthenticated } = useAuth();
 
   return (
     <>
       <LandingNavbar />
-      <main className="min-h-screen bg-[var(--brand-ink)] text-foreground">
+      <main id="main-content" className="min-h-screen bg-[var(--brand-ink)] text-foreground">
         {/* Hero — public/pesas.png: B/N, desenfoque suave y sombreado (fondo legible) */}
         <section className="relative min-h-[92vh] overflow-hidden">
           <div className="absolute inset-0 overflow-hidden">
@@ -277,6 +281,24 @@ export default function HomePage() {
           </div>
         </section>
 
+        {faqItems.length > 0 && (
+          <section className="px-4 py-16 sm:px-6 lg:px-8" aria-labelledby="faq-heading">
+            <div className="mx-auto max-w-3xl">
+              <h2 id="faq-heading" className="landing-heading text-3xl text-white sm:text-4xl">
+                Preguntas frecuentes
+              </h2>
+              <div className="mt-8 space-y-6">
+                {faqItems.map((item) => (
+                  <article key={item.question} className="border border-white/10 bg-white/[0.03] p-6">
+                    <h3 className="text-lg font-bold text-[var(--brand-lime)]">{item.question}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-white/70">{item.answer}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {!isAuthenticated && (
           <section className="px-4 pb-20 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl border border-[var(--brand-lime)]/25 bg-gradient-to-br from-white/[0.06] to-transparent px-8 py-12 text-center sm:py-14">
@@ -308,15 +330,15 @@ export default function HomePage() {
                 Proyecto Ganar desde Adentro
               </p>
               <nav className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/55">
-                <Link href="/login" className="hover:text-[var(--brand-lime)]">
+                <Link href="/register" className="hover:text-[var(--brand-lime)]">
                   Privacidad
                 </Link>
-                <Link href="/login" className="hover:text-[var(--brand-lime)]">
+                <Link href="/register" className="hover:text-[var(--brand-lime)]">
                   Términos
                 </Link>
-                <Link href="/login" className="hover:text-[var(--brand-lime)]">
+                <a href="mailto:soporte@fittrack.app" className="hover:text-[var(--brand-lime)]">
                   Soporte
-                </Link>
+                </a>
                 <span className="text-white/25">|</span>
                 <a href="https://instagram.com" className="hover:text-[var(--brand-lime)]" rel="noopener noreferrer" target="_blank">
                   Instagram

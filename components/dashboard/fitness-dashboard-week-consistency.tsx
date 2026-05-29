@@ -1,22 +1,64 @@
 'use client';
 
+import type { SessionLog, WeeklyPlan } from '@/lib/data/types';
+import { getScheduledDateForDayIndex } from '@/lib/workout/session-utils';
+
 const DAY_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const;
 
-/** Demo: días con actividad registrada (true = entreno / métrica). */
-const WEEK_ACTIVE = [true, false, true, true, false, true, true] as const;
+interface FitnessDashboardWeekConsistencyProps {
+  weeklyPlan: WeeklyPlan | null;
+  weekSessionLogs: SessionLog[];
+  weekStartDate: string;
+}
 
-export function FitnessDashboardWeekConsistency() {
-  const activeCount = WEEK_ACTIVE.filter(Boolean).length;
-  const consistencyPct = Math.round((activeCount / 7) * 100);
+function dayHasActivity(
+  dayIndex: number,
+  weeklyPlan: WeeklyPlan | null,
+  weekSessionLogs: SessionLog[],
+  weekStartDate: string,
+): boolean {
+  if (!weeklyPlan) {
+    return weekSessionLogs.some((s) => {
+      const d = new Date(s.scheduledDate + 'T12:00:00');
+      const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      return idx === dayIndex && (s.sessionOutcome === 'completed' || s.completed);
+    });
+  }
+  const day = weeklyPlan.days.find((d) => d.dayIndex === dayIndex);
+  if (!day?.routineId) return false;
+  const scheduled = getScheduledDateForDayIndex(weekStartDate, dayIndex);
+  return weekSessionLogs.some(
+    (s) =>
+      s.scheduledDate === scheduled &&
+      (s.sessionOutcome === 'completed' || s.completed || (s.completedSets ?? 0) > 0),
+  );
+}
+
+export function FitnessDashboardWeekConsistency({
+  weeklyPlan,
+  weekSessionLogs,
+  weekStartDate,
+}: FitnessDashboardWeekConsistencyProps) {
+  const weekActive = DAY_LABELS.map((_, i) =>
+    dayHasActivity(i, weeklyPlan, weekSessionLogs, weekStartDate),
+  );
+  const plannedDays = weeklyPlan
+    ? weeklyPlan.days.filter((d) => d.routineId).length
+    : 7;
+  const activeCount = weekActive.filter(Boolean).length;
+  const consistencyPct =
+    plannedDays > 0 ? Math.round((activeCount / plannedDays) * 100) : 0;
 
   return (
     <div className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-6">
       <h3 className="mb-1 text-xs font-semibold uppercase tracking-widest text-[#9ca3af]">
-        Métricas recientes
+        Consistencia semanal
       </h3>
-      <p className="mb-4 text-sm font-bold text-white">Esta semana</p>
+      <p className="mb-4 text-sm font-bold text-white">
+        {weeklyPlan ? 'Plan del entrenador' : 'Esta semana'}
+      </p>
       <div className="mb-6 flex justify-between gap-1">
-        {WEEK_ACTIVE.map((on, i) => (
+        {weekActive.map((on, i) => (
           <div key={DAY_LABELS[i]} className="flex flex-col items-center gap-2">
             <span
               className={

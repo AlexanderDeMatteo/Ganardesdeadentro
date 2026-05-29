@@ -3,7 +3,8 @@
 import { AthleteProfile } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, Link2, Edit2, Trash2, Search } from 'lucide-react';
+import { Eye, Link2, Search, UtensilsCrossed } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 interface AthletesTableProps {
@@ -33,16 +34,17 @@ export function AthletesTable({ athletes, onViewDetails, onAssignTrainer }: Athl
       </div>
 
       <div className="rounded-xl border border-secondary/20 bg-card/50 overflow-hidden">
-        <table className="w-full">
+        <table className="w-full" aria-label="Listado de atletas">
+          <caption className="sr-only">Atletas registrados en la plataforma</caption>
           <thead className="border-b border-secondary/20 bg-secondary/5">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Nombre</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Edad</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Peso</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Membresía</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold">Entrenador</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">Acciones</th>
+              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Nombre</th>
+              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Email</th>
+              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Edad</th>
+              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Peso</th>
+              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Membresía</th>
+              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Entrenador</th>
+              <th scope="col" className="px-6 py-3 text-center text-sm font-semibold">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -80,8 +82,22 @@ export function AthletesTable({ athletes, onViewDetails, onAssignTrainer }: Athl
                     <Button
                       variant="outline"
                       size="sm"
+                      asChild
+                      className="h-8 w-8 p-0 border-primary/30 hover:bg-primary/10"
+                    >
+                      <Link
+                        href={`/admin/athletes/${athlete.id}/nutrition`}
+                        aria-label={`Nutrición de ${athlete.name}`}
+                      >
+                        <UtensilsCrossed className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => onViewDetails(athlete)}
                       className="h-8 w-8 p-0 border-primary/30 hover:bg-primary/10"
+                      aria-label={`Ver detalle de ${athlete.name}`}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -90,6 +106,7 @@ export function AthletesTable({ athletes, onViewDetails, onAssignTrainer }: Athl
                       size="sm"
                       onClick={() => onAssignTrainer(athlete)}
                       className="h-8 w-8 p-0 border-secondary/30 hover:bg-secondary/10"
+                      aria-label={`Asignar entrenador a ${athlete.name}`}
                     >
                       <Link2 className="h-4 w-4" />
                     </Button>

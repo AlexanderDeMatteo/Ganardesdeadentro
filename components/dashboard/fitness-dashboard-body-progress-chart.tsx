@@ -12,6 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useMetrics } from '@/hooks/use-metrics';
+import { buildYAxisDomain, filterOutliersByRollingAverage } from '@/lib/metrics-chart-utils';
 
 const axisStroke = '#6b7280';
 const gridStroke = '#374151';
@@ -24,6 +25,7 @@ type ChartRow = {
   bodyFat?: number;
   muscleMass?: number;
   bodyFatSource?: 'manual' | 'estimated';
+  muscleMassSource?: 'manual' | 'estimated';
 };
 
 type TooltipPayloadItem = {
@@ -58,7 +60,8 @@ function BodyProgressTooltip({
       {payload.map((p) => {
         const row = p.payload;
         const isEstimatedBodyFat = p.dataKey === 'bodyFat' && row?.bodyFatSource === 'estimated';
-        const suffix = isEstimatedBodyFat ? ' (est.)' : '';
+        const isEstimatedMuscle = p.dataKey === 'muscleMass' && row?.muscleMassSource === 'estimated';
+        const suffix = isEstimatedBodyFat || isEstimatedMuscle ? ' (est.)' : '';
         return (
           <p key={String(p.dataKey)} style={{ margin: '2px 0' }}>
             {p.name}: {p.value}
@@ -73,8 +76,8 @@ function BodyProgressTooltip({
 export function FitnessDashboardBodyProgressChart() {
   const { entries, isLoading } = useMetrics();
 
-  const data = useMemo(() => {
-    return [...entries]
+  const { data, hiddenWeightOutliers, kgDomain } = useMemo(() => {
+    const base = [...entries]
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .map((e) => ({
         label: new Date(e.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
@@ -82,8 +85,19 @@ export function FitnessDashboardBodyProgressChart() {
         bodyFat: e.bodyFat,
         muscleMass: e.muscleMass,
         bodyFatSource: e.bodyFatSource,
+        muscleMassSource: e.muscleMassSource,
       }))
       .filter((d) => d.weight != null || d.bodyFat != null || d.muscleMass != null);
+
+    const weights = base.map((row) => ({ date: row.label, value: row.weight }));
+    const filteredWeights = filterOutliersByRollingAverage(weights);
+    const merged = base.map((row, idx) => ({ ...row, weight: filteredWeights.points[idx]?.value }));
+    const kgValues = merged.map((row) => row.weight ?? row.muscleMass);
+    return {
+      data: merged,
+      hiddenWeightOutliers: filteredWeights.hiddenCount,
+      kgDomain: buildYAxisDomain(kgValues),
+    };
   }, [entries]);
 
   if (isLoading) {
@@ -112,7 +126,7 @@ export function FitnessDashboardBodyProgressChart() {
             yAxisId="kg"
             stroke={axisStroke}
             tick={{ fill: '#9ca3af', fontSize: 11 }}
-            domain={['auto', 'auto']}
+            domain={kgDomain}
             label={{ value: 'kg', angle: -90, position: 'insideLeft', fill: '#9ca3af', fontSize: 10 }}
           />
           <YAxis
@@ -157,6 +171,11 @@ export function FitnessDashboardBodyProgressChart() {
           />
         </LineChart>
       </ResponsiveContainer>
+      {hiddenWeightOutliers > 0 ? (
+        <p className="mt-2 text-xs text-[#9ca3af]">
+          {hiddenWeightOutliers} valor atípico de peso oculto (puedes corregirlo en Historial).
+        </p>
+      ) : null}
     </div>
   );
 }

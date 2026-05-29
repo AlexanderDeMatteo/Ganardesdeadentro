@@ -18,10 +18,11 @@ Se ha implementado un **sistema completo de seguimiento de métricas** que permi
 ### 2. Componente `MetricsForm` (`components/metrics/metrics-form.tsx`)
 - **Propósito**: Formulario para agregar nuevas mediciones
 - **Características**:
-  - Campos para 9 medidas diferentes (peso, grasa corporal, etc.)
+  - Campos para medidas generales + medidas bilaterales (izq/der)
   - Interfaz expandible/colapsable
   - Validación de números
   - Notas opcionales por medición
+  - Cálculo automático de composición corporal al guardar (sin botón manual)
   - Guardado automático en localStorage
   - Diseño responsivo con grid
 
@@ -59,16 +60,24 @@ interface MetricEntry {
   date: string;                    // ISO string
   weight?: number;                 // kg
   bodyFat?: number;                // %
+  bodyFatSource?: 'manual' | 'estimated';
   muscleMass?: number;             // kg
-  biceps?: number;                 // cm
+  muscleMassSource?: 'manual' | 'estimated';
+  bicepsLeft?: number;             // cm
+  bicepsRight?: number;            // cm
   chest?: number;                  // cm
   waist?: number;                  // cm
   hips?: number;                   // cm
-  thighs?: number;                 // cm
-  calves?: number;                 // cm
+  thighLeft?: number;              // cm
+  thighRight?: number;             // cm
+  calfLeft?: number;               // cm
+  calfRight?: number;              // cm
   notes?: string;
 }
 ```
+
+Cálculo de composición: [`lib/body-composition.ts`](lib/body-composition.ts) (`resolveBodyComposition`, Deurenberg + derivación de masa muscular).
+Corrección rápida de historial: `updateEntry` y `removeEntry` en [`hooks/use-metrics.ts`](hooks/use-metrics.ts).
 
 ## Almacenamiento
 

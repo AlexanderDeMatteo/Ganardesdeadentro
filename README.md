@@ -12,10 +12,17 @@ Una plataforma moderna y hermosa para gestionar entrenamientos personalizados, s
 - Dark/Light mode compatible
 
 💪 **Funcionalidades Principales**
-- Autenticación mock para pruebas sin backend
-- Dashboard personalizado con estadísticas
-- Gestión de rutinas de entrenamiento
-- Seguimiento de métricas y progreso
+- Autenticación (mock para pruebas; backend Flask con JWT disponible)
+- Dashboard personalizado con resumen, membresía y métricas
+- Gestión de rutinas de entrenamiento y biblioteca de ejercicios (ExerciseDB)
+- Seguimiento de métricas y composición corporal (peso, grasa, músculo, medidas)
+- Gráficos interactivos de progreso
+- Módulo de nutrición: cálculo de metabolismo (BMR/TDEE), macros objetivo,
+  plan de comidas asignado por el entrenador, diario de alimentos, control de
+  agua y adherencia semanal
+- Titan: coach con IA (vía Ollama) que motiva, analiza tus sesiones de
+  entrenamiento y estima calorías/macros de comidas de forma conversacional
+- Planes de membresía (Básica, Premium, Pro) que desbloquean funciones
 - Perfil de usuario con estadísticas
 
 🎨 **Sistema de Diseño**
@@ -210,7 +217,8 @@ Edita `/app/globals.css` para cambiar los tokens de diseño:
 - **Framework**: Next.js 16
 - **Estilización**: Tailwind CSS v4
 - **UI Components**: shadcn/ui
-- **Autenticación**: Mock (localStorage)
+- **Autenticación**: Mock (localStorage) + backend Flask con JWT
+- **IA (coach Titan)**: Ollama (modelo `granite4.1:3b`) vía rutas Next API
 - **Iconos**: Lucide React
 - **Lenguaje**: TypeScript
 

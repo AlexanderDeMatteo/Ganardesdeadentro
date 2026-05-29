@@ -34,7 +34,7 @@ const sidebarNav: NavItem[] = [
   { href: '/routines', label: 'Rutinas', icon: Dumbbell },
   { href: '/metrics', label: 'Métricas', icon: LineChart },
   { href: '/', label: 'Comunidad', icon: Users },
-  { href: '/settings', label: 'Ajustes', icon: Settings },
+  { href: '/profile', label: 'Ajustes', icon: Settings },
 ];
 
 function NavLink({

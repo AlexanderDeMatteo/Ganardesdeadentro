@@ -5,15 +5,18 @@ import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Navbar } from '@/components/layout/navbar';
 import { useAuth } from '@/app/context/auth-context';
+import { MyTrainerCard } from '@/components/dashboard/my-trainer-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useBodyProfile } from '@/hooks/use-body-profile';
+import { useAthleteData } from '@/hooks/use-athlete-data';
 import type { BiologicalSex, BodyProfile } from '@/lib/body-profile';
 import { User, Mail, Ruler } from 'lucide-react';
 
 function ProfileContent() {
   const { user } = useAuth();
   const { profile, isLoaded, setProfile } = useBodyProfile();
+  const { completedSessionsCount, latestMetric, isLoading: athleteLoading } = useAthleteData();
   const [heightDraft, setHeightDraft] = useState('');
   const [ageDraft, setAgeDraft] = useState('');
   const [sexDraft, setSexDraft] = useState<'' | BiologicalSex>('');
@@ -194,13 +197,29 @@ function ProfileContent() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 p-4 border border-secondary/20">
                   <p className="text-sm text-muted-foreground mb-2">Entrenamientos completados</p>
-                  <p className="text-3xl font-bold text-foreground">28</p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {athleteLoading ? '—' : completedSessionsCount}
+                  </p>
                 </div>
                 <div className="rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 p-4 border border-orange-500/20">
-                  <p className="text-sm text-muted-foreground mb-2">Calorías quemadas</p>
-                  <p className="text-3xl font-bold text-foreground">8,420</p>
+                  <p className="text-sm text-muted-foreground mb-2">Peso actual</p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {latestMetric?.weight != null ? `${latestMetric.weight} kg` : '—'}
+                  </p>
                 </div>
               </div>
+              {user?.membership && (
+                <div className="mt-4 rounded-xl border border-border p-4">
+                  <p className="text-sm text-muted-foreground">Membresía</p>
+                  <p className="font-bold text-foreground">
+                    {user.membership.name} · {user.membership.daysRemaining} días restantes
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-border pt-8">
+              <MyTrainerCard />
             </div>
 
             {/* Actions */}

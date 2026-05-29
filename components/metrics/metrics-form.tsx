@@ -1,26 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useBodyProfile } from '@/hooks/use-body-profile';
-import { useMetrics, type MetricEntry, type BodyFatSource } from '@/hooks/use-metrics';
-import { estimateBodyFatFromWeightAndProfile } from '@/lib/estimate-body-fat';
+import { useMetrics, type MetricEntry, type BodyFatSource, type MuscleMassSource } from '@/hooks/use-metrics';
+import { resolveBodyComposition } from '@/lib/body-composition';
 import { cn } from '@/lib/utils';
 import { Plus, X } from 'lucide-react';
-
-const METRIC_FIELDS = [
-  { key: 'weight', label: 'Peso (kg)', placeholder: '85.5' },
-  { key: 'bodyFat', label: 'Grasa corporal (%) — opcional', placeholder: '18.5' },
-  { key: 'muscleMass', label: 'Masa Muscular (kg)', placeholder: '35.2' },
-  { key: 'biceps', label: 'Bíceps (cm)', placeholder: '33' },
-  { key: 'chest', label: 'Pecho (cm)', placeholder: '102' },
-  { key: 'waist', label: 'Cintura (cm)', placeholder: '79' },
-  { key: 'hips', label: 'Cadera (cm)', placeholder: '92' },
-  { key: 'thighs', label: 'Muslos (cm)', placeholder: '54' },
-  { key: 'calves', label: 'Pantorrillas (cm)', placeholder: '37' },
-] as const;
 
 export type MetricsFormVariant = 'default' | 'grouped' | 'zoned';
 
@@ -35,77 +23,21 @@ export type MetricsFormProps = {
   compact?: boolean;
 };
 
-type FieldKey = (typeof METRIC_FIELDS)[number]['key'];
+function parseOptionalFloat(raw: string | undefined): number | null {
+  const value = parseFloat(String(raw ?? '').replace(',', '.'));
+  return Number.isFinite(value) ? value : null;
+}
 
-const GROUPS: { title: string; keys: FieldKey[] }[] = [
-  { title: 'Composición corporal', keys: ['weight', 'bodyFat', 'muscleMass'] },
-  { title: 'Tren superior', keys: ['biceps', 'chest'] },
-  { title: 'Core y cadera', keys: ['waist', 'hips'] },
-  { title: 'Tren inferior', keys: ['thighs', 'calves'] },
-];
-
-function renderField(
-  key: FieldKey,
+function renderNumberField(
+  key: string,
   label: string,
   placeholder: string,
   formData: Record<string, string>,
   handleInputChange: (key: string, value: string) => void,
   idPrefix: string,
-  extras?: {
-    bodyFat?: {
-      showEstimate: boolean;
-      estimatedValue: number | null;
-      isLoaded: boolean;
-      onEstimate: () => void;
-    };
-  },
+  helperText?: ReactNode,
 ) {
   const inputId = `${idPrefix}${key}`;
-
-  if (key === 'bodyFat') {
-    const bf = extras?.bodyFat;
-    return (
-      <div key={key} className="space-y-2 lg:col-span-2">
-        <label htmlFor={inputId} className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">
-          {label}
-        </label>
-        <Input
-          id={inputId}
-          type="number"
-          step="0.1"
-          placeholder={placeholder}
-          value={formData[key] || ''}
-          onChange={(e) => handleInputChange(key, e.target.value)}
-          className="h-10"
-        />
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Si tu báscula muestra % grasa, introdúcelo aquí. Si no, completa tu perfil en{' '}
-          <Link href="/profile" className="font-semibold text-secondary underline-offset-2 hover:underline">
-            Mi perfil
-          </Link>{' '}
-          (talla, edad, sexo) y usa el botón de abajo.
-        </p>
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="border-secondary text-secondary hover:bg-secondary/10"
-            disabled={!bf?.showEstimate || bf.estimatedValue == null}
-            onClick={bf?.onEstimate}
-          >
-            Estimar a partir de mi perfil
-          </Button>
-          {bf && !bf.showEstimate && bf.isLoaded && (
-            <span className="text-xs text-muted-foreground">
-              Indica peso arriba y completa talla, edad y sexo en perfil (18+ años).
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div key={key} className="space-y-2">
       <label htmlFor={inputId} className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">
@@ -118,8 +50,60 @@ function renderField(
         placeholder={placeholder}
         value={formData[key] || ''}
         onChange={(e) => handleInputChange(key, e.target.value)}
-        className="h-10"
+        className="h-11 border-border/70 bg-black/50 focus-visible:ring-1 focus-visible:ring-primary"
       />
+      {helperText ? <p className="text-xs leading-relaxed text-muted-foreground">{helperText}</p> : null}
+    </div>
+  );
+}
+
+function renderBilateralFields(
+  baseId: string,
+  label: string,
+  leftKey: string,
+  rightKey: string,
+  placeholder: string,
+  formData: Record<string, string>,
+  handleInputChange: (key: string, value: string) => void,
+  idPrefix: string,
+) {
+  const leftId = `${idPrefix}${leftKey}`;
+  const rightId = `${idPrefix}${rightKey}`;
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">{label}</p>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label htmlFor={leftId} className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+            Izq
+          </label>
+          <Input
+            id={leftId}
+            type="number"
+            step="0.1"
+            placeholder={placeholder}
+            value={formData[leftKey] || ''}
+            onChange={(e) => handleInputChange(leftKey, e.target.value)}
+            className="h-11 border-border/70 bg-black/50 focus-visible:ring-1 focus-visible:ring-primary"
+            data-field-group={baseId}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor={rightId} className="text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+            Der
+          </label>
+          <Input
+            id={rightId}
+            type="number"
+            step="0.1"
+            placeholder={placeholder}
+            value={formData[rightKey] || ''}
+            onChange={(e) => handleInputChange(rightKey, e.target.value)}
+            className="h-11 border-border/70 bg-black/50 focus-visible:ring-1 focus-visible:ring-primary"
+            data-field-group={baseId}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -131,15 +115,17 @@ export function MetricsForm({
   compact = false,
 }: MetricsFormProps) {
   const { addEntry } = useMetrics();
-  const { profile, isLoaded, canEstimateBodyFat } = useBodyProfile();
+  const { profile, isLoaded } = useBodyProfile();
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [bodyFatSourceDraft, setBodyFatSourceDraft] = useState<BodyFatSource | null>(null);
+  const [muscleMassSourceDraft, setMuscleMassSourceDraft] = useState<MuscleMassSource | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setBodyFatSourceDraft(null);
+      setMuscleMassSourceDraft(null);
     }
   }, [isOpen]);
 
@@ -147,49 +133,62 @@ export function MetricsForm({
     if (key === 'bodyFat') {
       setBodyFatSourceDraft('manual');
     }
+    if (key === 'muscleMass') {
+      setMuscleMassSourceDraft('manual');
+    }
     setFormData((prev) => ({
       ...prev,
       [key]: value,
     }));
   };
 
-  const weightKg = parseFloat(String(formData.weight ?? '').replace(',', '.'));
-  const showEstimate = isLoaded && canEstimateBodyFat(weightKg);
-  const estimatedValue =
-    showEstimate && Number.isFinite(weightKg) ? estimateBodyFatFromWeightAndProfile(weightKg, profile) : null;
-
-  const handleEstimateBodyFat = () => {
-    if (estimatedValue == null) return;
-    setBodyFatSourceDraft('estimated');
-    setFormData((prev) => ({
-      ...prev,
-      bodyFat: estimatedValue.toFixed(1),
-    }));
-  };
+  const weightKg = parseOptionalFloat(formData.weight);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      const entry: Omit<MetricEntry, 'id'> = {
+      const entry: Omit<MetricEntry, 'id' | 'athleteId'> = {
         date: new Date().toISOString(),
       };
 
-      METRIC_FIELDS.forEach(({ key }) => {
-        if (key === 'bodyFat') {
-          const value = parseFloat(String(formData[key] ?? '').replace(',', '.'));
-          if (!isNaN(value)) {
-            entry.bodyFat = value;
-            entry.bodyFatSource = bodyFatSourceDraft === 'estimated' ? 'estimated' : 'manual';
-          }
-          return;
-        }
-        const value = parseFloat(String(formData[key] ?? '').replace(',', '.'));
-        if (!isNaN(value)) {
+      const resolved = resolveBodyComposition({
+        weightKg,
+        bodyFatPercent: parseOptionalFloat(formData.bodyFat),
+        muscleMassKg: parseOptionalFloat(formData.muscleMass),
+        profile,
+        bodyFatSourceDraft: bodyFatSourceDraft ?? null,
+        muscleMassSourceDraft: muscleMassSourceDraft ?? null,
+      });
+
+      const directNumericFields: Array<keyof Omit<MetricEntry, 'id' | 'athleteId' | 'date'>> = [
+        'weight',
+        'chest',
+        'waist',
+        'hips',
+        'bicepsLeft',
+        'bicepsRight',
+        'thighLeft',
+        'thighRight',
+        'calfLeft',
+        'calfRight',
+      ];
+      directNumericFields.forEach((key) => {
+        const value = parseOptionalFloat(formData[key]);
+        if (value != null) {
           (entry as Record<string, unknown>)[key] = value;
         }
       });
+
+      if (resolved.bodyFat != null) {
+        entry.bodyFat = resolved.bodyFat;
+        entry.bodyFatSource = resolved.bodyFatSource;
+      }
+      if (resolved.muscleMass != null) {
+        entry.muscleMass = resolved.muscleMass;
+        entry.muscleMassSource = resolved.muscleMassSource;
+      }
 
       if (formData.notes) {
         entry.notes = formData.notes;
@@ -198,6 +197,7 @@ export function MetricsForm({
       addEntry(entry);
       setFormData({});
       setBodyFatSourceDraft(null);
+      setMuscleMassSourceDraft(null);
       setIsOpen(false);
     } catch (error) {
       console.error('Error guardando métrica:', error);
@@ -206,20 +206,8 @@ export function MetricsForm({
     }
   };
 
-  const fieldMap = Object.fromEntries(METRIC_FIELDS.map((f) => [f.key, f])) as Record<
-    FieldKey,
-    (typeof METRIC_FIELDS)[number]
-  >;
-
-  const bodyFatExtras = {
-    showEstimate,
-    estimatedValue,
-    isLoaded,
-    onEstimate: handleEstimateBodyFat,
-  };
-
   const notesBlock = (
-    <div className="space-y-2">
+      <div className="space-y-3">
       <label htmlFor={`${idPrefix}notes`} className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">
         Notas (opcional)
       </label>
@@ -228,65 +216,101 @@ export function MetricsForm({
         placeholder="Cómo te sientes hoy, qué cambios notaste, etc."
         value={formData.notes || ''}
         onChange={(e) => handleInputChange('notes', e.target.value)}
-        className="h-24 w-full resize-none rounded-lg border border-input bg-input/50 p-3 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="h-24 w-full resize-none rounded-lg border border-border/70 bg-black/50 p-3 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
       />
     </div>
   );
 
-  const renderDefaultGrid = () => (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {METRIC_FIELDS.map(({ key, label, placeholder }) =>
-        renderField(key, label, placeholder, formData, handleInputChange, idPrefix, {
-          bodyFat: bodyFatExtras,
-        }),
-      )}
-    </div>
+  const sectionTitleClass = cn(
+    'text-[11px] font-extrabold uppercase tracking-[0.18em]',
+    variant === 'zoned' ? 'inline-flex rounded-full bg-primary/15 px-3 py-1 text-primary' : 'text-muted-foreground',
   );
-
-  const renderGroupedOrZoned = (zoned: boolean) => (
-    <div className="space-y-8">
-      {GROUPS.map((group) => (
-        <div key={group.title} className="space-y-4">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'text-[10px] font-extrabold uppercase tracking-[0.18em]',
-                zoned ? 'rounded-full bg-primary/15 px-3 py-1 text-primary' : 'text-muted-foreground',
-              )}
-            >
-              {group.title}
-            </span>
-            {zoned && <span className="h-px flex-1 bg-border" />}
-          </div>
-          <div
-            className={cn(
-              'grid gap-4',
-              group.keys.includes('bodyFat') ? 'md:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2',
-            )}
-          >
-            {group.keys.map((key) => {
-              const f = fieldMap[key];
-              return renderField(f.key, f.label, f.placeholder, formData, handleInputChange, idPrefix, {
-                bodyFat: bodyFatExtras,
-              });
-            })}
-          </div>
-        </div>
-      ))}
-      {notesBlock}
-    </div>
+  const sectionClass = cn(
+    'space-y-4 rounded-xl border border-border/60 bg-surface p-4',
+    variant === 'zoned' && 'border-primary/30 bg-primary/[0.03]',
   );
 
   const formInner = (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {variant === 'default' ? (
-        <>
-          {renderDefaultGrid()}
-          {notesBlock}
-        </>
-      ) : (
-        renderGroupedOrZoned(variant === 'zoned')
-      )}
+      <div className={sectionClass}>
+        <p className={sectionTitleClass}>Métricas generales</p>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {renderNumberField('weight', 'Peso (kg)', '85.5', formData, handleInputChange, idPrefix)}
+          {renderNumberField(
+            'bodyFat',
+            'Grasa corporal (%) — opcional si usas báscula',
+            '18.5',
+            formData,
+            handleInputChange,
+            idPrefix,
+            <>
+              Si tu báscula muestra % grasa, introdúcelo aquí. Si no, completa tu perfil en{' '}
+              <Link href="/profile" className="font-semibold text-secondary underline-offset-2 hover:underline">
+                Mi perfil
+              </Link>{' '}
+              (talla, edad, sexo). Al guardar se estima composición automáticamente cuando aplica.
+            </>,
+          )}
+          {renderNumberField(
+            'muscleMass',
+            'Masa muscular (kg) — opcional',
+            '35.2',
+            formData,
+            handleInputChange,
+            idPrefix,
+            !isLoaded
+              ? 'Cargando perfil para estimar composición automática.'
+              : 'Si queda vacío, se intentará calcular automáticamente al guardar.',
+          )}
+        </div>
+      </div>
+
+      <div className={sectionClass}>
+        <p className={sectionTitleClass}>Tren superior</p>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {renderNumberField('chest', 'Pecho (cm)', '102', formData, handleInputChange, idPrefix)}
+          {renderBilateralFields(
+            'biceps',
+            'Bíceps (cm)',
+            'bicepsLeft',
+            'bicepsRight',
+            '33',
+            formData,
+            handleInputChange,
+            idPrefix,
+          )}
+        </div>
+      </div>
+
+      <div className={sectionClass}>
+        <p className={sectionTitleClass}>Tren inferior</p>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {renderNumberField('waist', 'Cintura (cm)', '79', formData, handleInputChange, idPrefix)}
+          {renderNumberField('hips', 'Cadera (cm)', '92', formData, handleInputChange, idPrefix)}
+          {renderBilateralFields(
+            'thigh',
+            'Muslos (cm)',
+            'thighLeft',
+            'thighRight',
+            '54',
+            formData,
+            handleInputChange,
+            idPrefix,
+          )}
+          {renderBilateralFields(
+            'calf',
+            'Pantorrillas (cm)',
+            'calfLeft',
+            'calfRight',
+            '37',
+            formData,
+            handleInputChange,
+            idPrefix,
+          )}
+        </div>
+      </div>
+
+      {notesBlock}
 
       <div className="flex justify-end gap-3">
         <Button
@@ -346,6 +370,7 @@ export function MetricsForm({
               type="button"
               onClick={() => setIsOpen(false)}
               className="rounded-lg p-2 transition-colors hover:bg-secondary/10"
+              aria-label="Cerrar formulario de medición"
             >
               <X className="h-5 w-5 text-muted-foreground" />
             </button>

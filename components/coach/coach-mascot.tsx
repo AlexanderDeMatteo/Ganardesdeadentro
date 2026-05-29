@@ -1,14 +1,36 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { MessageCircle, Minimize2 } from 'lucide-react';
 import { CoachAvatar } from '@/components/coach/coach-avatar';
 import { Button } from '@/components/ui/button';
-import { useCoachTips } from '@/hooks/use-coach-tips';
+import { CoachTitanMessage } from '@/components/coach/coach-titan-message';
+import { useCoach } from '@/app/context/coach-context';
 import { cn } from '@/lib/utils';
 
 export function CoachMascot() {
-  const { tip, isMinimized, minimize, restore } = useCoachTips();
+  const messageScrollRef = useRef<HTMLDivElement>(null);
+  const {
+    tip,
+    coachMood,
+    isMinimized,
+    isTitanLoading,
+    titanMessage,
+    titanFetchId,
+    showTitanUi,
+    isSessionReviewActive,
+    isNutritionAssistantActive,
+    nutritionMessages,
+    nutritionEstimate,
+    nutritionQuickReplies,
+    nutritionError,
+    minimize,
+    restore,
+    sendNutritionReply,
+    confirmNutritionEstimate,
+  } = useCoach();
+  const [nutritionInput, setNutritionInput] = useState('');
 
   if (isMinimized) {
     return (
@@ -27,7 +49,7 @@ export function CoachMascot() {
     <aside
       className={cn(
         'coach-dialog fixed bottom-3 right-3 z-40 sm:bottom-5 sm:right-5',
-        `coach-dialog--${tip.mood}`,
+        `coach-dialog--${coachMood}`,
       )}
       aria-label="Coach visual de FitTrack"
     >
@@ -46,11 +68,108 @@ export function CoachMascot() {
               </button>
             </div>
 
-            <p className="coach-dialog__message" aria-live="polite">
-              {tip.message}
-            </p>
+            {showTitanUi ? (
+              <div
+                ref={messageScrollRef}
+                className={cn(
+                  'coach-dialog__messageScroll',
+                  isSessionReviewActive && 'coach-dialog__messageScroll--review',
+                )}
+              >
+                {isNutritionAssistantActive ? (
+                  <div className="space-y-2">
+                    <div className="max-h-36 space-y-1 overflow-y-auto rounded-md bg-muted/30 p-2 text-sm">
+                      {nutritionMessages.map((msg, idx) => (
+                        <p key={`${msg.role}-${idx}`} className="leading-relaxed">
+                          <span className="font-semibold">{msg.role === 'assistant' ? 'Titan' : 'Tú'}:</span>{' '}
+                          {msg.content}
+                        </p>
+                      ))}
+                    </div>
 
-            {tip.actionHref && tip.actionLabel && (
+                    <div className="flex gap-2">
+                      <input
+                        value={nutritionInput}
+                        onChange={(e) => setNutritionInput(e.target.value)}
+                        placeholder="Responde a Titan..."
+                        className="h-9 w-full rounded-md border border-input bg-input/50 px-3 text-sm"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          if (!nutritionInput.trim()) return;
+                          sendNutritionReply(nutritionInput);
+                          setNutritionInput('');
+                        }}
+                        disabled={isTitanLoading || nutritionInput.trim().length === 0}
+                      >
+                        Enviar
+                      </Button>
+                    </div>
+
+                    {nutritionQuickReplies.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {nutritionQuickReplies.map((reply) => (
+                          <Button
+                            key={reply}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => sendNutritionReply(reply)}
+                            disabled={isTitanLoading}
+                          >
+                            {reply}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {nutritionError && <p className="text-xs text-destructive">{nutritionError}</p>}
+
+                    {nutritionEstimate && (
+                      <div className="space-y-2 rounded-md border border-border bg-background/80 p-2 text-sm">
+                        <p className="font-semibold">
+                          Estimación: {nutritionEstimate.totalCalories} kcal ({nutritionEstimate.confidence})
+                        </p>
+                        <div className="max-h-32 space-y-1 overflow-y-auto rounded-md bg-muted/30 p-2 text-xs">
+                          {nutritionEstimate.items.map((item, idx) => (
+                            <div key={`${item.name}-${idx}`} className="rounded border border-border/60 p-2">
+                              <p className="font-semibold text-foreground">
+                                {item.name} - {item.quantity}
+                              </p>
+                              <p className="text-muted-foreground">
+                                {item.calories} kcal · P {item.proteinG}g · C {item.carbsG}g · G {item.fatG}g
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <Button type="button" size="sm" onClick={confirmNutritionEstimate}>
+                          Confirmar y registrar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <CoachTitanMessage
+                    isLoading={isTitanLoading}
+                    text={titanMessage}
+                    messageKey={titanFetchId}
+                    className="coach-dialog__message"
+                    animate
+                    msPerChar={isSessionReviewActive ? 18 : 32}
+                    scrollContainerRef={messageScrollRef}
+                    isReview={isSessionReviewActive}
+                  />
+                )}
+              </div>
+            ) : (
+              <p className="coach-dialog__message" aria-live="polite">
+                {tip.message}
+              </p>
+            )}
+
+            {tip.actionHref && tip.actionLabel && !isSessionReviewActive && !isNutritionAssistantActive && (
               <Button asChild size="sm" className="coach-dialog__cta">
                 <Link href={tip.actionHref}>{tip.actionLabel}</Link>
               </Button>
@@ -60,7 +179,7 @@ export function CoachMascot() {
 
         <div className="coach-dialog__trainer">
           <div className="coach-dialog__trainerGlow" aria-hidden />
-          <CoachAvatar mood={tip.mood} className="coach-dialog__avatar" priority />
+          <CoachAvatar mood={coachMood} className="coach-dialog__avatar" priority />
         </div>
       </div>
     </aside>

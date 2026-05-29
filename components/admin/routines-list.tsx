@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { Routine } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Clock, Dumbbell, Trash2, Edit2 } from 'lucide-react';
 
 interface RoutinesListProps {
@@ -10,6 +13,8 @@ interface RoutinesListProps {
 }
 
 export function RoutinesList({ routines, onDelete }: RoutinesListProps) {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case 'beginner':
@@ -22,6 +27,8 @@ export function RoutinesList({ routines, onDelete }: RoutinesListProps) {
         return 'bg-muted';
     }
   };
+
+  const pendingRoutine = routines.find((r) => r.id === pendingDeleteId);
 
   return (
     <div className="space-y-4">
@@ -59,21 +66,22 @@ export function RoutinesList({ routines, onDelete }: RoutinesListProps) {
                 variant="outline"
                 size="sm"
                 className="h-10 w-10 p-0 border-secondary/30 hover:bg-secondary/10"
+                aria-label={`Editar rutina ${routine.name}`}
               >
                 <Edit2 className="h-4 w-4" />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onDelete(routine.id)}
+                onClick={() => setPendingDeleteId(routine.id)}
                 className="h-10 w-10 p-0 border-destructive/30 text-destructive hover:bg-destructive/10"
+                aria-label={`Eliminar rutina ${routine.name}`}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Ejercicios Preview */}
           <div className="bg-secondary/5 rounded-lg p-4 border border-secondary/20">
             <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase">Ejercicios incluidos</p>
             <div className="space-y-2">
@@ -96,10 +104,30 @@ export function RoutinesList({ routines, onDelete }: RoutinesListProps) {
       ))}
 
       {routines.length === 0 && (
-        <div className="text-center py-12 rounded-2xl border border-secondary/20 bg-secondary/5">
-          <p className="text-muted-foreground">No hay rutinas creadas aún</p>
-        </div>
+        <EmptyState
+          title="No hay rutinas creadas aún"
+          description="Crea tu primera rutina para asignarla a tus atletas."
+        />
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => !open && setPendingDeleteId(null)}
+        title="Eliminar rutina"
+        description={
+          pendingRoutine
+            ? `¿Eliminar "${pendingRoutine.name}"? Esta acción no se puede deshacer.`
+            : '¿Eliminar esta rutina? Esta acción no se puede deshacer.'
+        }
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            onDelete(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+      />
     </div>
   );
 }

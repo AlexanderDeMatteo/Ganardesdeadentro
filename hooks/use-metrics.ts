@@ -9,129 +9,176 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useAuth } from '@/app/context/auth-context';
+import {
+  addMetric as clientAddMetric,
+  getAthleteMetrics,
+  removeMetric as clientRemoveMetric,
+  updateMetric as clientUpdateMetric,
+} from '@/lib/data/client';
+import { useDataStore } from '@/lib/data/store';
+import type { Metric } from '@/lib/data/types';
+import { resolveAthleteId } from '@/lib/nutrition/resolve-athlete-id';
 
-export type BodyFatSource = 'manual' | 'estimated';
-
-export interface MetricEntry {
-  id: string;
-  date: string;
-  weight?: number;
-  bodyFat?: number;
-  /** Present when bodyFat was set explicitly (manual scale/trainer) vs app formula. */
-  bodyFatSource?: BodyFatSource;
-  muscleMass?: number;
-  biceps?: number;
-  chest?: number;
-  waist?: number;
-  hips?: number;
-  thighs?: number;
-  calves?: number;
-  notes?: string;
-}
-
-const STORAGE_KEY = 'fittrack_metrics';
+export type BodyFatSource = Metric['bodyFatSource'];
+export type MuscleMassSource = Metric['muscleMassSource'];
+export type MetricEntry = Metric;
 
 export type MetricsContextValue = {
   entries: MetricEntry[];
+  athleteId: string | null;
   isLoading: boolean;
-  addEntry: (entry: Omit<MetricEntry, 'id'>) => MetricEntry;
+  error: string | null;
+  addEntry: (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => MetricEntry;
+  updateEntry: (id: string, patch: Partial<Omit<MetricEntry, 'id' | 'athleteId'>>) => void;
+  removeEntry: (id: string) => void;
   getLatestEntry: () => MetricEntry | null;
   getProgressChange: (metric: keyof MetricEntry) => number | null;
-  getChartData: (metric: keyof MetricEntry) => Array<{
+  getChartData: (metric: keyof MetricEntry | 'bicepsAvg' | 'thighAvg' | 'calfAvg') => Array<{
     date: string;
     value: number | undefined;
     fullDate: string;
     bodyFatSource?: BodyFatSource;
+    muscleMassSource?: MuscleMassSource;
   }>;
 };
 
 const MetricsContext = createContext<MetricsContextValue | null>(null);
 
 function useMetricsStore(): MetricsContextValue {
+  const { user } = useAuth();
+  const { isHydrated, state } = useDataStore();
+  const athleteId = resolveAthleteId(user);
   const [entries, setEntries] = useState<MetricEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadMetrics = useCallback(async () => {
+    if (!athleteId) {
+      setEntries([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setEntries(JSON.parse(stored));
-      } else {
-        const mockData: MetricEntry[] = [
+      const data = await getAthleteMetrics(athleteId);
+      if (data.length === 0) {
+        const seed: MetricEntry[] = [
           {
             id: '1',
+            athleteId,
             date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
             weight: 88,
             bodyFat: 22,
             muscleMass: 33,
-            biceps: 31,
+            bicepsLeft: 31,
+            bicepsRight: 31.4,
             chest: 98,
             waist: 82,
             hips: 95,
-            thighs: 52,
-            calves: 36,
+            thighLeft: 52,
+            thighRight: 52.4,
+            calfLeft: 36,
+            calfRight: 36.2,
           },
           {
             id: '2',
-            date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-            weight: 87,
-            bodyFat: 21.5,
-            muscleMass: 33.5,
-            biceps: 31.5,
-            chest: 99,
-            waist: 81,
-            hips: 94,
-            thighs: 52.5,
-            calves: 36.2,
+            athleteId,
+            date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+            weight: 85.5,
+            bodyFat: 18.5,
+            muscleMass: 35.2,
+            bicepsLeft: 33,
+            bicepsRight: 33.5,
+            chest: 102,
+            waist: 79,
+            hips: 92,
+            thighLeft: 54,
+            thighRight: 54.6,
+            calfLeft: 37,
+            calfRight: 37.2,
           },
           {
             id: '3',
-            date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-            weight: 85.5,
-            bodyFat: 20.5,
-            muscleMass: 34.2,
-            biceps: 32,
-            chest: 100,
-            waist: 80,
-            hips: 93,
-            thighs: 53,
-            calves: 36.5,
-          },
-          {
-            id: '4',
+            athleteId,
             date: new Date().toISOString(),
             weight: 85.5,
             bodyFat: 18.5,
             muscleMass: 35.2,
-            biceps: 33,
+            bicepsLeft: 33,
+            bicepsRight: 33.5,
             chest: 102,
             waist: 79,
             hips: 92,
-            thighs: 54,
-            calves: 37,
+            thighLeft: 54,
+            thighRight: 54.6,
+            calfLeft: 37,
+            calfRight: 37.2,
           },
         ];
-        setEntries(mockData);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mockData));
+        for (const entry of seed) {
+          await clientAddMetric(athleteId, entry);
+        }
+        setEntries(await getAthleteMetrics(athleteId));
+      } else {
+        setEntries(data);
       }
-    } catch (error) {
-      console.error('Error loading metrics:', error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar métricas');
+      setEntries([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [athleteId]);
 
-  const addEntry = useCallback((entry: Omit<MetricEntry, 'id'>) => {
-    const newEntry: MetricEntry = {
-      ...entry,
-      id: Date.now().toString(),
-    };
-    setEntries((prev) => {
-      const updated = [...prev, newEntry];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      return updated;
+  useEffect(() => {
+    if (!isHydrated) return;
+    void loadMetrics();
+  }, [isHydrated, loadMetrics, state.metrics, athleteId]);
+
+  const addEntry = useCallback(
+    (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => {
+      if (!athleteId) throw new Error('No hay atleta identificado');
+      let created!: MetricEntry;
+      void clientAddMetric(athleteId, entry).then((m) => {
+        created = m;
+        setEntries((prev) => [...prev, m]);
+      });
+      return {
+        ...entry,
+        id: Date.now().toString(),
+        athleteId,
+      } as MetricEntry;
+    },
+    [athleteId],
+  );
+
+  const addEntryAsync = useCallback(
+    async (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => {
+      if (!athleteId) throw new Error('No hay atleta identificado');
+      const created = await clientAddMetric(athleteId, entry);
+      setEntries((prev) => [...prev, created]);
+      return created;
+    },
+    [athleteId],
+  );
+
+  const updateEntry = useCallback(
+    (id: string, patch: Partial<Omit<MetricEntry, 'id' | 'athleteId'>>) => {
+      void clientUpdateMetric(id, patch).then((updated) => {
+        if (updated) {
+          setEntries((prev) => prev.map((e) => (e.id === id ? updated : e)));
+        }
+      });
+    },
+    [],
+  );
+
+  const removeEntry = useCallback((id: string) => {
+    void clientRemoveMetric(id).then(() => {
+      setEntries((prev) => prev.filter((e) => e.id !== id));
     });
-    return newEntry;
   }, []);
 
   const getLatestEntry = useCallback(() => {
@@ -142,31 +189,43 @@ function useMetricsStore(): MetricsContextValue {
   const getProgressChange = useCallback(
     (metric: keyof MetricEntry) => {
       if (entries.length < 2) return null;
-
       const latest = entries[entries.length - 1];
       const previous = entries[entries.length - 2];
-
       const latestValue = latest[metric as keyof MetricEntry];
       const previousValue = previous[metric as keyof MetricEntry];
-
-      if (typeof latestValue !== 'number' || typeof previousValue !== 'number') {
-        return null;
-      }
-
+      if (typeof latestValue !== 'number' || typeof previousValue !== 'number') return null;
       return latestValue - previousValue;
     },
     [entries],
   );
 
   const getChartData = useCallback(
-    (metric: keyof MetricEntry) => {
+    (metric: keyof MetricEntry | 'bicepsAvg' | 'thighAvg' | 'calfAvg') => {
+      const avg = (a?: number, b?: number): number | undefined => {
+        if (typeof a === 'number' && typeof b === 'number') return (a + b) / 2;
+        if (typeof a === 'number') return a;
+        if (typeof b === 'number') return b;
+        return undefined;
+      };
       return entries
-        .filter((entry) => entry[metric] !== undefined)
+        .map((entry) => {
+          const value =
+            metric === 'bicepsAvg'
+              ? avg(entry.bicepsLeft, entry.bicepsRight)
+              : metric === 'thighAvg'
+                ? avg(entry.thighLeft, entry.thighRight)
+                : metric === 'calfAvg'
+                  ? avg(entry.calfLeft, entry.calfRight)
+                  : (entry[metric] as number | undefined);
+          return { entry, value };
+        })
+        .filter((row) => row.value !== undefined)
         .map((entry) => ({
-          date: new Date(entry.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
-          value: entry[metric] as number | undefined,
-          fullDate: entry.date,
-          ...(metric === 'bodyFat' ? { bodyFatSource: entry.bodyFatSource } : {}),
+          date: new Date(entry.entry.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
+          value: entry.value,
+          fullDate: entry.entry.date,
+          ...(metric === 'bodyFat' ? { bodyFatSource: entry.entry.bodyFatSource } : {}),
+          ...(metric === 'muscleMass' ? { muscleMassSource: entry.entry.muscleMassSource } : {}),
         }));
     },
     [entries],
@@ -174,15 +233,22 @@ function useMetricsStore(): MetricsContextValue {
 
   return {
     entries,
+    athleteId,
     isLoading,
-    addEntry,
+    error,
+    addEntry: (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => {
+      if (!athleteId) throw new Error('No hay atleta identificado');
+      void addEntryAsync(entry);
+      return { ...entry, id: Date.now().toString(), athleteId } as MetricEntry;
+    },
+    updateEntry,
+    removeEntry,
     getLatestEntry,
     getProgressChange,
     getChartData,
   };
 }
 
-/** Fuente única de métricas (localStorage) para toda la app. Debe envolver el árbol donde se use `useMetrics`. */
 export function MetricsProvider({ children }: { children: ReactNode }) {
   const value = useMetricsStore();
   return createElement(MetricsContext.Provider, { value }, children);

@@ -65,7 +65,22 @@ export function MetricsSummary({ variant = 'default' }: { variant?: MetricsSumma
     latest.bodyFat != null
       ? `${latest.bodyFat.toFixed(1)}%${latest.bodyFatSource === 'estimated' ? ' (est.)' : ''}`
       : '—';
-  const muscleMass = latest.muscleMass ? `${latest.muscleMass.toFixed(1)} kg` : '—';
+  const muscleMass =
+    latest.muscleMass != null
+      ? `${latest.muscleMass.toFixed(1)} kg${latest.muscleMassSource === 'estimated' ? ' (est.)' : ''}`
+      : '—';
+  const bicepsPair =
+    latest.bicepsLeft != null || latest.bicepsRight != null
+      ? `${latest.bicepsLeft?.toFixed(1) ?? '—'} / ${latest.bicepsRight?.toFixed(1) ?? '—'} cm`
+      : '—';
+  const thighPair =
+    latest.thighLeft != null || latest.thighRight != null
+      ? `${latest.thighLeft?.toFixed(1) ?? '—'} / ${latest.thighRight?.toFixed(1) ?? '—'} cm`
+      : '—';
+  const calfPair =
+    latest.calfLeft != null || latest.calfRight != null
+      ? `${latest.calfLeft?.toFixed(1) ?? '—'} / ${latest.calfRight?.toFixed(1) ?? '—'} cm`
+      : '—';
 
   const weightChange = getProgressChange('weight');
   const bodyFatChange = getProgressChange('bodyFat');
@@ -159,6 +174,27 @@ export function MetricsSummary({ variant = 'default' }: { variant?: MetricsSumma
               </span>
             )}
           </div>
+        </div>
+
+        <div className="flex items-end justify-between border-b border-border pb-2">
+          <span className={cn('text-sm text-muted-foreground', isBrutalist && 'dm-label text-[10px] font-bold uppercase')}>
+            Bíceps (izq/der)
+          </span>
+          <span className={cn('font-semibold text-foreground', isBrutalist && 'dm-display text-base')}>{bicepsPair}</span>
+        </div>
+
+        <div className="flex items-end justify-between border-b border-border pb-2">
+          <span className={cn('text-sm text-muted-foreground', isBrutalist && 'dm-label text-[10px] font-bold uppercase')}>
+            Muslos (izq/der)
+          </span>
+          <span className={cn('font-semibold text-foreground', isBrutalist && 'dm-display text-base')}>{thighPair}</span>
+        </div>
+
+        <div className="flex items-end justify-between border-b border-border pb-2">
+          <span className={cn('text-sm text-muted-foreground', isBrutalist && 'dm-label text-[10px] font-bold uppercase')}>
+            Pantorrillas (izq/der)
+          </span>
+          <span className={cn('font-semibold text-foreground', isBrutalist && 'dm-display text-base')}>{calfPair}</span>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import type { CoachMood } from '@/hooks/use-coach-tips';
+import type { CoachMood } from '@/lib/coach/types';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 

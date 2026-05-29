@@ -3,10 +3,12 @@
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { MetricsOptionConservative } from '@/components/metrics/metrics-option-conservative';
 import { Navbar } from '@/components/layout/navbar';
+import { LoadingState } from '@/components/ui/loading-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { useMetrics } from '@/hooks/use-metrics';
 
 function MetricsContent() {
-  const { isLoading } = useMetrics();
+  const { isLoading, error } = useMetrics();
 
   if (isLoading) {
     return (
@@ -14,7 +16,20 @@ function MetricsContent() {
         <Navbar />
         <main className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/5">
           <div className="mx-auto max-w-6xl px-4 py-12">
-            <p className="text-muted-foreground">Cargando métricas...</p>
+            <LoadingState label="Cargando métricas…" />
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/5">
+          <div className="mx-auto max-w-6xl px-4 py-12">
+            <ErrorState message={error} />
           </div>
         </main>
       </>
