@@ -4,28 +4,7 @@ os.environ.setdefault('ENVIRONMENT', 'testing')
 
 import pytest
 
-from app import create_app
-from app.config import TestingConfig
-from app.database import SessionLocal, drop_db, init_db
-from app.models import User
 from app.services.auth_service import AuthService
-
-
-@pytest.fixture
-def app():
-    application = create_app(TestingConfig)
-    application.config.update({'TESTING': True})
-    return application
-
-
-@pytest.fixture
-def client(app):
-    with app.test_client() as test_client:
-        with app.app_context():
-            drop_db()
-            init_db()
-            yield test_client
-            SessionLocal.remove()
 
 
 def _register_user(client, email='user@example.com', password='password123', role=None):
@@ -64,6 +43,11 @@ class TestRegister:
         assert response.status_code == 400
         assert 'email' in response.get_json()['error'].lower()
 
+    def test_register_invalid_email(self, client):
+        response = _register_user(client, email='not-an-email')
+        assert response.status_code == 400
+        assert 'email' in response.get_json()['error'].lower()
+
     def test_register_short_password(self, client):
         response = _register_user(client, email='short@example.com', password='short')
         assert response.status_code == 400
@@ -86,6 +70,9 @@ class TestLogin:
         assert response.status_code == 401
 
     def test_login_inactive_user(self, client):
+        from app.database import SessionLocal
+        from app.models import User
+
         _register_user(client, email='inactive@example.com')
         user = AuthService.get_user_by_email('inactive@example.com')
         assert user is not None
@@ -115,6 +102,26 @@ class TestProtectedRoutes:
         )
         assert response.status_code == 200
         assert response.get_json()['user']['email'] == 'me@example.com'
+
+    def test_me_rejects_inactive_user(self, client):
+        from app.database import SessionLocal
+        from app.models import User
+
+        register_response = _register_user(client, email='inactive-me@example.com')
+        token = register_response.get_json()['access_token']
+        session = SessionLocal()
+        try:
+            user = session.query(User).filter_by(email='inactive-me@example.com').first()
+            user.is_active = False
+            session.commit()
+        finally:
+            session.close()
+
+        response = client.get(
+            '/api/auth/me',
+            headers={'Authorization': f'Bearer {token}'},
+        )
+        assert response.status_code == 401
 
 
 class TestChangePassword:

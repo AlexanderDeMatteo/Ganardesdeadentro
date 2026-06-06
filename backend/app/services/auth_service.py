@@ -2,8 +2,10 @@ import logging
 
 import bcrypt
 from datetime import datetime, timezone
-from app.models import RoleEnum, User, UserProfile
+
 from app.database import SessionLocal
+from app.models import RoleEnum, User, UserProfile
+from app.utils.validation import validate_email
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +19,10 @@ class AuthService:
 
     @staticmethod
     def hash_password(password: str) -> str:
-        """Genera un hash seguro de la contraseña."""
         return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
 
     @staticmethod
     def verify_password(password: str, password_hash: str) -> bool:
-        """Verifica una contraseña contra su hash."""
         return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
 
     @staticmethod
@@ -34,12 +34,6 @@ class AuthService:
         role: str = 'user',
         session=None,
     ) -> tuple[User | None, str]:
-        """
-        Crea un nuevo usuario.
-
-        Returns:
-            tuple: (usuario creado, mensaje de error o vacio)
-        """
         if role not in ALLOWED_ROLES:
             return None, 'Rol no permitido'
 
@@ -49,18 +43,24 @@ class AuthService:
             close_session = True
 
         try:
-            existing_user = session.query(User).filter_by(email=email).first()
+            email_error = validate_email(email)
+            if email_error:
+                return None, email_error
+
+            normalized_email = email.strip().lower()
+
+            existing_user = session.query(User).filter_by(email=normalized_email).first()
             if existing_user:
                 return None, 'El email ya está registrado'
 
-            if not email or not password or not first_name or not last_name:
+            if not password or not first_name or not last_name:
                 return None, 'Faltan campos requeridos'
 
             if len(password) < 8:
                 return None, 'La contraseña debe tener al menos 8 caracteres'
 
             user = User(
-                email=email.lower(),
+                email=normalized_email,
                 password_hash=AuthService.hash_password(password),
                 first_name=first_name.strip(),
                 last_name=last_name.strip(),
@@ -95,19 +95,17 @@ class AuthService:
         password: str,
         session=None,
     ) -> tuple[User | None, str]:
-        """
-        Autentica un usuario verificando email y contraseña.
-
-        Returns:
-            tuple: (usuario autenticado, mensaje de error o vacio)
-        """
         close_session = False
         if session is None:
             session = SessionLocal()
             close_session = True
 
         try:
-            user = session.query(User).filter_by(email=email.lower()).first()
+            email_error = validate_email(email)
+            if email_error:
+                return None, 'Email o contraseña incorrectos'
+
+            user = session.query(User).filter_by(email=email.strip().lower()).first()
 
             if not user:
                 return None, 'Email o contraseña incorrectos'
@@ -130,7 +128,6 @@ class AuthService:
 
     @staticmethod
     def get_user_by_id(user_id: int, session=None) -> User | None:
-        """Obtiene un usuario por ID."""
         close_session = False
         if session is None:
             session = SessionLocal()
@@ -144,14 +141,13 @@ class AuthService:
 
     @staticmethod
     def get_user_by_email(email: str, session=None) -> User | None:
-        """Obtiene un usuario por email."""
         close_session = False
         if session is None:
             session = SessionLocal()
             close_session = True
 
         try:
-            return session.query(User).filter_by(email=email.lower()).first()
+            return session.query(User).filter_by(email=email.strip().lower()).first()
         finally:
             if close_session:
                 session.close()
@@ -163,12 +159,6 @@ class AuthService:
         new_password: str,
         session=None,
     ) -> tuple[bool, str]:
-        """
-        Cambia la contraseña del usuario.
-
-        Returns:
-            tuple: (éxito, mensaje de error o vacio)
-        """
         close_session = False
         if session is None:
             session = SessionLocal()
@@ -179,6 +169,9 @@ class AuthService:
 
             if not user:
                 return False, 'Usuario no encontrado'
+
+            if not user.is_active:
+                return False, 'La cuenta ha sido desactivada'
 
             if not AuthService.verify_password(old_password, user.password_hash):
                 return False, 'Contraseña actual incorrecta'

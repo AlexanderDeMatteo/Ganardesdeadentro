@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from app.database import SessionLocal
 from app.models import RoleEnum, User, UserMembership, UserProfile
 from app.schemas.serializers import serialize_athlete, serialize_trainer
+from app.services.membership_service import MembershipService
+from app.utils.validation import validate_email
 
 logger = logging.getLogger(__name__)
 GENERIC_ERROR = 'No se pudo completar la operación'
@@ -98,7 +100,18 @@ class UserService:
                 athlete.first_name = parts[0]
                 athlete.last_name = parts[1] if len(parts) > 1 else ''
             if 'email' in patch:
-                athlete.email = str(patch['email']).lower()
+                email_error = validate_email(str(patch['email']))
+                if email_error:
+                    return None, email_error
+                normalized_email = str(patch['email']).strip().lower()
+                existing = (
+                    session.query(User)
+                    .filter(User.email == normalized_email, User.id != athlete.id)
+                    .first()
+                )
+                if existing:
+                    return None, 'El email ya está registrado'
+                athlete.email = normalized_email
             if 'age' in patch:
                 profile.age = patch['age']
             if 'gender' in patch:
@@ -108,7 +121,19 @@ class UserService:
             if 'height' in patch:
                 profile.initial_height = patch['height']
             if 'membershipLevel' in patch:
-                pass
+                level = str(patch['membershipLevel']).lower()
+                if level == 'basic':
+                    _, membership_error = MembershipService.revoke_membership(athlete.id, session=session)
+                    if membership_error and membership_error != 'No hay membresía activa':
+                        return None, membership_error
+                else:
+                    _, membership_error = MembershipService.assign_membership_by_level(
+                        athlete.id,
+                        level,
+                        session=session,
+                    )
+                    if membership_error:
+                        return None, membership_error
             athlete.updated_at = datetime.now(timezone.utc)
             session.commit()
             active = (

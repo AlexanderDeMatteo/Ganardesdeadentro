@@ -67,7 +67,12 @@ def patch_athlete(athlete_id):
     data = request.get_json() or {}
     athlete, error = UserService.update_athlete(parsed, data)
     if error:
-        status = 404 if error == 'Atleta no encontrado' else 500
+        if error in ('Atleta no encontrado',):
+            status = 404
+        elif error in ('Email inválido', 'El email ya está registrado', 'Plan de membresía no encontrado'):
+            status = 400
+        else:
+            status = 500
         return {'error': error}, status
     return {'athlete': athlete}, 200
 

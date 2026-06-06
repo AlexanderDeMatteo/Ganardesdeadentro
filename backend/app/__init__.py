@@ -2,13 +2,16 @@ from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from app.config import get_config, validate_critical_config
-from app.database import init_db, SessionLocal
+from app.database import SessionLocal, init_db
+from app.extensions import limiter
+from app.models import User
 
 
 def create_app(config=None):
     """Factory para crear la aplicación Flask."""
 
     app = Flask(__name__)
+    app.url_map.strict_slashes = False
 
     if config is None:
         config = get_config()
@@ -17,7 +20,24 @@ def create_app(config=None):
     app.config.from_object(config)
 
     CORS(app, origins=app.config['CORS_ORIGINS'], supports_credentials=True)
-    JWTManager(app)
+    jwt = JWTManager(app)
+    limiter.init_app(app)
+
+    @jwt.user_lookup_loader
+    def load_user(_jwt_header, jwt_data):
+        session = SessionLocal()
+        try:
+            user_id = int(jwt_data['sub'])
+            user = session.query(User).filter_by(id=user_id).first()
+            if user is None or not user.is_active:
+                return None
+            return user
+        finally:
+            session.close()
+
+    @jwt.user_lookup_error_loader
+    def invalid_user(_jwt_header, jwt_data):
+        return {'error': 'La cuenta ha sido desactivada o no existe'}, 401
 
     init_db()
 
@@ -54,6 +74,10 @@ def create_app(config=None):
     @app.errorhandler(500)
     def server_error(error):
         return {'error': 'Error interno del servidor'}, 500
+
+    @app.errorhandler(429)
+    def rate_limit_exceeded(error):
+        return {'error': 'Demasiadas solicitudes. Intenta más tarde.'}, 429
 
     @app.teardown_appcontext
     def shutdown_session(exception=None):

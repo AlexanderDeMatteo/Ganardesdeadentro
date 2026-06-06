@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
-from app.services.session_service import SessionService
+from app.services.session_service import GENERIC_ERROR, SessionService
 from app.utils.authorization import get_current_user_id, require_athlete_access
 
 sessions_bp = Blueprint('sessions', __name__)
@@ -34,7 +34,10 @@ def complete_session():
     finally:
         session.close()
     if error:
-        return {'error': error}, 500
+        status = 400 if error != GENERIC_ERROR else 500
+        if error in ('Rutina no encontrada', 'Rutina no asignada al atleta'):
+            status = 400
+        return {'error': error}, status
     return {'session': log}, 201
 
 

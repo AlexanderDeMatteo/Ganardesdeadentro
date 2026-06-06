@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     Enum as SQLEnum,
@@ -40,7 +41,7 @@ class User(Base):
     last_name = Column(String(120), nullable=False)
     role = Column(SQLEnum(RoleEnum), default=RoleEnum.USER, nullable=False)
     trainer_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
         DateTime,
@@ -191,7 +192,7 @@ class Routine(Base):
     difficulty = Column(SQLEnum(DifficultyEnum), default=DifficultyEnum.BEGINNER)
     duration_minutes = Column(Integer)
     required_membership_level = Column(Integer, ForeignKey('memberships.id'))
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     is_public = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
@@ -210,6 +211,7 @@ class Routine(Base):
         Index('idx_routine_admin', 'admin_id', 'is_active'),
         Index('idx_routine_trainer', 'trainer_id', 'is_active'),
         Index('idx_routine_difficulty', 'difficulty'),
+        CheckConstraint('admin_id IS NOT NULL OR trainer_id IS NOT NULL', name='ck_routine_owner_present'),
     )
 
 

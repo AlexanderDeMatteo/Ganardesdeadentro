@@ -36,7 +36,6 @@ def active_membership():
 
 @memberships_bp.route('/plans', methods=['GET'])
 @jwt_required()
-@role_required('admin')
 def list_plans():
     plans, error = MembershipService.list_plans()
     if error:
@@ -83,3 +82,24 @@ def delete_plan(plan_id):
         status = 404 if error == 'Plan no encontrado' else 500
         return {'error': error}, status
     return {'message': 'Plan eliminado'}, 200
+
+
+@memberships_bp.route('/users/<user_id>', methods=['PUT'])
+@jwt_required()
+@role_required('admin')
+def assign_user_membership(user_id):
+    parsed, err = _parse_int(user_id, 'userId')
+    if err:
+        return err
+    data = request.get_json() or {}
+    plan_id = data.get('planId')
+    if plan_id is None:
+        return {'error': 'planId requerido'}, 400
+    plan_parsed, err = _parse_int(plan_id, 'planId')
+    if err:
+        return err
+    membership, error = MembershipService.assign_membership(parsed, plan_parsed)
+    if error:
+        status = 404 if error in ('Atleta no encontrado', 'Plan no encontrado') else 500
+        return {'error': error}, status
+    return {'membership': membership}, 200

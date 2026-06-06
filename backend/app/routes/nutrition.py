@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
-from app.services.nutrition_service import NutritionService
+from app.services.nutrition_service import GENERIC_ERROR, NutritionService
 from app.utils.authorization import require_athlete_access, require_manage_athlete, role_required
 
 nutrition_bp = Blueprint('nutrition', __name__)
@@ -54,7 +54,12 @@ def publish_plan():
     finally:
         session.close()
     if error:
-        return {'error': error}, 500
+        if error in ('Atleta no encontrado',):
+            return {'error': error}, 404
+        if error in ('El usuario no es un atleta',):
+            return {'error': error}, 400
+        status = 400 if error not in (GENERIC_ERROR,) else 500
+        return {'error': error}, status
     return {'plan': plan}, 200
 
 
@@ -99,5 +104,6 @@ def save_coach_draft():
     finally:
         session.close()
     if error:
-        return {'error': error}, 500
+        status = 400 if error != GENERIC_ERROR else 500
+        return {'error': error}, status
     return {'draft': saved}, 200

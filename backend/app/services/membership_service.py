@@ -1,10 +1,10 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.database import SessionLocal
-from app.models import Membership, UserMembership
-from app.schemas.serializers import serialize_active_membership, serialize_membership_plan
+from app.models import Membership, RoleEnum, User, UserMembership
+from app.schemas.serializers import _membership_level_from_name, serialize_active_membership, serialize_membership_plan
 
 logger = logging.getLogger(__name__)
 GENERIC_ERROR = 'No se pudo completar la operación'
@@ -128,6 +128,91 @@ class MembershipService:
         except Exception:
             session.rollback()
             logger.exception('Error deleting membership plan')
+            return False, GENERIC_ERROR
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
+    def _resolve_plan_by_level(session, level: str) -> Membership | None:
+        normalized = str(level).lower()
+        plans = session.query(Membership).filter_by(is_active=True).order_by(Membership.id.asc()).all()
+        for plan in plans:
+            if _membership_level_from_name(plan.name) == normalized:
+                return plan
+        return None
+
+    @staticmethod
+    def assign_membership(user_id: int, plan_id: int, session=None):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            user = session.query(User).filter_by(id=user_id, role=RoleEnum.USER).first()
+            if not user:
+                return None, 'Atleta no encontrado'
+
+            plan = session.query(Membership).filter_by(id=plan_id, is_active=True).first()
+            if not plan:
+                return None, 'Plan no encontrado'
+
+            now = datetime.now(timezone.utc)
+            session.query(UserMembership).filter_by(user_id=user_id, is_active=True).update({'is_active': False})
+            membership = UserMembership(
+                user_id=user_id,
+                membership_id=plan.id,
+                start_date=now,
+                end_date=now + timedelta(days=plan.duration_days or 30),
+                is_active=True,
+                auto_renew=False,
+            )
+            session.add(membership)
+            session.commit()
+            session.refresh(membership)
+            return serialize_active_membership(membership), ''
+        except Exception:
+            session.rollback()
+            logger.exception('Error assigning membership')
+            return None, GENERIC_ERROR
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
+    def assign_membership_by_level(user_id: int, level: str, session=None):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            plan = MembershipService._resolve_plan_by_level(session, level)
+            if plan is None:
+                return None, 'Plan de membresía no encontrado'
+            return MembershipService.assign_membership(user_id, plan.id, session=session)
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
+    def revoke_membership(user_id: int, session=None):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            updated = (
+                session.query(UserMembership)
+                .filter_by(user_id=user_id, is_active=True)
+                .update({'is_active': False})
+            )
+            session.commit()
+            if updated == 0:
+                return False, 'No hay membresía activa'
+            return True, ''
+        except Exception:
+            session.rollback()
+            logger.exception('Error revoking membership')
             return False, GENERIC_ERROR
         finally:
             if close_session:

@@ -3,8 +3,10 @@ import logging
 from datetime import datetime, timezone
 
 from app.database import SessionLocal
-from app.models import WorkoutSession
+from app.models import Routine, UserRoutineAssignment, WorkoutSession
+from app.schemas.request_schemas import CompleteSessionSchema, parse_schema
 from app.schemas.serializers import serialize_session
+from app.utils.authorization import can_read_routine
 
 logger = logging.getLogger(__name__)
 GENERIC_ERROR = 'No se pudo completar la operación'
@@ -12,28 +14,57 @@ GENERIC_ERROR = 'No se pudo completar la operación'
 
 class SessionService:
     @staticmethod
+    def _validate_routine_for_athlete(athlete_id: int, routine_id: int, session) -> str | None:
+        routine = session.query(Routine).filter_by(id=routine_id).first()
+        if not routine:
+            return 'Rutina no encontrada'
+        if not can_read_routine(routine_id, session=session):
+            return 'Rutina no asignada al atleta'
+        assignment = (
+            session.query(UserRoutineAssignment)
+            .filter_by(user_id=athlete_id, routine_id=routine_id, is_active=True)
+            .first()
+        )
+        if assignment is None:
+            return 'Rutina no asignada al atleta'
+        return None
+
+    @staticmethod
     def mark_complete(athlete_id: int, payload: dict, session=None):
         close_session = False
         if session is None:
             session = SessionLocal()
             close_session = True
         try:
-            set_logs = payload.get('setLogs') or []
+            parsed, validation_error = parse_schema(CompleteSessionSchema, payload)
+            if validation_error:
+                return None, validation_error
+
+            routine_error = SessionService._validate_routine_for_athlete(
+                athlete_id,
+                parsed.routineId,
+                session,
+            )
+            if routine_error:
+                return None, routine_error
+
+            set_logs = [item.model_dump() for item in parsed.setLogs]
+            total_sets = parsed.totalSets if parsed.totalSets is not None else len(set_logs)
             workout = WorkoutSession(
                 user_id=athlete_id,
-                routine_id=int(payload['routineId']),
-                assignment_id=int(payload['assignmentId']) if payload.get('assignmentId') else None,
-                week_plan_id=int(payload['weekPlanId']) if payload.get('weekPlanId') else None,
-                scheduled_date=payload.get('scheduledDate') or datetime.now(timezone.utc).date().isoformat(),
-                date=datetime.fromisoformat(payload['date'].replace('Z', '+00:00'))
-                if payload.get('date')
+                routine_id=parsed.routineId,
+                assignment_id=parsed.assignmentId,
+                week_plan_id=parsed.weekPlanId,
+                scheduled_date=parsed.scheduledDate or datetime.now(timezone.utc).date().isoformat(),
+                date=datetime.fromisoformat(parsed.date.replace('Z', '+00:00'))
+                if parsed.date
                 else datetime.now(timezone.utc),
                 set_logs=json.dumps(set_logs),
-                completed=bool(payload.get('completed', True)),
-                completed_sets=payload.get('completedSets', 0),
-                failed_sets=payload.get('failedSets', 0),
-                total_sets=payload.get('totalSets', len(set_logs)),
-                session_outcome=payload.get('sessionOutcome', 'completed'),
+                completed=parsed.completed,
+                completed_sets=parsed.completedSets,
+                failed_sets=parsed.failedSets,
+                total_sets=total_sets,
+                session_outcome=parsed.sessionOutcome,
             )
             session.add(workout)
             session.commit()

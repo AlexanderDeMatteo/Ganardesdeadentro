@@ -7,8 +7,12 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 
 # Environment variables
+.env
 .env*.local
 backend/.env
+
+# Local SQLite database
+backend/fitness_platform.db
 
 # Common ignores
 node_modules

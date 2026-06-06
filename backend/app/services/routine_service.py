@@ -2,6 +2,8 @@ import json
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import joinedload
+
 from app.database import SessionLocal
 from app.models import (
     DifficultyEnum,
@@ -36,6 +38,53 @@ class RoutineService:
         session.add(exercise)
         session.flush()
         return exercise
+
+    @staticmethod
+    def list_routines_by_trainer(trainer_id: int, active_only: bool = True, session=None):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            query = session.query(Routine).filter_by(trainer_id=trainer_id)
+            if active_only:
+                query = query.filter_by(is_active=True)
+            routines = query.order_by(Routine.created_at.desc()).all()
+            return [serialize_routine(item) for item in routines], ''
+        except Exception:
+            logger.exception('Error listing routines')
+            return None, GENERIC_ERROR
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
+    def list_assignments(
+        trainer_id: int | None = None,
+        athlete_id: int | None = None,
+        active_only: bool = True,
+        session=None,
+    ):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            query = session.query(UserRoutineAssignment)
+            if trainer_id is not None:
+                query = query.filter_by(trainer_id=trainer_id)
+            if athlete_id is not None:
+                query = query.filter_by(user_id=athlete_id)
+            if active_only:
+                query = query.filter_by(is_active=True)
+            assignments = query.order_by(UserRoutineAssignment.assigned_date.desc()).all()
+            return [serialize_assignment(item) for item in assignments], ''
+        except Exception:
+            logger.exception('Error listing assignments')
+            return None, GENERIC_ERROR
+        finally:
+            if close_session:
+                session.close()
 
     @staticmethod
     def get_my_routine(athlete_id: int, session=None):
@@ -110,16 +159,25 @@ class RoutineService:
                         routine_id=routine.id,
                         exercise_id=exercise.id,
                         order=index + 1,
-                        sets=exercise_payload.get('sets', 3),
-                        reps=exercise_payload.get('reps', 10),
-                        rest_seconds=exercise_payload.get('rest', 60),
+                        sets=int(exercise_payload.get('sets', 3)),
+                        reps=int(exercise_payload.get('reps', 10)),
+                        rest_seconds=int(exercise_payload.get('rest', 60)),
                         suggested_weights=json.dumps(suggested),
                         technique=exercise_payload.get('technique'),
                     )
                 )
             session.commit()
-            session.refresh(routine)
+            routine = (
+                session.query(Routine)
+                .options(joinedload(Routine.exercises).joinedload(RoutineExercise.exercise))
+                .filter_by(id=routine.id)
+                .first()
+            )
             return serialize_routine(routine), ''
+        except ValueError:
+            session.rollback()
+            logger.exception('Invalid routine payload')
+            return None, 'Datos de rutina inválidos'
         except Exception:
             session.rollback()
             logger.exception('Error creating routine')
