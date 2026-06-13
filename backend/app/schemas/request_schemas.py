@@ -139,6 +139,107 @@ class CompleteSessionSchema(BaseModel):
         return value
 
 
+class MealItemSchema(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    id: str | None = None
+    name: str = Field(min_length=1, max_length=120)
+    calories: int | None = Field(default=None, ge=0, le=10000)
+    proteinG: float | None = Field(default=None, ge=0, le=10000)
+    carbsG: float | None = Field(default=None, ge=0, le=10000)
+    fatG: float | None = Field(default=None, ge=0, le=10000)
+    quantityG: float | None = Field(default=None, ge=0, le=10000)
+    scheduledTime: str | None = Field(default=None, max_length=20)
+    notes: str | None = Field(default=None, max_length=220)
+
+
+class FoodLogEntrySchema(BaseModel):
+    date: str = Field(min_length=8, max_length=30)
+    items: list[MealItemSchema] = Field(default_factory=list, max_length=200)
+
+
+class DiaryPutSchema(BaseModel):
+    athleteId: int
+    foodLog: list[FoodLogEntrySchema] = Field(default_factory=list)
+    waterByDate: dict[str, int] = Field(default_factory=dict)
+    waterGoalMl: int = Field(default=2500, ge=0, le=20000)
+
+
+class DiaryEntryPostSchema(BaseModel):
+    athleteId: int
+    date: str = Field(min_length=8, max_length=30)
+    item: MealItemSchema
+
+
+class DiaryWaterPatchSchema(BaseModel):
+    athleteId: int
+    date: str = Field(min_length=8, max_length=30)
+    ml: int | None = Field(default=None, ge=0, le=20000)
+    mlDelta: int | None = Field(default=None, ge=-20000, le=20000)
+    goalMl: int | None = Field(default=None, ge=0, le=20000)
+
+
+class BodyProfilePatchSchema(BaseModel):
+    heightCm: float | None = Field(default=None, ge=50, le=260)
+    age: int | None = Field(default=None, ge=18, le=120)
+    sex: str | None = None
+
+    @field_validator('sex')
+    @classmethod
+    def validate_sex(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value not in ('male', 'female'):
+            raise ValueError('sex debe ser male o female')
+        return value
+
+
+class CreateTrainerInviteSchema(BaseModel):
+    email: str = Field(min_length=3, max_length=120)
+    firstName: str = Field(min_length=1, max_length=120)
+    lastName: str = Field(min_length=1, max_length=120)
+    specialization: str | None = Field(default=None, max_length=160)
+
+
+class AthleteTrainerActionSchema(BaseModel):
+    athleteId: int
+    action: str
+    newTrainerId: int | None = None
+
+    @field_validator('action')
+    @classmethod
+    def validate_action(cls, value: str) -> str:
+        if value not in ('reassign', 'unassign'):
+            raise ValueError('action debe ser reassign o unassign')
+        return value
+
+
+class DeactivateTrainerSchema(BaseModel):
+    athleteActions: list[AthleteTrainerActionSchema] = Field(default_factory=list)
+
+
+class UpdateMeProfileSchema(BaseModel):
+    first_name: str | None = Field(default=None, min_length=1, max_length=120)
+    last_name: str | None = Field(default=None, max_length=120)
+
+
+class ReactivateTrainerSchema(BaseModel):
+    isActive: bool | None = None
+    maxAthletes: int | None = Field(default=None, ge=1, le=100)
+
+    @field_validator('isActive')
+    @classmethod
+    def validate_is_active(cls, value: bool | None) -> bool | None:
+        if value is not None and value is not True:
+            raise ValueError('isActive debe ser true para reactivar')
+        return value
+
+
+class AcceptInviteSchema(BaseModel):
+    token: str = Field(min_length=10)
+    password: str = Field(min_length=8, max_length=128)
+
+
 def parse_schema(schema_cls, data: dict):
     try:
         return schema_cls.model_validate(data), None

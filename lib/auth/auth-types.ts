@@ -6,6 +6,7 @@ export interface Membership {
   daysRemaining: number;
   price: number;
   features: string[];
+  durationDays?: number;
 }
 
 export interface AuthUser {
@@ -50,4 +51,8 @@ export interface AuthClient {
   register(credentials: RegisterCredentials): Promise<AuthSession>;
   logout(): Promise<void>;
   refreshSession(): Promise<AuthSession | null>;
+  changePassword(oldPassword: string, newPassword: string): Promise<void>;
+  updateProfile(patch: { first_name?: string; last_name?: string }): Promise<void>;
+  validateInviteToken?(token: string): Promise<{ email: string; firstName: string; expiresAt: string }>;
+  acceptInvite?(token: string, password: string): Promise<void>;
 }

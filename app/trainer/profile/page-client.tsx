@@ -13,16 +13,24 @@ export default function TrainerProfilePage() {
   const [specialization, setSpecialization] = useState(profile.specialization);
   const [bio, setBio] = useState(profile.bio);
   const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setSpecialization(profile.specialization);
     setBio(profile.bio);
   }, [profile]);
 
-  const handleSave = () => {
-    updateProfile({ specialization, bio });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateProfile({ specialization, bio });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // toast handled in useTrainer
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -96,8 +104,8 @@ export default function TrainerProfilePage() {
           />
         </div>
 
-        <Button onClick={handleSave} className="w-full sm:w-auto">
-          {saved ? 'Guardado' : 'Guardar cambios'}
+        <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+          {isSaving ? 'Guardando…' : saved ? 'Guardado' : 'Guardar cambios'}
         </Button>
       </div>
     </div>

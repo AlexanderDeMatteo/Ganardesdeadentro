@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { useAuth } from '@/app/context/auth-context';
 import { useCoach } from '@/app/context/coach-context';
 import { useAthleteData } from '@/hooks/use-athlete-data';
-import { useDataStore } from '@/lib/data/store';
 import { getExerciseProgress } from '@/lib/data/client';
 import { storeRoutineToUi, type UiRoutine } from '@/lib/data/routine-ui-adapter';
 import { getScheduledDateForDayIndex } from '@/lib/workout/session-utils';
@@ -19,14 +18,27 @@ function getTodayDayIndex(): number {
   return d === 0 ? 6 : d - 1;
 }
 
+function buildDaySubtitle(
+  weeklyPlan: boolean,
+  dayLabel: string | undefined,
+  focus: string | undefined,
+  routineName: string | undefined,
+): string {
+  if (!weeklyPlan) return 'Rutina asignada';
+  const parts = [dayLabel ?? 'Día', focus ?? 'Entreno'];
+  if (routineName) parts.push(routineName);
+  return parts.join(' · ');
+}
+
 export function AssignedRoutineView() {
   const { user, isAuthenticated } = useAuth();
   const { requestSessionReview } = useCoach();
-  const { state } = useDataStore();
   const {
     activeRoutine,
     activeAssignment,
     weeklyPlan,
+    getRoutineForDay,
+    routineNamesById,
     weekSessionLogs,
     weekStartDate,
     athleteId,
@@ -44,10 +56,10 @@ export function AssignedRoutineView() {
 
   const sessionRoutine = useMemo(() => {
     if (weeklyPlan && selectedDay?.routineId) {
-      return state.routines.find((r) => r.id === selectedDay.routineId) ?? null;
+      return getRoutineForDay(selectedDay);
     }
     return activeRoutine;
-  }, [weeklyPlan, selectedDay, activeRoutine, state.routines]);
+  }, [weeklyPlan, selectedDay, activeRoutine, getRoutineForDay]);
 
   const uiRoutine: UiRoutine | null = useMemo(
     () => (sessionRoutine ? storeRoutineToUi(sessionRoutine) : null),
@@ -59,11 +71,12 @@ export function AssignedRoutineView() {
     return new Date().toISOString().split('T')[0];
   }, [weeklyPlan, weekStartDate, selectedDayIndex]);
 
-  const routineNames = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const r of state.routines) map[r.id] = r.name;
-    return map;
-  }, [state.routines]);
+  const daySubtitle = buildDaySubtitle(
+    Boolean(weeklyPlan),
+    selectedDay?.label,
+    selectedDay?.focus,
+    sessionRoutine?.name,
+  );
 
   const handleSessionSaved = useCallback(() => {
     void refresh();
@@ -108,6 +121,7 @@ export function AssignedRoutineView() {
         weekSessionLogs={weekSessionLogs}
         selectedDayIndex={selectedDayIndex}
         onSelectDay={setSelectedDayIndex}
+        routineNamesById={routineNamesById}
       />
 
       {isRestDay ? (
@@ -123,18 +137,24 @@ export function AssignedRoutineView() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-                {weeklyPlan ? `${selectedDay?.label ?? 'Día'} · ${selectedDay?.focus ?? 'Entreno'}` : 'Rutina asignada'}
+                {daySubtitle}
               </p>
               <h2 className="mt-1 text-2xl font-black uppercase text-foreground">{uiRoutine.name}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{uiRoutine.description}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {uiRoutine.duration} min · {uiRoutine.exercises} ejercicios · {uiRoutine.difficulty}
               </p>
-              {activeAssignment && (
+              {weeklyPlan ? (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Asignada el {activeAssignment.assignedDate} · {completedSessionsCount} sesiones
-                  completadas
+                  Plan semanal · semana del {weeklyPlan.weekStartDate}
                 </p>
+              ) : (
+                activeAssignment && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Asignada el {activeAssignment.assignedDate} · {completedSessionsCount} sesiones
+                    completadas
+                  </p>
+                )
               )}
             </div>
           </div>
@@ -144,7 +164,7 @@ export function AssignedRoutineView() {
               <ActiveWorkoutPanel
                 uiRoutine={uiRoutine}
                 athleteId={athleteId}
-                assignmentId={activeAssignment?.id}
+                assignmentId={weeklyPlan ? undefined : activeAssignment?.id}
                 weekPlanId={weeklyPlan?.id}
                 scheduledDate={scheduledDate}
                 sessionLogs={sessionLogs}
@@ -199,7 +219,7 @@ export function AssignedRoutineView() {
       {athleteId && (
         <SessionHistoryList
           sessionLogs={sessionLogs}
-          routineNames={routineNames}
+          routineNames={routineNamesById}
           athleteId={athleteId}
           getProgress={getExerciseProgress}
         />

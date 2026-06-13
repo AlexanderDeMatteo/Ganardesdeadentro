@@ -1,24 +1,54 @@
 'use client';
 
 import { useState } from 'react';
-import { useMemberships } from '@/hooks/use-memberships';
+import { toast } from 'sonner';
+import { useMemberships, type MembershipPlan } from '@/hooks/use-memberships';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { CreditCard, Trash2, Plus, X } from 'lucide-react';
+import { CreditCard, Trash2, Plus, X, Pencil } from 'lucide-react';
+
+const DEFAULT_FORM: Omit<MembershipPlan, 'id' | 'createdAt'> = {
+  name: 'Básica',
+  price: 0,
+  description: '',
+  features: [''],
+  durationDays: 30,
+  color: 'blue',
+};
 
 export default function MembershipsPage() {
-  const { plans, createPlan, deletePlan } = useMemberships();
+  const { plans, createPlan, updatePlan, deletePlan } = useMemberships();
   const [isOpen, setIsOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    name: 'Básica' as const,
-    price: 0,
-    description: '',
-    features: [''],
-    durationDays: 30,
-    color: 'blue' as const,
-  });
+  const [formData, setFormData] = useState<Omit<MembershipPlan, 'id' | 'createdAt'>>(DEFAULT_FORM);
+
+  const openCreate = () => {
+    setEditingPlan(null);
+    setFormData(DEFAULT_FORM);
+    setIsOpen(true);
+  };
+
+  const openEdit = (plan: MembershipPlan) => {
+    setEditingPlan(plan);
+    setFormData({
+      name: plan.name,
+      price: plan.price,
+      description: plan.description,
+      features: plan.features.length > 0 ? plan.features : [''],
+      durationDays: plan.durationDays,
+      color: plan.color,
+    });
+    setIsOpen(true);
+  };
+
+  const closeForm = () => {
+    setIsOpen(false);
+    setEditingPlan(null);
+    setFormData(DEFAULT_FORM);
+  };
 
   const handleAddFeature = () => {
     setFormData(prev => ({
@@ -41,28 +71,34 @@ export default function MembershipsPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.price || !formData.description) return;
 
-    createPlan({
+    const payload = {
       name: formData.name,
       price: formData.price,
       description: formData.description,
       features: formData.features.filter(f => f.trim()),
       durationDays: formData.durationDays,
       color: formData.color,
-    });
+    };
 
-    setFormData({
-      name: 'Básica',
-      price: 0,
-      description: '',
-      features: [''],
-      durationDays: 30,
-      color: 'blue',
-    });
-    setIsOpen(false);
+    setIsSaving(true);
+    try {
+      if (editingPlan) {
+        await updatePlan(editingPlan.id, payload);
+        toast.success('Plan actualizado');
+      } else {
+        await createPlan(payload);
+        toast.success('Plan creado');
+      }
+      closeForm();
+    } catch {
+      toast.error(editingPlan ? 'No se pudo actualizar el plan' : 'No se pudo crear el plan');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const colorMap: Record<string, string> = {
@@ -80,7 +116,7 @@ export default function MembershipsPage() {
             <p className="text-lg text-muted-foreground">Gestiona los planes disponibles</p>
           </div>
           <Button
-            onClick={() => setIsOpen(true)}
+            onClick={openCreate}
             className="bg-gradient-to-r from-primary to-secondary hover:shadow-lg gap-2"
           >
             <Plus className="h-5 w-5" />
@@ -115,14 +151,24 @@ export default function MembershipsPage() {
                 ))}
               </div>
 
-              <Button
-                onClick={() => setPendingDeleteId(plan.id)}
-                variant="destructive"
-                className="w-full gap-2"
-              >
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={() => openEdit(plan)}
+                  variant="outline"
+                  className="w-full gap-2"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Editar Plan
+                </Button>
+                <Button
+                  onClick={() => setPendingDeleteId(plan.id)}
+                  variant="destructive"
+                  className="w-full gap-2"
+                >
                 <Trash2 className="h-4 w-4" />
                 Eliminar Plan
-              </Button>
+                </Button>
+              </div>
             </div>
           ))}
         </div>
@@ -131,10 +177,12 @@ export default function MembershipsPage() {
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-background rounded-2xl border border-secondary/20 w-full max-w-md max-h-[90vh] overflow-y-auto p-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Crear Nuevo Plan</h2>
+                <h2 className="text-2xl font-bold">
+                  {editingPlan ? 'Editar Plan' : 'Crear Nuevo Plan'}
+                </h2>
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
+                  onClick={closeForm}
                   className="text-muted-foreground hover:text-foreground"
                   aria-label="Cerrar formulario"
                 >
@@ -239,9 +287,14 @@ export default function MembershipsPage() {
 
                 <Button
                   type="submit"
+                  disabled={isSaving}
                   className="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-lg"
                 >
-                  Crear Plan
+                  {isSaving
+                    ? 'Guardando…'
+                    : editingPlan
+                      ? 'Guardar cambios'
+                      : 'Crear Plan'}
                 </Button>
               </form>
             </div>

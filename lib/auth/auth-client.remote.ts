@@ -1,10 +1,18 @@
-import type { LoginResponse, MeResponse, RegisterResponse } from '@/lib/api/contracts/auth';
+import type {
+  AcceptInviteResponse,
+  InviteValidationResponse,
+  LoginResponse,
+  MeMembershipResponse,
+  MeResponse,
+  RegisterResponse,
+} from '@/lib/api/contracts/auth';
 import { httpRequest } from '@/lib/api/http-client';
 import type {
   AuthClient,
   AuthSession,
   AuthUser,
   LoginCredentials,
+  Membership,
   RegisterCredentials,
 } from '@/lib/auth/auth-types';
 import { AuthError } from '@/lib/auth/auth-types';
@@ -21,19 +29,52 @@ function mapApiUser(user: {
   last_name: string;
   role: AuthUser['role'];
 }): AuthUser {
+  const id = String(user.id);
   return {
-    id: String(user.id),
+    id,
     email: user.email,
     first_name: user.first_name,
     last_name: user.last_name,
     role: user.role,
+    ...(user.role === 'trainer' ? { trainer_id: id } : {}),
   };
 }
 
-function toSession(response: LoginResponse | RegisterResponse): AuthSession {
+function mapMeMembership(membership: MeMembershipResponse | null | undefined): Membership | undefined {
+  if (!membership) return undefined;
+  const name = membership.name;
+  if (name !== 'Básica' && name !== 'Premium' && name !== 'Pro') {
+    return undefined;
+  }
   return {
-    user: mapApiUser(response.user),
+    id: membership.planId,
+    name,
+    startDate: membership.startDate ?? '',
+    endDate: membership.endDate ?? '',
+    daysRemaining: membership.daysRemaining,
+    price: membership.price ?? 0,
+    features: membership.features ?? [],
+    durationDays: membership.durationDays,
+  };
+}
+
+function toSession(
+  response: LoginResponse | RegisterResponse,
+  membership?: Membership,
+): AuthSession {
+  const user = mapApiUser(response.user);
+  return {
+    user: membership ? { ...user, membership } : user,
     accessToken: response.access_token,
+  };
+}
+
+function toSessionFromMe(response: MeResponse, accessToken: string): AuthSession {
+  const membership = mapMeMembership(response.membership);
+  const user = mapApiUser(response.user);
+  return {
+    user: membership ? { ...user, membership } : user,
+    accessToken,
   };
 }
 
@@ -47,7 +88,8 @@ export const remoteAuthClient: AuthClient = {
       });
       const session = toSession(response);
       setStoredSession(session);
-      return session;
+      const refreshed = await this.refreshSession();
+      return refreshed ?? session;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error de autenticación';
       throw new AuthError(message);
@@ -64,7 +106,8 @@ export const remoteAuthClient: AuthClient = {
       });
       const session = toSession(response);
       setStoredSession(session);
-      return session;
+      const refreshed = await this.refreshSession();
+      return refreshed ?? session;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error de registro';
       throw new AuthError(message);
@@ -86,15 +129,41 @@ export const remoteAuthClient: AuthClient = {
     if (!existing) return null;
     try {
       const response = await httpRequest<MeResponse>('/api/auth/me');
-      const session: AuthSession = {
-        user: mapApiUser(response.user),
-        accessToken: existing.accessToken,
-      };
+      const session = toSessionFromMe(response, existing.accessToken);
       setStoredSession(session);
       return session;
     } catch {
       clearStoredSession();
       return null;
     }
+  },
+
+  async validateInviteToken(token: string) {
+    return httpRequest<InviteValidationResponse>(
+      `/api/auth/invite/${encodeURIComponent(token)}`,
+      { auth: false },
+    );
+  },
+
+  async acceptInvite(token: string, password: string) {
+    await httpRequest<AcceptInviteResponse>('/api/auth/accept-invite', {
+      method: 'POST',
+      body: { token, password },
+      auth: false,
+    });
+  },
+
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    await httpRequest('/api/auth/change-password', {
+      method: 'POST',
+      body: { old_password: oldPassword, new_password: newPassword },
+    });
+  },
+
+  async updateProfile(patch: { first_name?: string; last_name?: string }): Promise<void> {
+    await httpRequest('/api/users/me', {
+      method: 'PATCH',
+      body: patch,
+    });
   },
 };

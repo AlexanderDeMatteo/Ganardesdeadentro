@@ -1,8 +1,10 @@
 import type { Membership } from '@/app/context/auth-context';
 import { isDevDataSnapshotEnabled } from '@/lib/api/config';
 import { getDataState, setDataState } from '@/lib/data/store';
+import { SEED_EXERCISES } from '@/lib/data/seeds';
 import type {
   Athlete,
+  Exercise,
   Metric,
   Routine,
   RoutineAssignment,
@@ -18,10 +20,28 @@ import {
   saveAssignedPlan,
   saveCoachDraft,
 } from '@/lib/nutrition/assigned-storage';
-import type { AssignedNutritionPlan, CoachNutritionDraft } from '@/lib/nutrition/types';
+import {
+  loadDiaryState,
+  migrateLegacyDiaryIfNeeded,
+  saveDiaryState,
+} from '@/lib/nutrition/diary-storage';
+import type { AssignedNutritionPlan, AthleteDiaryState, CoachNutritionDraft, MealItem } from '@/lib/nutrition/types';
 import { getMondayOfWeek } from '@/lib/workout/session-utils';
 
 const delay = () => new Promise<void>((r) => setTimeout(r, 0));
+
+function withLatestMetric(athlete: Athlete): Athlete {
+  if (!athlete.metrics) return athlete;
+  return {
+    ...athlete,
+    latestMetric: {
+      weight: athlete.metrics.weight,
+      bodyFat: athlete.metrics.bodyFat,
+      muscleMass: athlete.metrics.muscleMass,
+      date: athlete.joinDate,
+    },
+  };
+}
 
 function findAthlete(athleteId: string): Athlete | undefined {
   return getDataState().athletes.find((a) => a.id === athleteId);
@@ -323,6 +343,11 @@ export async function getMembership(athleteId: string): Promise<{
   };
 }
 
+export async function subscribeMembership(_planId: string): Promise<void> {
+  await delay();
+  // En modo local la suscripción se gestiona en memberships/page-client.tsx vía localStorage.
+}
+
 // ---------------------------------------------------------------------------
 // Trainer endpoints (Fase 2)
 // ---------------------------------------------------------------------------
@@ -373,7 +398,26 @@ export async function unassignRoutine(assignmentId: string): Promise<void> {
  */
 export async function getTrainerAthletes(trainerId: string): Promise<Athlete[]> {
   await delay();
-  return getDataState().athletes.filter((a) => a.trainerId === trainerId);
+  return getDataState().athletes.filter((a) => a.trainerId === trainerId).map(withLatestMetric);
+}
+
+export async function listRoutines(trainerId?: string): Promise<Routine[]> {
+  await delay();
+  if (!trainerId) {
+    return getDataState().routines;
+  }
+  return getDataState().routines.filter((r) => !r.trainerId || r.trainerId === trainerId);
+}
+
+export async function listAssignments(
+  trainerId?: string,
+  options?: { activeOnly?: boolean },
+): Promise<RoutineAssignment[]> {
+  await delay();
+  const activeOnly = options?.activeOnly ?? true;
+  return getDataState().assignments.filter(
+    (a) => (!trainerId || a.trainerId === trainerId) && (!activeOnly || a.isActive),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -406,6 +450,95 @@ export async function getAdminOverview(): Promise<{
   };
 }
 
+export async function listAdminAthletes(): Promise<Athlete[]> {
+  await delay();
+  return getDataState().athletes.map(withLatestMetric);
+}
+
+export async function listAdminTrainers(): Promise<Trainer[]> {
+  await delay();
+  return [...getDataState().trainers];
+}
+
+export async function createAdminTrainer(payload: {
+  email: string;
+  firstName: string;
+  lastName: string;
+  specialization?: string;
+}): Promise<Trainer> {
+  await delay();
+  const id = `trainer-${Date.now()}`;
+  const trainer: Trainer = {
+    id,
+    name: `${payload.firstName} ${payload.lastName}`.trim(),
+    email: payload.email,
+    specialization: payload.specialization ?? 'General',
+    athletes: 0,
+    rating: 0,
+    joinDate: new Date().toISOString(),
+    isActive: false,
+    invitePending: true,
+    maxAthletes: 10,
+  };
+  setDataState((prev) => ({ ...prev, trainers: [...prev.trainers, trainer] }));
+  return trainer;
+}
+
+export async function deactivateAdminTrainer(
+  trainerId: string,
+  athleteActions: Array<{
+    athleteId: string;
+    action: 'reassign' | 'unassign';
+    newTrainerId?: string;
+  }>,
+): Promise<void> {
+  await delay();
+  setDataState((prev) => {
+    let athletes = [...prev.athletes];
+    for (const action of athleteActions) {
+      athletes = athletes.map((a) => {
+        if (a.id !== action.athleteId) return a;
+        if (action.action === 'unassign') return { ...a, trainerId: undefined };
+        return { ...a, trainerId: action.newTrainerId };
+      });
+    }
+    const trainers = prev.trainers.map((t) =>
+      t.id === trainerId ? { ...t, isActive: false, invitePending: false } : t,
+    );
+    return { ...prev, athletes, trainers };
+  });
+}
+
+export async function reactivateAdminTrainer(trainerId: string): Promise<void> {
+  await updateAdminTrainer(trainerId, { isActive: true });
+}
+
+export async function updateAdminTrainer(
+  trainerId: string,
+  patch: { isActive?: boolean; maxAthletes?: number },
+): Promise<void> {
+  await delay();
+  setDataState((prev) => ({
+    ...prev,
+    trainers: prev.trainers.map((t) => {
+      if (t.id !== trainerId) return t;
+      return {
+        ...t,
+        ...(patch.isActive === true ? { isActive: true, invitePending: false } : {}),
+        ...(patch.maxAthletes != null ? { maxAthletes: patch.maxAthletes } : {}),
+      };
+    }),
+  }));
+}
+
+export async function resendTrainerInvite(_trainerId: string): Promise<void> {
+  await delay();
+}
+
+export async function unassignTrainerFromAthlete(athleteId: string): Promise<void> {
+  await assignTrainerToAthlete(athleteId, null);
+}
+
 export async function getAthleteById(athleteId: string): Promise<Athlete | null> {
   await delay();
   return findAthlete(athleteId) ?? null;
@@ -433,15 +566,18 @@ export async function updateAthlete(
   return updated;
 }
 
-export async function assignTrainerToAthlete(athleteId: string, trainerId: string): Promise<void> {
+export async function assignTrainerToAthlete(
+  athleteId: string,
+  trainerId: string | null,
+): Promise<void> {
   await delay();
   setDataState((prev) => {
     const oldTrainerId = prev.athletes.find((a) => a.id === athleteId)?.trainerId;
     const athletes = prev.athletes.map((a) =>
-      a.id === athleteId ? { ...a, trainerId } : a,
+      a.id === athleteId ? { ...a, trainerId: trainerId ?? undefined } : a,
     );
     const trainers = prev.trainers.map((t) => {
-      if (t.id === trainerId) return { ...t, athletes: t.athletes + 1 };
+      if (trainerId && t.id === trainerId) return { ...t, athletes: t.athletes + 1 };
       if (oldTrainerId && t.id === oldTrainerId && t.athletes > 0) {
         return { ...t, athletes: t.athletes - 1 };
       }
@@ -632,6 +768,32 @@ export async function updateMembershipPlan(
   return updated;
 }
 
+export async function assignUserMembership(userId: string, planId: string): Promise<void> {
+  await delay();
+  const plans = loadMembershipPlansFromStorage();
+  const plan = plans.find((p) => p.id === planId);
+  if (!plan) return;
+
+  const levelMap: Record<MembershipPlan['name'], Athlete['membershipLevel']> = {
+    Básica: 'basic',
+    Premium: 'premium',
+    Pro: 'pro',
+  };
+
+  setDataState((prev) => ({
+    ...prev,
+    athletes: prev.athletes.map((a) =>
+      a.id === userId
+        ? {
+            ...a,
+            membershipId: planId,
+            membershipLevel: levelMap[plan.name] ?? a.membershipLevel,
+          }
+        : a,
+    ),
+  }));
+}
+
 /**
  * @endpoint PUT /api/nutrition/plan
  * @auth Bearer (trainer assigned | admin)
@@ -674,4 +836,142 @@ export async function saveCoachNutritionDraft(
   await delay();
   saveCoachDraft(athleteId, draft);
   return draft;
+}
+
+export async function listExercises(_opts?: {
+  muscle?: string;
+  page?: number;
+  perPage?: number;
+}): Promise<Exercise[]> {
+  await delay();
+  return [...SEED_EXERCISES];
+}
+
+export async function searchExercises(query: string): Promise<Exercise[]> {
+  await delay();
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  return SEED_EXERCISES.filter(
+    (ex) =>
+      ex.name.toLowerCase().includes(q) ||
+      ex.targetMuscle.toLowerCase().includes(q),
+  );
+}
+
+export async function getDiary(athleteId: string, _date?: string): Promise<AthleteDiaryState> {
+  await delay();
+  return migrateLegacyDiaryIfNeeded(athleteId);
+}
+
+export async function putDiary(athleteId: string, state: AthleteDiaryState): Promise<AthleteDiaryState> {
+  await delay();
+  saveDiaryState(athleteId, state);
+  return state;
+}
+
+export async function addDiaryEntry(
+  athleteId: string,
+  date: string,
+  item: Omit<MealItem, 'id'> & { id?: string },
+): Promise<AthleteDiaryState> {
+  await delay();
+  const current = loadDiaryState(athleteId);
+  const newItem: MealItem = {
+    ...item,
+    id: item.id ?? `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  };
+  const idx = current.foodLog.findIndex((e) => e.date === date);
+  const foodLog = [...current.foodLog];
+  if (idx >= 0) {
+    foodLog[idx] = { ...foodLog[idx], items: [...foodLog[idx].items, newItem] };
+  } else {
+    foodLog.push({ date, items: [newItem] });
+  }
+  const next = { ...current, foodLog };
+  saveDiaryState(athleteId, next);
+  return next;
+}
+
+export async function deleteDiaryEntry(
+  athleteId: string,
+  entryId: string,
+  date?: string,
+): Promise<AthleteDiaryState> {
+  await delay();
+  const current = loadDiaryState(athleteId);
+  const next = {
+    ...current,
+    foodLog: current.foodLog
+      .map((e) =>
+        date && e.date !== date
+          ? e
+          : { ...e, items: e.items.filter((i) => i.id !== entryId) },
+      )
+      .filter((e) => e.items.length > 0),
+  };
+  saveDiaryState(athleteId, next);
+  return next;
+}
+
+export async function patchDiaryWater(
+  athleteId: string,
+  payload: { date: string; ml?: number; mlDelta?: number; goalMl?: number },
+): Promise<AthleteDiaryState> {
+  await delay();
+  const current = loadDiaryState(athleteId);
+  const waterByDate = { ...current.waterByDate };
+  if (payload.ml !== undefined) {
+    waterByDate[payload.date] = payload.ml;
+  } else if (payload.mlDelta !== undefined) {
+    waterByDate[payload.date] = Math.max(0, (waterByDate[payload.date] ?? 0) + payload.mlDelta);
+  }
+  const next = {
+    ...current,
+    waterByDate,
+    waterGoalMl: payload.goalMl ?? current.waterGoalMl,
+  };
+  saveDiaryState(athleteId, next);
+  return next;
+}
+
+const BODY_PROFILE_KEY = 'fittrack_body_profile';
+
+export async function getBodyProfile(): Promise<import('@/lib/body-profile').BodyProfile> {
+  await delay();
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(BODY_PROFILE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as import('@/lib/body-profile').BodyProfile;
+  } catch {
+    return {};
+  }
+}
+
+export async function getAthleteBodyProfile(athleteId: string): Promise<import('@/lib/body-profile').BodyProfile> {
+  await delay();
+  const athlete = findAthlete(athleteId);
+  if (!athlete) return {};
+  const sex = athlete.gender === 'F' || athlete.gender === 'female' ? 'female' : athlete.gender === 'M' || athlete.gender === 'male' ? 'male' : undefined;
+  return {
+    heightCm: athlete.height || undefined,
+    age: athlete.age || undefined,
+    sex,
+  };
+}
+
+export async function updateBodyProfile(
+  patch: import('@/lib/body-profile').BodyProfile,
+): Promise<import('@/lib/body-profile').BodyProfile> {
+  await delay();
+  const current = await getBodyProfile();
+  const merged = { ...current, ...patch };
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(BODY_PROFILE_KEY, JSON.stringify(merged));
+    } catch {
+      /* ignore */
+    }
+  }
+  return merged;
 }

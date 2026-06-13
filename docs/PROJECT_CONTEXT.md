@@ -9,7 +9,7 @@ Documento de referencia para trabajo en frontend, backend, Docker y pruebas. **N
 - **Frontend:** Next.js 16 (App Router), React 19, Tailwind v4, componentes en `components/ui` (shadcn/Radix). Gran parte del flujo actual es **demo/mock** (usuarios en memoria, `localStorage` para sesión y datos auxiliares).
 - **Backend:** Flask, SQLAlchemy, JWT (`Flask-JWT-Extended`), CORS, Alembic. **Implementados:** autenticación (`/api/auth/*`), ejercicios (`/api/exercises/*`), usuarios (`/api/users/*`), rutinas (`/api/routines/*`), métricas (`/api/metrics/*`), membresías (`/api/memberships/*`), sesiones (`/api/sessions/*`), nutrición (`/api/nutrition/*`), admin overview (`/api/admin/overview`). Contratos en `docs/API_CONTRACTS.md`.
 - **IA / Coach "Titan":** asistente conversacional servido por **Ollama** (modelo `granite4.1:3b`) mediante rutas Next en `app/api/coach/*` y `app/api/nutrition/titan`. Genera motivación contextual, reseña de sesión de entrenamiento y estimación de calorías/macros. Requiere `ollama serve` local (`OLLAMA_BASE_URL`, default `http://localhost:11434`); incluye *fallbacks* si el modelo no está disponible. Acceso al asistente nutricional gateado a membresías Premium/Pro.
-- **Nutrición:** módulo en `app/nutrition`, `components/nutrition/*`, `hooks/use-nutrition.ts` y `lib/nutrition/*`. Calcula metabolismo (Mifflin-St Jeor: BMR/TDEE), define macros objetivo, gestiona plan de comidas asignado por el entrenador, diario de alimentos, hidratación y adherencia. Persistencia local (`localStorage`).
+- **Nutrición:** módulo en `app/nutrition`, `components/nutrition/*`, `hooks/use-nutrition.ts` y `lib/nutrition/*`. Calcula metabolismo (Mifflin-St Jeor: BMR/TDEE), define macros objetivo, gestiona plan de comidas asignado por el entrenador, diario de alimentos (kcal y macros opcionales P/C/G), hidratación y adherencia. Con `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` el diario y plan persisten en Flask; en modo `local` usa `localStorage`.
 - **Datos:** SQLite por defecto; en Docker la URI apunta a un volumen (`/data/fitness_platform.db`).
 - **Objetivo de este documento:** evitar redescubrir la arquitectura en cada tarea y alinear cambios con las reglas en `.cursor/rules/`.
 
@@ -49,7 +49,7 @@ Hoy el navegador habla principalmente con Next; el backend está disponible en `
 | Área | Ruta(s) | Notas |
 |------|---------|--------|
 | Público | `/`, `/login`, `/register` | Login/register contra usuarios mock en `AuthProvider` |
-| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile` | Protegidas por `ProtectedRoute` (solo cliente). El dashboard de usuario es la vista FITTRACK en [`components/dashboard/fitness-dashboard-view.tsx`](components/dashboard/fitness-dashboard-view.tsx); `/dashboard-2` y `/dashboard-3` redirigen a `/dashboard`. |
+| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile` | Protegidas por `ProtectedRoute` (solo cliente). Dashboard principal: [`components/dashboard/fitness-dashboard-view.tsx`](components/dashboard/fitness-dashboard-view.tsx). |
 | Trainer | `/trainer`, `/trainer/*` | Rol `trainer` (cliente). Gestiona atletas, rutinas, asignaciones, progreso y nutrición asignada (`/trainer/athletes/[athleteId]/nutrition`) |
 | Admin | `/admin`, `/admin/*` | Rol `admin` verificado en cliente. Incluye atletas, entrenadores, rutinas, membresías, asignaciones y nutrición por atleta |
 | API Next (IA) | `/api/coach/titan`, `/api/coach/session-review`, `/api/nutrition/titan` | Route handlers que hablan con Ollama (coach Titan). No dependen de Flask |
@@ -107,8 +107,8 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 | Rate limiting | Flask-Limiter (Fase 2) | — | `login`/`register`/`change-password`; storage `memory://` dev, Redis en prod (`RATELIMIT_STORAGE_URI`) |
 | API ejercicios | Sí | — | Requiere clave RapidAPI en env; `clear-cache` con `@role_required('admin')` |
 | Users / routines / memberships / metrics / sessions / nutrition API | Implementados | — | Frontend: adaptador remoto cableado por dominio (Fase 1: overview admin, CRUD planes, patch/asignación atleta); default sigue `local` |
-| Coach IA "Titan" (rutas Next + Ollama) | Sí | — | `applyRouteGuard` (Bearer + rate limit); JWT real y gating membresía incompletos en modo `api` (Fase 3) |
-| Nutrición (metabolismo, macros, plan, diario) | UI + lógica cliente | Persistencia en `localStorage` | Plan asignado por entrenador (no IA); diario orientativo, no sustituye asesoría profesional |
+| Coach IA "Titan" (rutas Next + Ollama) | Sí | — | Fase 3: introspección JWT vía Flask `/api/auth/me`, gating membresía/rol server-side, rate limit por `userId`, `middleware.ts` ligero, fallbacks servidor si Ollama cae |
+| Nutrición (metabolismo, macros, plan, diario) | UI + API Flask cuando `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` | Modo `local`: `localStorage` | Coach/admin leen diario del atleta; interceptor 401 global (Sprint 4) |
 | Typecheck en build | `ignoreBuildErrors: false` en Next | — | Build puede fallar si hay errores TS; ESLint no se ignora en build |
 | `.env` en repo | `.gitignore` ignora `.env`, `.env*.local`, `backend/.env` y `backend/fitness_platform.db` (Fase 0) | — | No versionar secretos ni la DB local |
 
@@ -123,7 +123,7 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 5. **Ejercicios:** servicio intenta caché en SQLite; si no hay datos, llama a ExerciseDB y persiste ejercicios cacheados.
 6. **Métricas (piloto API):** con `NEXT_PUBLIC_AUTH_SOURCE=api` y/o `NEXT_PUBLIC_DATA_SOURCE_METRICS=api`, el frontend resuelve `athleteId` como `user.id` del JWT (no usa el mapa demo `EMAIL_TO_ATHLETE_ID`). En backend, `athleteId` ≡ `users.id` ≡ `metrics_history.user_id`. El mapa demo y seeds solo aplican en modo fully-local.
 7. **Rutinas/sesiones (piloto API):** con `NEXT_PUBLIC_DATA_SOURCE_ROUTINES=api`, entrenador y atleta comparten datos vía Flask: listados (`GET /api/routines/`, `GET /api/routines/assignments`), CRUD/asignaciones del entrenador y lectura/completar sesión del atleta (`/api/routines/*`, `/api/sessions/*`).
-8. **Datos auxiliares atleta (piloto API):** con `NEXT_PUBLIC_DATA_SOURCE_USERS=api` → tarjeta “Mi entrenador”; `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` → plan nutricional asignado; `NEXT_PUBLIC_DATA_SOURCE_MEMBERSHIPS=api` → membresía activa. El diario de nutrición sigue en localStorage.
+8. **Datos auxiliares atleta (piloto API):** con `NEXT_PUBLIC_DATA_SOURCE_USERS=api` → tarjeta “Mi entrenador”; `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` → plan nutricional asignado y diario persistido en Flask; `NEXT_PUBLIC_DATA_SOURCE_MEMBERSHIPS=api` → membresía activa.
 9. **Resolución de atleta en nutrición API:** si `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api`, `resolveAthleteId` debe usar `user.id` del JWT igual que métricas/rutinas. Páginas coach/admin de nutrición deben cargar el atleta con API (`getAthleteById`) en lugar de seeds (`findAthleteById`).
 
 ---

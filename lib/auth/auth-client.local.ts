@@ -169,4 +169,42 @@ export const localAuthClient: AuthClient = {
   async refreshSession(): Promise<AuthSession | null> {
     return getStoredSession();
   },
+
+  async validateInviteToken(_token: string) {
+    throw new AuthError('Activación de cuenta no disponible en modo local');
+  },
+
+  async acceptInvite(_token: string, _password: string) {
+    throw new AuthError('Activación de cuenta no disponible en modo local');
+  },
+
+  async changePassword(oldPassword: string, newPassword: string): Promise<void> {
+    await delay();
+    const session = getStoredSession();
+    if (!session) {
+      throw new AuthError('No hay sesión activa');
+    }
+    const record = MOCK_USERS[session.user.email];
+    if (!record || record.password !== oldPassword) {
+      throw new AuthError('Contraseña actual incorrecta');
+    }
+    record.password = newPassword;
+  },
+
+  async updateProfile(patch: { first_name?: string; last_name?: string }): Promise<void> {
+    await delay();
+    const session = getStoredSession();
+    if (!session) {
+      throw new AuthError('No hay sesión activa');
+    }
+    const record = MOCK_USERS[session.user.email];
+    if (record) {
+      if (patch.first_name !== undefined) record.first_name = patch.first_name;
+      if (patch.last_name !== undefined) record.last_name = patch.last_name;
+      setStoredSession({
+        ...session,
+        user: toAuthUser(record),
+      });
+    }
+  },
 };

@@ -1,14 +1,41 @@
+name: fittrack
+
 services:
-  frontend:
+  fittrack-frontend:
+    container_name: fittrack-frontend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     build:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
       - "3000:3000"
+    environment:
+      # Piloto híbrido: auth + métricas + rutinas + users/nutrition/memberships vía API
+      # Con AUTH_SOURCE=api, athleteId === user.id del JWT (no usar IDs del seed demo)
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:5000
+      NEXT_PUBLIC_AUTH_SOURCE: api
+      NEXT_PUBLIC_DATA_SOURCE: api
+      NEXT_PUBLIC_DATA_SOURCE_METRICS: api
+      NEXT_PUBLIC_DATA_SOURCE_ROUTINES: api
+      NEXT_PUBLIC_DATA_SOURCE_USERS: api
+      NEXT_PUBLIC_DATA_SOURCE_NUTRITION: api
+      NEXT_PUBLIC_DATA_SOURCE_MEMBERSHIPS: api
+      # Server-side (Titan guard → Flask /api/auth/me); browser sigue usando localhost:5000
+      API_INTERNAL_URL: http://fittrack-backend:5000
+      # Ollama en el host (Windows/Mac: host.docker.internal)
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
     depends_on:
-      - backend
+      - fittrack-backend
 
-  backend:
+  fittrack-backend:
+    container_name: fittrack-backend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -24,7 +51,8 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - backend_data:/data
+      - fittrack_backend_data:/data
 
 volumes:
-  backend_data:
+  fittrack_backend_data:
+    name: fittrack_backend_data

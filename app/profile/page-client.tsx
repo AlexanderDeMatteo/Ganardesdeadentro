@@ -5,22 +5,48 @@ import Link from 'next/link';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Navbar } from '@/components/layout/navbar';
 import { useAuth } from '@/app/context/auth-context';
+import { getAuthClient } from '@/lib/auth/auth-client';
 import { MyTrainerCard } from '@/components/dashboard/my-trainer-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useBodyProfile } from '@/hooks/use-body-profile';
 import { useAthleteData } from '@/hooks/use-athlete-data';
+import { useMetrics } from '@/hooks/use-metrics';
 import type { BiologicalSex, BodyProfile } from '@/lib/body-profile';
 import { User, Mail, Ruler } from 'lucide-react';
+import { toast } from 'sonner';
 
 function ProfileContent() {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const { profile, isLoaded, setProfile } = useBodyProfile();
-  const { completedSessionsCount, latestMetric, isLoading: athleteLoading } = useAthleteData();
+  const { completedSessionsCount, isLoading: athleteLoading } = useAthleteData();
+  const { getLatestEntry, isLoading: metricsLoading } = useMetrics();
+  const latestMetric = getLatestEntry();
+  const [firstNameDraft, setFirstNameDraft] = useState('');
+  const [lastNameDraft, setLastNameDraft] = useState('');
   const [heightDraft, setHeightDraft] = useState('');
   const [ageDraft, setAgeDraft] = useState('');
   const [sexDraft, setSexDraft] = useState<'' | BiologicalSex>('');
   const [savedFlash, setSavedFlash] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingIdentity, setIsSavingIdentity] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    setFirstNameDraft(user.first_name ?? '');
+    setLastNameDraft(user.last_name ?? '');
+  }, [user?.first_name, user?.last_name, user]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -29,7 +55,7 @@ function ProfileContent() {
     setSexDraft(profile.sex ?? '');
   }, [isLoaded, profile.heightCm, profile.age, profile.sex]);
 
-  const handleSaveBodyProfile = () => {
+  const handleSaveBodyProfile = async () => {
     const h = parseFloat(heightDraft.replace(',', '.'));
     const a = parseInt(ageDraft, 10);
     const next: BodyProfile = {
@@ -37,9 +63,60 @@ function ProfileContent() {
       age: Number.isFinite(a) && a >= 18 && a <= 120 ? a : undefined,
       sex: sexDraft === 'male' || sexDraft === 'female' ? sexDraft : undefined,
     };
-    setProfile(next);
-    setSavedFlash(true);
-    window.setTimeout(() => setSavedFlash(false), 2500);
+    setIsSavingProfile(true);
+    try {
+      await setProfile(next);
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 2500);
+    } catch {
+      toast.error('No se pudo guardar el perfil corporal');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleSaveIdentity = async () => {
+    if (!firstNameDraft.trim()) {
+      toast.error('El nombre es obligatorio');
+      return;
+    }
+    setIsSavingIdentity(true);
+    try {
+      await getAuthClient().updateProfile({
+        first_name: firstNameDraft.trim(),
+        last_name: lastNameDraft.trim(),
+      });
+      await refreshSession();
+      toast.success('Perfil actualizado');
+    } catch {
+      toast.error('No se pudo actualizar el perfil');
+    } finally {
+      setIsSavingIdentity(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 8) {
+      toast.error('La nueva contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Las contraseñas no coinciden');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      await getAuthClient().changePassword(oldPassword, newPassword);
+      toast.success('Contraseña actualizada');
+      setPasswordOpen(false);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch {
+      toast.error('No se pudo cambiar la contraseña');
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -78,9 +155,9 @@ function ProfileContent() {
                   </label>
                   <Input
                     type="text"
-                    value={user?.first_name || ''}
-                    readOnly
-                    className="h-11 bg-background/50 border-border text-foreground"
+                    value={firstNameDraft}
+                    onChange={(e) => setFirstNameDraft(e.target.value)}
+                    className="h-11 bg-background border-border text-foreground"
                   />
                 </div>
 
@@ -91,11 +168,29 @@ function ProfileContent() {
                   </label>
                   <Input
                     type="text"
-                    value={user?.last_name || ''}
-                    readOnly
-                    className="h-11 bg-background/50 border-border text-foreground"
+                    value={lastNameDraft}
+                    onChange={(e) => setLastNameDraft(e.target.value)}
+                    className="h-11 bg-background border-border text-foreground"
                   />
                 </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  onClick={() => void handleSaveIdentity()}
+                  disabled={isSavingIdentity}
+                  variant="outline"
+                >
+                  {isSavingIdentity ? 'Guardando…' : 'Guardar nombre'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPasswordOpen(true)}
+                >
+                  Cambiar contraseña
+                </Button>
               </div>
 
               <div className="space-y-2">
@@ -111,6 +206,50 @@ function ProfileContent() {
                 />
               </div>
             </div>
+
+            <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Cambiar contraseña</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Contraseña actual</label>
+                    <Input
+                      type="password"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Nueva contraseña</label>
+                    <Input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium">Confirmar contraseña</label>
+                    <Input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={() => void handleChangePassword()}
+                    disabled={isChangingPassword}
+                  >
+                    {isChangingPassword ? 'Guardando…' : 'Actualizar contraseña'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             <div className="border-t border-border pt-8 space-y-6">
               <div className="flex items-center gap-2">
@@ -175,8 +314,13 @@ function ProfileContent() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" onClick={handleSaveBodyProfile} className="bg-gradient-to-r from-primary to-secondary">
-                  Guardar datos corporales
+                <Button
+                  type="button"
+                  onClick={() => void handleSaveBodyProfile()}
+                  disabled={isSavingProfile}
+                  className="bg-gradient-to-r from-primary to-secondary"
+                >
+                  {isSavingProfile ? 'Guardando…' : 'Guardar datos corporales'}
                 </Button>
                 {savedFlash && (
                   <span className="text-sm font-medium text-green-600 dark:text-green-400">Guardado</span>
@@ -220,16 +364,6 @@ function ProfileContent() {
 
             <div className="border-t border-border pt-8">
               <MyTrainerCard />
-            </div>
-
-            {/* Actions */}
-            <div className="border-t border-border pt-8 space-y-4">
-              <Button className="w-full bg-gradient-to-r from-primary to-secondary hover:shadow-lg">
-                Editar Perfil
-              </Button>
-              <Button variant="outline" className="w-full border-secondary text-secondary hover:bg-secondary/10">
-                Cambiar Contraseña
-              </Button>
             </div>
           </div>
         </div>

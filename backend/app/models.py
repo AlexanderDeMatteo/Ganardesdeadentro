@@ -71,6 +71,7 @@ class User(Base):
     workout_sessions = relationship('WorkoutSession', back_populates='user', cascade='all, delete-orphan')
     nutrition_plan = relationship('NutritionPlan', back_populates='user', uselist=False, cascade='all, delete-orphan')
     nutrition_draft = relationship('CoachNutritionDraft', back_populates='user', uselist=False, cascade='all, delete-orphan')
+    nutrition_diary = relationship('NutritionDiary', back_populates='user', uselist=False, cascade='all, delete-orphan')
 
     __table_args__ = (
         Index('idx_user_email_active', 'email', 'is_active'),
@@ -93,6 +94,7 @@ class UserProfile(Base):
     bio = Column(Text)
     specialization = Column(String(160))
     rating = Column(Float, default=0.0)
+    max_athletes = Column(Integer, default=10)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
         DateTime,
@@ -351,6 +353,24 @@ class NutritionPlan(Base):
     user = relationship('User', back_populates='nutrition_plan')
 
 
+class NutritionDiary(Base):
+    __tablename__ = 'nutrition_diaries'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), unique=True, nullable=False, index=True)
+    food_log = Column(Text, nullable=False, default='[]')
+    water_by_date = Column(Text, nullable=False, default='{}')
+    water_goal_ml = Column(Integer, default=2500, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    user = relationship('User', back_populates='nutrition_diary')
+
+
 class CoachNutritionDraft(Base):
     __tablename__ = 'coach_nutrition_drafts'
 
@@ -365,3 +385,21 @@ class CoachNutritionDraft(Base):
     )
 
     user = relationship('User', back_populates='nutrition_draft')
+
+
+class InvitationToken(Base):
+    __tablename__ = 'invitation_tokens'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    token_hash = Column(String(255), nullable=False, unique=True)
+    purpose = Column(String(32), nullable=False, default='trainer_invite')
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship('User', backref='invitation_tokens')
+
+    __table_args__ = (
+        Index('idx_invitation_user_purpose', 'user_id', 'purpose'),
+    )

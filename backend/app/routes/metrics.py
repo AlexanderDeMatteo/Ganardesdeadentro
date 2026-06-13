@@ -2,7 +2,8 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
-from app.services.metrics_service import MetricsService
+from app.models import RoleEnum, User
+from app.services.metrics_service import VALIDATION_ERRORS, MetricsService
 from app.utils.authorization import require_athlete_access
 
 metrics_bp = Blueprint('metrics', __name__)
@@ -13,6 +14,14 @@ def _parse_int(value, name='id'):
         return int(value), None
     except (TypeError, ValueError):
         return None, ({'error': f'{name} inválido'}, 400)
+
+
+def _error_status(error: str) -> int:
+    if error in VALIDATION_ERRORS:
+        return 400
+    if error == 'Métrica no encontrada':
+        return 404
+    return 500
 
 
 @metrics_bp.route('/', methods=['GET'])
@@ -30,7 +39,7 @@ def list_metrics():
     finally:
         session.close()
     if error:
-        return {'error': error}, 500
+        return {'error': error}, _error_status(error)
     return {'metrics': metrics}, 200
 
 
@@ -49,11 +58,16 @@ def create_metric():
         denied = require_athlete_access(athlete_parsed, session=session)
         if denied:
             return denied
+        athlete = session.query(User).filter_by(id=athlete_parsed).first()
+        if not athlete:
+            return {'error': 'Atleta no encontrado'}, 404
+        if athlete.role != RoleEnum.USER.value:
+            return {'error': 'El usuario no es un atleta'}, 400
         metric, error = MetricsService.add_metric(athlete_parsed, data, session=session)
     finally:
         session.close()
     if error:
-        return {'error': error}, 500
+        return {'error': error}, _error_status(error)
     return {'metric': metric}, 201
 
 
@@ -75,8 +89,7 @@ def update_metric(metric_id):
     finally:
         session.close()
     if error:
-        status = 404 if error == 'Métrica no encontrada' else 500
-        return {'error': error}, status
+        return {'error': error}, _error_status(error)
     return {'metric': metric}, 200
 
 
@@ -98,6 +111,5 @@ def delete_metric(metric_id):
     finally:
         session.close()
     if not success:
-        status = 404 if error == 'Métrica no encontrada' else 500
-        return {'error': error}, status
+        return {'error': error}, _error_status(error)
     return {'message': 'Métrica eliminada'}, 200

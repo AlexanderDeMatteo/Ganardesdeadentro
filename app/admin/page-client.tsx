@@ -2,46 +2,72 @@
 
 import { useAdmin } from '@/hooks/use-admin';
 import { useAuth } from '@/app/context/auth-context';
-import { Users, Dumbbell, TrendingUp, Award, Calendar } from 'lucide-react';
+import { Users, Dumbbell, TrendingUp, Award, Calendar, Link2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export default function AdminDashboardPage() {
-  const { athletes, trainers, routines } = useAdmin();
+  const { athletes, trainers, routines, overview, isLoading } = useAdmin();
   const { user } = useAuth();
+
+  const athleteCount = overview?.athleteCount ?? athletes.length;
+  const trainerCount = overview?.trainerCount ?? trainers.length;
+  const athletesWithoutTrainer =
+    overview?.athletesWithoutTrainer ?? athletes.filter((a) => !a.trainerId).length;
+  const routineCount = routines.length;
+  const trainerAssignmentsCount = athleteCount - athletesWithoutTrainer;
 
   const stats = [
     {
       label: 'Atletas Total',
-      value: athletes.length,
+      value: athleteCount,
       icon: Users,
       color: 'from-primary to-secondary',
       href: '/admin/athletes',
     },
     {
       label: 'Sin Entrenador',
-      value: athletes.filter(a => !a.trainerId).length,
+      value: athletesWithoutTrainer,
       icon: TrendingUp,
       color: 'from-accent to-destructive',
       href: '/admin/athletes',
     },
     {
       label: 'Entrenadores',
-      value: trainers.length,
+      value: trainerCount,
       icon: Award,
       color: 'from-primary to-secondary',
       href: '/admin/trainers',
     },
     {
       label: 'Rutinas',
-      value: routines.length,
+      value: routineCount,
       icon: Dumbbell,
       color: 'from-secondary to-accent',
       href: '/admin/routines',
     },
+    {
+      label: 'Asignaciones trainer',
+      value: trainerAssignmentsCount,
+      icon: Link2,
+      color: 'from-accent to-primary',
+      href: '/admin/assignments',
+    },
   ];
 
-  const unassignedAthletes = athletes.filter(a => !a.trainerId);
+  const unassignedAthletes = athletes.filter((a) => !a.trainerId);
+  const assignmentRate =
+    athleteCount > 0
+      ? Math.round(((athleteCount - athletesWithoutTrainer) / athleteCount) * 100)
+      : 0;
+
+  if (isLoading) {
+    return (
+      <div className="px-8 py-12">
+        <p className="text-muted-foreground">Cargando panel de administración…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="px-8 py-12 space-y-12">
@@ -53,7 +79,7 @@ export default function AdminDashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {stats.map((stat, idx) => {
           const Icon = stat.icon;
           return (
@@ -78,6 +104,12 @@ export default function AdminDashboardPage() {
             </div>
             Atletas Sin Entrenador
           </h2>
+
+          {overview ? (
+            <p className="text-muted-foreground mb-4">
+              {overview.athletesWithoutTrainer} atleta(s) sin entrenador asignado en la plataforma.
+            </p>
+          ) : null}
 
           {unassignedAthletes.length > 0 ? (
             <div className="space-y-3">
@@ -117,24 +149,39 @@ export default function AdminDashboardPage() {
           <div className="space-y-4">
             <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
               <p className="text-sm text-muted-foreground mb-1">Atletas Activos</p>
-              <p className="text-3xl font-bold text-primary">{athletes.length}</p>
+              <p className="text-3xl font-bold text-primary">{athleteCount}</p>
             </div>
 
             <div className="p-4 rounded-lg bg-secondary/10 border border-secondary/20">
               <p className="text-sm text-muted-foreground mb-1">Membresías Premium</p>
               <p className="text-3xl font-bold text-secondary">
-                {athletes.filter(a => a.membershipLevel === 'premium' || a.membershipLevel === 'pro').length}
+                {athletes.filter((a) => a.membershipLevel === 'premium' || a.membershipLevel === 'pro').length}
               </p>
             </div>
 
             <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
               <p className="text-sm text-muted-foreground mb-1">Tasa de Asignación</p>
-              <p className="text-3xl font-bold text-accent">
-                {athletes.length > 0
-                  ? Math.round(((athletes.length - unassignedAthletes.length) / athletes.length) * 100)
-                  : 0}%
-              </p>
+              <p className="text-3xl font-bold text-accent">{assignmentRate}%</p>
+              <Link
+                href="/admin/assignments"
+                className="mt-2 inline-block text-xs font-medium text-accent hover:underline"
+              >
+                Ver asignaciones trainer
+              </Link>
             </div>
+
+            {overview ? (
+              <>
+                <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-sm text-muted-foreground mb-1">Asignaciones de rutina activas</p>
+                  <p className="text-3xl font-bold text-foreground">{overview.assignmentCount}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                  <p className="text-sm text-muted-foreground mb-1">Entrenadores sin atletas</p>
+                  <p className="text-3xl font-bold text-foreground">{overview.trainersWithoutAthletes}</p>
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       </div>

@@ -1,10 +1,12 @@
 'use client';
 
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { MetricsFeaturedChartPanel } from '@/components/metrics/metrics-featured-chart-panel';
 import { METRICS_REPLICA_PANEL_BG } from '@/components/metrics/metrics-replica-panel-tokens';
 import { useMetrics } from '@/hooks/use-metrics';
+import { getAthleteSessionLogs } from '@/lib/data/client';
+import type { SessionLog } from '@/lib/data/types';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -14,20 +16,65 @@ const LIME = '#b8ff00';
 const CYAN = '#42f4ff';
 const INK = '#080a0d';
 
-const MOCK_VOLUME_SPARK = [
-  { v: 92 },
-  { v: 96 },
-  { v: 98 },
-  { v: 108 },
-  { v: 118 },
-  { v: 124.5 },
-];
+function parseReps(raw?: string): number {
+  if (!raw) return 0;
+  const match = raw.match(/\d+/);
+  return match ? Number.parseInt(match[0], 10) : 0;
+}
 
-const MOCK_PRS = [
-  { name: 'SQUAT', last: '155 kg', change: '+10.7%' },
-  { name: 'BENCH PRESS', last: '102 kg', change: '+7.4%' },
-  { name: 'DEADLIFT', last: '195 kg', change: '+8.3%' },
-] as const;
+function sessionVolumeTons(session: SessionLog): number {
+  let kg = 0;
+  for (const set of session.setLogs ?? []) {
+    const weight = set.weightKg ?? 0;
+    const reps = parseReps(set.repsLogged);
+    if (weight > 0 && reps > 0) kg += weight * reps;
+  }
+  return kg / 1000;
+}
+
+type PersonalRecord = {
+  name: string;
+  last: string;
+  change: string | null;
+};
+
+function buildPersonalRecords(sessions: SessionLog[]): PersonalRecord[] {
+  const byExercise = new Map<string, Array<{ date: string; maxKg: number }>>();
+  for (const session of sessions) {
+    if (!session.completed) continue;
+    for (const set of session.setLogs ?? []) {
+      const weight = set.weightKg;
+      if (weight == null || weight <= 0) continue;
+      const name = set.exerciseName?.trim() || `Ejercicio ${set.exerciseId}`;
+      const rows = byExercise.get(name) ?? [];
+      const existing = rows.find((r) => r.date === session.scheduledDate);
+      if (existing) {
+        existing.maxKg = Math.max(existing.maxKg, weight);
+      } else {
+        rows.push({ date: session.scheduledDate, maxKg: weight });
+      }
+      byExercise.set(name, rows);
+    }
+  }
+
+  const records: Array<PersonalRecord & { maxKg: number }> = [];
+  for (const [name, points] of byExercise) {
+    const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+    const latest = sorted[sorted.length - 1];
+    const prev = sorted.length >= 2 ? sorted[sorted.length - 2] : undefined;
+    records.push({
+      name: name.toUpperCase(),
+      last: `${latest.maxKg} kg`,
+      change: pctChange(prev?.maxKg, latest.maxKg),
+      maxKg: latest.maxKg,
+    });
+  }
+
+  return records
+    .sort((a, b) => b.maxKg - a.maxKg)
+    .slice(0, 3)
+    .map(({ name, last, change }) => ({ name, last, change }));
+}
 
 function MiniSparkline({ points, color }: { points: { v: number }[]; color: string }) {
   const rawId = useId().replace(/:/g, '');
@@ -106,8 +153,27 @@ function ReplicaKpiCard({
 }
 
 export function MetricsOptionOneDesignReplica() {
-  const { entries, getLatestEntry, updateEntry, removeEntry, addEntry } = useMetrics();
+  const { entries, athleteId, getLatestEntry, updateEntry, removeEntry, addEntry } = useMetrics();
   const latest = getLatestEntry();
+  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
+
+  useEffect(() => {
+    if (!athleteId) {
+      setSessionLogs([]);
+      return;
+    }
+    let cancelled = false;
+    void getAthleteSessionLogs(athleteId)
+      .then((logs) => {
+        if (!cancelled) setSessionLogs(logs);
+      })
+      .catch(() => {
+        if (!cancelled) setSessionLogs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [athleteId, entries.length]);
   const [menuRowId, setMenuRowId] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [draftWeight, setDraftWeight] = useState('');
@@ -117,6 +183,7 @@ export function MetricsOptionOneDesignReplica() {
   const [quickBodyFat, setQuickBodyFat] = useState('');
   const [quickMuscleMass, setQuickMuscleMass] = useState('');
   const [pendingDeleteRowId, setPendingDeleteRowId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const sorted = useMemo(
     () => [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
@@ -151,19 +218,26 @@ export function MetricsOptionOneDesignReplica() {
     setEditingRowId(null);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingRowId) return;
     const parse = (raw: string) => {
       const v = parseFloat(raw.replace(',', '.'));
       return Number.isFinite(v) ? v : undefined;
     };
-    updateEntry(editingRowId, {
-      weight: parse(draftWeight),
-      bodyFat: parse(draftBodyFat),
-      muscleMass: parse(draftMuscleMass),
-    });
-    setEditingRowId(null);
-    setMenuRowId(null);
+    setIsSaving(true);
+    try {
+      await updateEntry(editingRowId, {
+        weight: parse(draftWeight),
+        bodyFat: parse(draftBodyFat),
+        muscleMass: parse(draftMuscleMass),
+      });
+      setEditingRowId(null);
+      setMenuRowId(null);
+    } catch {
+      /* error surfaced via MetricsContext */
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const askDelete = (rowId: string) => {
@@ -171,13 +245,20 @@ export function MetricsOptionOneDesignReplica() {
     setMenuRowId(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pendingDeleteRowId) return;
-    removeEntry(pendingDeleteRowId);
-    if (editingRowId === pendingDeleteRowId) {
-      setEditingRowId(null);
+    setIsSaving(true);
+    try {
+      await removeEntry(pendingDeleteRowId);
+      if (editingRowId === pendingDeleteRowId) {
+        setEditingRowId(null);
+      }
+      setPendingDeleteRowId(null);
+    } catch {
+      /* error surfaced via MetricsContext */
+    } finally {
+      setIsSaving(false);
     }
-    setPendingDeleteRowId(null);
   };
 
   const parseInput = (raw: string): number | undefined => {
@@ -186,7 +267,7 @@ export function MetricsOptionOneDesignReplica() {
   };
 
   const hasQuickData = quickWeight.trim() || quickBodyFat.trim() || quickMuscleMass.trim();
-  const submitQuickAdd = () => {
+  const submitQuickAdd = async () => {
     if (!hasQuickData) return;
     const entry = {
       date: new Date().toISOString(),
@@ -196,10 +277,17 @@ export function MetricsOptionOneDesignReplica() {
     };
     const hasAny = typeof entry.weight === 'number' || typeof entry.bodyFat === 'number' || typeof entry.muscleMass === 'number';
     if (!hasAny) return;
-    addEntry(entry);
-    setQuickWeight('');
-    setQuickBodyFat('');
-    setQuickMuscleMass('');
+    setIsSaving(true);
+    try {
+      await addEntry(entry);
+      setQuickWeight('');
+      setQuickBodyFat('');
+      setQuickMuscleMass('');
+    } catch {
+      /* error surfaced via MetricsContext */
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const wPct = pctChange(prev?.weight, latest?.weight);
@@ -216,6 +304,26 @@ export function MetricsOptionOneDesignReplica() {
     latest?.muscleMass != null
       ? `${latest.muscleMass.toFixed(1)} kg${latest.muscleMassSource === 'estimated' ? ' (est.)' : ''}`
       : '—';
+
+  const completedSessions = useMemo(
+    () =>
+      [...sessionLogs]
+        .filter((s) => s.completed)
+        .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate)),
+    [sessionLogs],
+  );
+
+  const volumeSpark = useMemo(
+    () => completedSessions.map((s) => ({ v: sessionVolumeTons(s) })).filter((p) => p.v > 0),
+    [completedSessions],
+  );
+
+  const latestVolume = volumeSpark.length > 0 ? volumeSpark[volumeSpark.length - 1].v : null;
+  const prevVolume = volumeSpark.length >= 2 ? volumeSpark[volumeSpark.length - 2].v : undefined;
+  const volumeVal = latestVolume != null ? `${latestVolume.toFixed(1)} t` : '—';
+  const volumePct = pctChange(prevVolume, latestVolume ?? undefined);
+
+  const personalRecords = useMemo(() => buildPersonalRecords(sessionLogs), [sessionLogs]);
 
   return (
     <div
@@ -255,10 +363,10 @@ export function MetricsOptionOneDesignReplica() {
           />
           <ReplicaKpiCard
             label="Volumen total"
-            valueLine="124.5 t"
-            subLine="+15%"
+            valueLine={volumeVal}
+            subLine={volumePct}
             icon={Weight}
-            sparkPoints={MOCK_VOLUME_SPARK}
+            sparkPoints={volumeSpark}
             sparkColor={CYAN}
           />
         </div>
@@ -273,18 +381,24 @@ export function MetricsOptionOneDesignReplica() {
               style={{ borderColor: LIME, background: METRICS_REPLICA_PANEL_BG }}
             >
               <h3 className="mb-4 text-xs font-black uppercase tracking-[0.18em] text-white/80">Personal records</h3>
-              <ul className="space-y-4">
-                {MOCK_PRS.map((row) => (
-                  <li key={row.name} className="border-b border-white/[0.06] pb-4 last:border-0 last:pb-0">
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-white/45">{row.name}</p>
-                    <div className="mt-1 flex items-baseline justify-between gap-2">
-                      <span className="text-lg font-black text-white">{row.last}</span>
-                      <span className="text-sm font-bold" style={{ color: LIME }}>{row.change}</span>
-                    </div>
-                    <p className="mt-1 text-[10px] uppercase tracking-wider text-white/35">Último</p>
-                  </li>
-                ))}
-              </ul>
+              {personalRecords.length === 0 ? (
+                <p className="text-sm text-white/45">Sin registros de entrenamiento aún.</p>
+              ) : (
+                <ul className="space-y-4">
+                  {personalRecords.map((row) => (
+                    <li key={row.name} className="border-b border-white/[0.06] pb-4 last:border-0 last:pb-0">
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-white/45">{row.name}</p>
+                      <div className="mt-1 flex items-baseline justify-between gap-2">
+                        <span className="text-lg font-black text-white">{row.last}</span>
+                        {row.change ? (
+                          <span className="text-sm font-bold" style={{ color: LIME }}>{row.change}</span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 text-[10px] uppercase tracking-wider text-white/35">Último</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
@@ -522,7 +636,7 @@ export function MetricsOptionOneDesignReplica() {
                 />
                 <div className="absolute inset-x-0 bottom-0 border-t border-white/[0.06] bg-black/60 px-3 py-2 backdrop-blur-sm">
                   <p className="text-[11px] font-black uppercase tracking-[0.2em] text-white">{label}</p>
-                  <p className="text-[10px] text-white/45">15 de junio, 2024</p>
+                  <p className="text-[10px] text-white/45">Vista de ejemplo</p>
                 </div>
                 {i === 0 ? (
                   <span
@@ -547,7 +661,7 @@ export function MetricsOptionOneDesignReplica() {
             <span className="cursor-default hover:text-white/70">Soporte</span>
             <span className="cursor-default hover:text-white/70">Términos</span>
           </div>
-          <span>© 2024 Todos los derechos reservados.</span>
+          <span>Maqueta visual · no refleja tus datos reales</span>
         </footer>
       </div>
 

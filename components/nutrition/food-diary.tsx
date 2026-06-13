@@ -7,6 +7,7 @@ import { useCoach } from '@/app/context/coach-context';
 import { useNutrition } from '@/hooks/use-nutrition';
 import { addDaysToDateKey, getLast7DateKeys, toLocalDateKey } from '@/lib/nutrition/dates';
 import { sumMealItemMacros } from '@/lib/nutrition/macros';
+import type { MealItem } from '@/lib/nutrition/types';
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { type RefObject, useMemo, useState } from 'react';
 
@@ -15,6 +16,24 @@ type FoodDiaryProps = {
   onDateChange?: (date: string) => void;
   formRef?: RefObject<HTMLInputElement | null>;
 };
+
+function parseOptionalMacro(value: string): number | undefined {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return parsed;
+}
+
+function formatItemMacros(item: MealItem): string {
+  const parts: string[] = [];
+  if (item.calories != null) parts.push(`${item.calories} kcal`);
+  const macros: string[] = [];
+  if (item.proteinG != null) macros.push(`P${item.proteinG}g`);
+  if (item.carbsG != null) macros.push(`C${item.carbsG}g`);
+  if (item.fatG != null) macros.push(`G${item.fatG}g`);
+  if (macros.length > 0) parts.push(macros.join(' '));
+  return parts.join(' · ');
+}
 
 export function FoodDiary({ date, onDateChange, formRef }: FoodDiaryProps) {
   const { diary, logFoodItem, removeFoodItem, macroTargets, hasTitanNutritionAccess } = useNutrition();
@@ -30,18 +49,29 @@ export function FoodDiary({ date, onDateChange, formRef }: FoodDiaryProps) {
 
   const [name, setName] = useState('');
   const [calories, setCalories] = useState('');
+  const [proteinG, setProteinG] = useState('');
+  const [carbsG, setCarbsG] = useState('');
+  const [fatG, setFatG] = useState('');
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    const kcal = calories ? Number(calories) : undefined;
-    logFoodItem({
-      name: trimmed,
-      calories: kcal && Number.isFinite(kcal) ? kcal : undefined,
-    }, dateKey);
+    logFoodItem(
+      {
+        name: trimmed,
+        calories: parseOptionalMacro(calories),
+        proteinG: parseOptionalMacro(proteinG),
+        carbsG: parseOptionalMacro(carbsG),
+        fatG: parseOptionalMacro(fatG),
+      },
+      dateKey,
+    );
     setName('');
     setCalories('');
+    setProteinG('');
+    setCarbsG('');
+    setFatG('');
   };
 
   const displayDate = new Date(`${dateKey}T00:00:00`).toLocaleDateString('es-ES', {
@@ -99,6 +129,12 @@ export function FoodDiary({ date, onDateChange, formRef }: FoodDiaryProps) {
 
       <p className="text-sm font-semibold text-foreground">
         Total: {totals.calories} kcal
+        {(totals.proteinG > 0 || totals.carbsG > 0 || totals.fatG > 0) && (
+          <span className="text-muted-foreground">
+            {' '}
+            · P {totals.proteinG}g · C {totals.carbsG}g · G {totals.fatG}g
+          </span>
+        )}
         {macroTargets && (
           <span className="text-muted-foreground">
             {' '}
@@ -134,8 +170,8 @@ export function FoodDiary({ date, onDateChange, formRef }: FoodDiaryProps) {
             className="text-base md:text-base"
           />
         </div>
-        <div className="w-28 space-y-1">
-          <Label htmlFor="diary-kcal">kcal estimadas</Label>
+        <div className="w-24 space-y-1">
+          <Label htmlFor="diary-kcal">kcal</Label>
           <Input
             id="diary-kcal"
             type="number"
@@ -143,6 +179,42 @@ export function FoodDiary({ date, onDateChange, formRef }: FoodDiaryProps) {
             value={calories}
             onChange={(e) => setCalories(e.target.value)}
             placeholder="350"
+            className="text-base md:text-base"
+          />
+        </div>
+        <div className="w-20 space-y-1">
+          <Label htmlFor="diary-protein">P (g)</Label>
+          <Input
+            id="diary-protein"
+            type="number"
+            min={0}
+            value={proteinG}
+            onChange={(e) => setProteinG(e.target.value)}
+            placeholder="12"
+            className="text-base md:text-base"
+          />
+        </div>
+        <div className="w-20 space-y-1">
+          <Label htmlFor="diary-carbs">C (g)</Label>
+          <Input
+            id="diary-carbs"
+            type="number"
+            min={0}
+            value={carbsG}
+            onChange={(e) => setCarbsG(e.target.value)}
+            placeholder="40"
+            className="text-base md:text-base"
+          />
+        </div>
+        <div className="w-20 space-y-1">
+          <Label htmlFor="diary-fat">G (g)</Label>
+          <Input
+            id="diary-fat"
+            type="number"
+            min={0}
+            value={fatG}
+            onChange={(e) => setFatG(e.target.value)}
+            placeholder="8"
             className="text-base md:text-base"
           />
         </div>
@@ -161,8 +233,8 @@ export function FoodDiary({ date, onDateChange, formRef }: FoodDiaryProps) {
             <li key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
               <span>
                 {item.name}
-                {item.calories != null && (
-                  <span className="ml-2 text-muted-foreground">{item.calories} kcal</span>
+                {formatItemMacros(item) && (
+                  <span className="ml-2 text-muted-foreground">{formatItemMacros(item)}</span>
                 )}
               </span>
               <button

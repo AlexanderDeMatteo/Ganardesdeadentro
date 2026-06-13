@@ -1,16 +1,20 @@
 'use client';
 
 import { useAuth } from '@/app/context/auth-context';
+import { isApiRoutinesSource } from '@/lib/api/config';
 import {
   assignRoutine as clientAssignRoutine,
   createRoutine as clientCreateRoutine,
   deleteRoutine as clientDeleteRoutine,
   unassignRoutine as clientUnassignRoutine,
+  updateRoutine as clientUpdateRoutine,
   updateTrainerProfile as clientUpdateTrainerProfile,
 } from '@/lib/data/client';
 import { useTrainerData } from '@/hooks/use-trainer-data';
+import { resolveTrainerId } from '@/lib/auth/guards';
 import type { Routine, RoutineAssignment } from '@/lib/data/types';
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 
 export type { RoutineAssignment };
 
@@ -20,11 +24,10 @@ export interface TrainerProfileData {
 }
 
 export type { AthleteProfile, Exercise, Routine, Trainer } from '@/lib/data/types';
-export { MOCK_ATHLETES, MOCK_EXERCISES, MOCK_TRAINERS } from '@/lib/data/seeds';
 
 export function useTrainer() {
   const { user } = useAuth();
-  const trainerId = user?.trainer_id ?? '';
+  const trainerId = resolveTrainerId(user);
 
   const {
     trainerInfo,
@@ -40,36 +43,85 @@ export function useTrainer() {
     getActiveAssignmentForAthlete,
     getRoutineName,
     setState,
+    refresh,
   } = useTrainerData();
 
   const createRoutine = useCallback(
     async (routine: Omit<Routine, 'id' | 'createdDate'>) => {
-      return clientCreateRoutine(routine, trainerId);
+      try {
+        const created = await clientCreateRoutine(routine, trainerId);
+        await refresh();
+        return created;
+      } catch {
+        toast.error('No se pudo crear la rutina');
+        throw new Error('createRoutine failed');
+      }
     },
-    [trainerId],
+    [trainerId, refresh],
   );
 
   const deleteRoutine = useCallback(
     async (id: string) => {
-      await clientDeleteRoutine(id);
+      try {
+        await clientDeleteRoutine(id);
+        await refresh();
+      } catch {
+        toast.error('No se pudo eliminar la rutina');
+        throw new Error('deleteRoutine failed');
+      }
     },
-    [],
+    [refresh],
+  );
+
+  const updateRoutine = useCallback(
+    async (id: string, routine: Parameters<typeof clientUpdateRoutine>[1]) => {
+      try {
+        await clientUpdateRoutine(id, routine);
+        await refresh();
+      } catch {
+        toast.error('No se pudo actualizar la rutina');
+        throw new Error('updateRoutine failed');
+      }
+    },
+    [refresh],
   );
 
   const assignRoutineToAthlete = useCallback(
     async (athleteId: string, routineId: string) => {
       if (!trainerId) return;
       await clientAssignRoutine(athleteId, routineId, trainerId);
+      await refresh();
     },
-    [trainerId],
+    [trainerId, refresh],
   );
 
-  const unassignRoutine = useCallback(async (assignmentId: string) => {
-    await clientUnassignRoutine(assignmentId);
-  }, []);
+  const unassignRoutine = useCallback(
+    async (assignmentId: string) => {
+      await clientUnassignRoutine(assignmentId);
+      await refresh();
+    },
+    [refresh],
+  );
 
   const toggleAssignmentCompleted = useCallback(
-    (assignmentId: string) => {
+    async (assignmentId: string) => {
+      const assignment = assignments.find((a) => a.id === assignmentId);
+      if (!assignment || !trainerId) return;
+
+      if (isApiRoutinesSource()) {
+        try {
+          if (assignment.isActive) {
+            await clientUnassignRoutine(assignmentId);
+          } else {
+            await clientAssignRoutine(assignment.athleteId, assignment.routineId, trainerId);
+          }
+          await refresh();
+        } catch {
+          toast.error('No se pudo actualizar la asignación');
+        }
+        return;
+      }
+
       setState((prev) => ({
         ...prev,
         assignments: prev.assignments.map((a) =>
@@ -77,20 +129,30 @@ export function useTrainer() {
         ),
       }));
     },
-    [setState],
+    [assignments, trainerId, refresh, setState],
   );
 
   const updateProfile = useCallback(
     async (data: Partial<TrainerProfileData>) => {
-      if (!trainerId) return;
-      await clientUpdateTrainerProfile(trainerId, data);
+      if (!trainerId) {
+        toast.error('No se pudo identificar al entrenador');
+        throw new Error('missing trainerId');
+      }
+      try {
+        await clientUpdateTrainerProfile(trainerId, data);
+        await refresh();
+        toast.success('Perfil actualizado');
+      } catch {
+        toast.error('No se pudo guardar el perfil');
+        throw new Error('updateProfile failed');
+      }
     },
-    [trainerId],
+    [trainerId, refresh],
   );
 
   const refreshAthletes = useCallback(() => {
-    /* reactive via store */
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   return {
     trainerId,
@@ -108,6 +170,7 @@ export function useTrainer() {
     getRoutineName,
     createRoutine,
     deleteRoutine,
+    updateRoutine,
     assignRoutineToAthlete,
     unassignRoutine,
     toggleAssignmentCompleted,

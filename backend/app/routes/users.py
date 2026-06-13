@@ -2,6 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
+from app.schemas.request_schemas import BodyProfilePatchSchema, UpdateMeProfileSchema, parse_schema
 from app.services.user_service import UserService
 from app.utils.authorization import (
     get_current_user_id,
@@ -85,17 +86,20 @@ def assign_trainer(athlete_id):
     if err:
         return err
     data = request.get_json() or {}
+    if 'trainerId' not in data:
+        return {'error': 'trainerId requerido'}, 400
     trainer_id = data.get('trainerId')
     if trainer_id is None:
-        return {'error': 'trainerId requerido'}, 400
-    trainer_parsed, err = _parse_int(trainer_id, 'trainerId')
-    if err:
-        return err
+        trainer_parsed = None
+    else:
+        trainer_parsed, err = _parse_int(trainer_id, 'trainerId')
+        if err:
+            return err
     success, error = UserService.assign_trainer_to_athlete(parsed, trainer_parsed)
     if not success:
         status = 404 if 'no encontrado' in error.lower() else 500
         return {'error': error}, status
-    return {'message': 'Entrenador asignado'}, 200
+    return {'message': 'Entrenador asignado' if trainer_parsed else 'Entrenador desasignado'}, 200
 
 
 @users_bp.route('/trainers/<trainer_id>', methods=['GET'])
@@ -109,6 +113,24 @@ def get_trainer(trainer_id):
         status = 404 if error == 'Entrenador no encontrado' else 500
         return {'error': error}, status
     return {'trainer': trainer}, 200
+
+
+@users_bp.route('/me', methods=['PATCH'])
+@jwt_required()
+def patch_me():
+    user_id = get_current_user_id()
+    data = request.get_json() or {}
+    parsed, validation_error = parse_schema(UpdateMeProfileSchema, data)
+    if validation_error:
+        return {'error': validation_error}, 400
+    if parsed.first_name is None and parsed.last_name is None:
+        return {'error': 'Se requiere al menos un campo'}, 400
+    patch = parsed.model_dump(exclude_none=True)
+    user, error = UserService.update_me_profile(user_id, patch)
+    if error:
+        status = 401 if error == 'La cuenta ha sido desactivada' else 404 if error == 'Usuario no encontrado' else 400
+        return {'error': error}, status
+    return {'user': user}, 200
 
 
 @users_bp.route('/trainers/<trainer_id>', methods=['PATCH'])
@@ -130,6 +152,60 @@ def patch_trainer(trainer_id):
         status = 404 if error == 'Entrenador no encontrado' else 500
         return {'error': error}, status
     return {'message': 'Perfil actualizado'}, 200
+
+
+@users_bp.route('/me/body-profile', methods=['GET'])
+@jwt_required()
+@role_required('user')
+def get_my_body_profile():
+    user_id = get_current_user_id()
+    body_profile, error = UserService.get_body_profile(user_id)
+    if error:
+        status = 404 if error == 'Atleta no encontrado' else 500
+        return {'error': error}, status
+    return {'bodyProfile': body_profile}, 200
+
+
+@users_bp.route('/me/body-profile', methods=['PATCH'])
+@jwt_required()
+@role_required('user')
+def patch_my_body_profile():
+    user_id = get_current_user_id()
+    data = request.get_json() or {}
+    parsed, validation_error = parse_schema(BodyProfilePatchSchema, data)
+    if validation_error:
+        return {'error': validation_error}, 400
+    if not any(
+        getattr(parsed, field) is not None
+        for field in ('heightCm', 'age', 'sex')
+    ):
+        return {'error': 'Se requiere al menos un campo'}, 400
+    patch = parsed.model_dump(exclude_none=True)
+    body_profile, error = UserService.update_body_profile(user_id, patch)
+    if error:
+        status = 404 if error == 'Atleta no encontrado' else 500
+        return {'error': error}, status
+    return {'bodyProfile': body_profile}, 200
+
+
+@users_bp.route('/athletes/<athlete_id>/body-profile', methods=['GET'])
+@jwt_required()
+def get_athlete_body_profile(athlete_id):
+    parsed, err = _parse_int(athlete_id, 'athleteId')
+    if err:
+        return err
+    session = SessionLocal()
+    try:
+        denied = require_athlete_access(parsed, session=session)
+        if denied:
+            return denied
+        body_profile, error = UserService.get_body_profile(parsed, session=session)
+    finally:
+        session.close()
+    if error:
+        status = 404 if error == 'Atleta no encontrado' else 500
+        return {'error': error}, status
+    return {'bodyProfile': body_profile}, 200
 
 
 @users_bp.route('/my-trainer', methods=['GET'])

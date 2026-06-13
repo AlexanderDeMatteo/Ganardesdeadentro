@@ -2,7 +2,10 @@ from flask import Blueprint, current_app, request
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 
 from app.extensions import limiter
+from app.schemas.request_schemas import AcceptInviteSchema, parse_schema
 from app.services.auth_service import AuthService
+from app.services.invitation_service import InvitationService
+from app.services.membership_service import MembershipService
 
 
 auth_bp = Blueprint('auth', __name__)
@@ -112,6 +115,10 @@ def get_current_user():
     if not user.is_active:
         return {'error': 'La cuenta ha sido desactivada'}, 401
 
+    membership, membership_error = MembershipService.get_me_membership(user.id)
+    if membership_error:
+        return {'error': membership_error}, 500
+
     return {
         'user': {
             'id': str(user.id),
@@ -122,6 +129,7 @@ def get_current_user():
             'is_active': user.is_active,
             'created_at': user.created_at.isoformat() if user.created_at else None,
         },
+        'membership': membership,
     }, 200
 
 
@@ -153,3 +161,26 @@ def change_password():
 def logout():
     """Logout del usuario (principalmente para limpiar en el cliente)."""
     return {'message': 'Sesión cerrada'}, 200
+
+
+@auth_bp.route('/invite/<token>', methods=['GET'])
+@limiter.limit(_auth_rate_limit)
+def validate_invite(token):
+    info, error = InvitationService.validate_token(token)
+    if error:
+        return {'error': error}, 400
+    return info, 200
+
+
+@auth_bp.route('/accept-invite', methods=['POST'])
+@limiter.limit(_auth_rate_limit)
+def accept_invite():
+    data = request.get_json() or {}
+    parsed, validation_error = parse_schema(AcceptInviteSchema, data)
+    if validation_error:
+        return {'error': validation_error}, 400
+    success, error = InvitationService.accept_invitation(parsed.token, parsed.password)
+    if not success:
+        status = 400
+        return {'error': error}, status
+    return {'message': 'Cuenta activada correctamente'}, 200

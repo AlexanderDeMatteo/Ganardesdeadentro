@@ -2,8 +2,16 @@
 
 import {
   assignTrainerToAthlete as clientAssignTrainer,
+  assignUserMembership as clientAssignUserMembership,
+  createAdminTrainer as clientCreateTrainer,
   createRoutine as clientCreateRoutine,
+  deactivateAdminTrainer as clientDeactivateTrainer,
   deleteRoutine as clientDeleteRoutine,
+  reactivateAdminTrainer as clientReactivateTrainer,
+  resendTrainerInvite as clientResendTrainerInvite,
+  updateAdminTrainer as clientUpdateAdminTrainer,
+  unassignTrainerFromAthlete as clientUnassignTrainer,
+  updateAthlete as clientUpdateAthlete,
   updateRoutine as clientUpdateRoutine,
 } from '@/lib/data/client';
 import { useAdminData } from '@/hooks/use-admin-data';
@@ -17,22 +25,18 @@ export type {
   Trainer,
 } from '@/lib/data/types';
 
-export {
-  MOCK_ATHLETES,
-  MOCK_EXERCISES,
-  MOCK_ROUTINES,
-  MOCK_TRAINERS,
-} from '@/lib/data/seeds';
-
 export function useAdmin() {
   const {
     athletes,
     trainers,
     exercises,
     routines,
+    overview,
     isHydrated,
     isLoading,
-    setState,
+    refreshOverview,
+    refreshUserLists,
+    refreshRoutines,
   } = useAdminData();
 
   const getAthleteById = useCallback(
@@ -45,54 +49,142 @@ export function useAdmin() {
     [trainers],
   );
 
+  const assignableTrainers = trainers.filter(
+    (t) => t.isActive !== false && !t.invitePending,
+  );
+
   const assignTrainerToAthlete = useCallback(
     async (athleteId: string, trainerId: string) => {
       await clientAssignTrainer(athleteId, trainerId);
+      await Promise.all([refreshOverview(), refreshUserLists()]);
+    },
+    [refreshOverview, refreshUserLists],
+  );
+
+  const unassignTrainerFromAthlete = useCallback(
+    async (athleteId: string) => {
+      await clientUnassignTrainer(athleteId);
+      await Promise.all([refreshOverview(), refreshUserLists()]);
+    },
+    [refreshOverview, refreshUserLists],
+  );
+
+  const createTrainer = useCallback(
+    async (payload: {
+      email: string;
+      firstName: string;
+      lastName: string;
+      specialization?: string;
+    }) => {
+      const created = await clientCreateTrainer(payload);
+      await Promise.all([refreshOverview(), refreshUserLists()]);
+      return created;
+    },
+    [refreshOverview, refreshUserLists],
+  );
+
+  const deactivateTrainer = useCallback(
+    async (
+      trainerId: string,
+      athleteActions: Array<{
+        athleteId: string;
+        action: 'reassign' | 'unassign';
+        newTrainerId?: string;
+      }>,
+    ) => {
+      await clientDeactivateTrainer(trainerId, athleteActions);
+      await Promise.all([refreshOverview(), refreshUserLists()]);
+    },
+    [refreshOverview, refreshUserLists],
+  );
+
+  const resendTrainerInvite = useCallback(
+    async (trainerId: string) => {
+      await clientResendTrainerInvite(trainerId);
     },
     [],
   );
 
+  const reactivateTrainer = useCallback(
+    async (trainerId: string) => {
+      await clientReactivateTrainer(trainerId);
+      await Promise.all([refreshOverview(), refreshUserLists()]);
+    },
+    [refreshOverview, refreshUserLists],
+  );
+
+  const updateTrainerCapacity = useCallback(
+    async (trainerId: string, maxAthletes: number) => {
+      await clientUpdateAdminTrainer(trainerId, { maxAthletes });
+      await refreshUserLists();
+    },
+    [refreshUserLists],
+  );
+
+  const updateAthlete = useCallback(
+    async (athleteId: string, patch: Parameters<typeof clientUpdateAthlete>[1]) => {
+      const updated = await clientUpdateAthlete(athleteId, patch);
+      await refreshUserLists();
+      return updated;
+    },
+    [refreshUserLists],
+  );
+
+  const assignMembershipToAthlete = useCallback(
+    async (athleteId: string, planId: string) => {
+      await clientAssignUserMembership(athleteId, planId);
+      await refreshUserLists();
+    },
+    [refreshUserLists],
+  );
+
   const createRoutine = useCallback(
     async (routine: Parameters<typeof clientCreateRoutine>[0]) => {
-      return clientCreateRoutine(routine);
+      const created = await clientCreateRoutine(routine);
+      await refreshRoutines();
+      return created;
     },
-    [],
+    [refreshRoutines],
   );
 
   const updateRoutine = useCallback(
     async (id: string, routine: Parameters<typeof clientUpdateRoutine>[1]) => {
       await clientUpdateRoutine(id, routine);
+      await refreshRoutines();
     },
-    [],
+    [refreshRoutines],
   );
 
-  const deleteRoutine = useCallback(async (id: string) => {
-    await clientDeleteRoutine(id);
-  }, []);
-
-  const saveData = useCallback(
-    (data: { athletes?: typeof athletes; routines?: typeof routines }) => {
-      setState((prev) => ({
-        ...prev,
-        athletes: data.athletes ?? prev.athletes,
-        routines: data.routines ?? prev.routines,
-      }));
+  const deleteRoutine = useCallback(
+    async (id: string) => {
+      await clientDeleteRoutine(id);
+      await refreshRoutines();
     },
-    [setState],
+    [refreshRoutines],
   );
 
   return {
     athletes,
     trainers,
+    assignableTrainers,
     exercises,
     routines,
+    overview,
     isLoading: isLoading || !isHydrated,
     getAthleteById,
     getTrainerById,
     assignTrainerToAthlete,
+    unassignTrainerFromAthlete,
+    createTrainer,
+    deactivateTrainer,
+    reactivateTrainer,
+    updateTrainerCapacity,
+    resendTrainerInvite,
+    updateAthlete,
+    assignMembershipToAthlete,
     createRoutine,
     updateRoutine,
     deleteRoutine,
-    saveData,
+    refreshOverview,
   };
 }

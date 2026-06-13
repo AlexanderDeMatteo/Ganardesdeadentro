@@ -29,9 +29,12 @@ export type MetricsContextValue = {
   athleteId: string | null;
   isLoading: boolean;
   error: string | null;
-  addEntry: (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => MetricEntry;
-  updateEntry: (id: string, patch: Partial<Omit<MetricEntry, 'id' | 'athleteId'>>) => void;
-  removeEntry: (id: string) => void;
+  addEntry: (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => Promise<MetricEntry>;
+  updateEntry: (
+    id: string,
+    patch: Partial<Omit<MetricEntry, 'id' | 'athleteId'>>,
+  ) => Promise<void>;
+  removeEntry: (id: string) => Promise<void>;
   getLatestEntry: () => MetricEntry | null;
   getProgressChange: (metric: keyof MetricEntry) => number | null;
   getChartData: (metric: keyof MetricEntry | 'bicepsAvg' | 'thighAvg' | 'calfAvg') => Array<{
@@ -63,67 +66,7 @@ function useMetricsStore(): MetricsContextValue {
     setError(null);
     try {
       const data = await getAthleteMetrics(athleteId);
-      if (data.length === 0) {
-        const seed: MetricEntry[] = [
-          {
-            id: '1',
-            athleteId,
-            date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-            weight: 88,
-            bodyFat: 22,
-            muscleMass: 33,
-            bicepsLeft: 31,
-            bicepsRight: 31.4,
-            chest: 98,
-            waist: 82,
-            hips: 95,
-            thighLeft: 52,
-            thighRight: 52.4,
-            calfLeft: 36,
-            calfRight: 36.2,
-          },
-          {
-            id: '2',
-            athleteId,
-            date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-            weight: 85.5,
-            bodyFat: 18.5,
-            muscleMass: 35.2,
-            bicepsLeft: 33,
-            bicepsRight: 33.5,
-            chest: 102,
-            waist: 79,
-            hips: 92,
-            thighLeft: 54,
-            thighRight: 54.6,
-            calfLeft: 37,
-            calfRight: 37.2,
-          },
-          {
-            id: '3',
-            athleteId,
-            date: new Date().toISOString(),
-            weight: 85.5,
-            bodyFat: 18.5,
-            muscleMass: 35.2,
-            bicepsLeft: 33,
-            bicepsRight: 33.5,
-            chest: 102,
-            waist: 79,
-            hips: 92,
-            thighLeft: 54,
-            thighRight: 54.6,
-            calfLeft: 37,
-            calfRight: 37.2,
-          },
-        ];
-        for (const entry of seed) {
-          await clientAddMetric(athleteId, entry);
-        }
-        setEntries(await getAthleteMetrics(athleteId));
-      } else {
-        setEntries(data);
-      }
+      setEntries(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar métricas');
       setEntries([]);
@@ -138,47 +81,49 @@ function useMetricsStore(): MetricsContextValue {
   }, [isHydrated, loadMetrics, state.metrics, athleteId]);
 
   const addEntry = useCallback(
-    (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => {
-      if (!athleteId) throw new Error('No hay atleta identificado');
-      let created!: MetricEntry;
-      void clientAddMetric(athleteId, entry).then((m) => {
-        created = m;
-        setEntries((prev) => [...prev, m]);
-      });
-      return {
-        ...entry,
-        id: Date.now().toString(),
-        athleteId,
-      } as MetricEntry;
-    },
-    [athleteId],
-  );
-
-  const addEntryAsync = useCallback(
     async (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => {
       if (!athleteId) throw new Error('No hay atleta identificado');
-      const created = await clientAddMetric(athleteId, entry);
-      setEntries((prev) => [...prev, created]);
-      return created;
+      setError(null);
+      try {
+        const created = await clientAddMetric(athleteId, entry);
+        setEntries((prev) => [...prev, created]);
+        return created;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error al guardar métrica';
+        setError(message);
+        throw err;
+      }
     },
     [athleteId],
   );
 
   const updateEntry = useCallback(
-    (id: string, patch: Partial<Omit<MetricEntry, 'id' | 'athleteId'>>) => {
-      void clientUpdateMetric(id, patch).then((updated) => {
+    async (id: string, patch: Partial<Omit<MetricEntry, 'id' | 'athleteId'>>) => {
+      setError(null);
+      try {
+        const updated = await clientUpdateMetric(id, patch);
         if (updated) {
           setEntries((prev) => prev.map((e) => (e.id === id ? updated : e)));
         }
-      });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error al actualizar métrica';
+        setError(message);
+        throw err;
+      }
     },
     [],
   );
 
-  const removeEntry = useCallback((id: string) => {
-    void clientRemoveMetric(id).then(() => {
+  const removeEntry = useCallback(async (id: string) => {
+    setError(null);
+    try {
+      await clientRemoveMetric(id);
       setEntries((prev) => prev.filter((e) => e.id !== id));
-    });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al eliminar métrica';
+      setError(message);
+      throw err;
+    }
   }, []);
 
   const getLatestEntry = useCallback(() => {
@@ -236,11 +181,7 @@ function useMetricsStore(): MetricsContextValue {
     athleteId,
     isLoading,
     error,
-    addEntry: (entry: Omit<MetricEntry, 'id' | 'athleteId'>) => {
-      if (!athleteId) throw new Error('No hay atleta identificado');
-      void addEntryAsync(entry);
-      return { ...entry, id: Date.now().toString(), athleteId } as MetricEntry;
-    },
+    addEntry,
     updateEntry,
     removeEntry,
     getLatestEntry,

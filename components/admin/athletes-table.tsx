@@ -3,7 +3,7 @@
 import { AthleteProfile } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, Link2, Search, UtensilsCrossed } from 'lucide-react';
+import { Eye, Link2, Pencil, Search, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -11,9 +11,15 @@ interface AthletesTableProps {
   athletes: AthleteProfile[];
   onViewDetails: (athlete: AthleteProfile) => void;
   onAssignTrainer: (athlete: AthleteProfile) => void;
+  onEditAthlete?: (athlete: AthleteProfile) => void;
 }
 
-export function AthletesTable({ athletes, onViewDetails, onAssignTrainer }: AthletesTableProps) {
+export function AthletesTable({
+  athletes,
+  onViewDetails,
+  onAssignTrainer,
+  onEditAthlete,
+}: AthletesTableProps) {
   const [search, setSearch] = useState('');
 
   const filtered = athletes.filter(a =>
@@ -41,7 +47,7 @@ export function AthletesTable({ athletes, onViewDetails, onAssignTrainer }: Athl
               <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Nombre</th>
               <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Email</th>
               <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Edad</th>
-              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Peso</th>
+              <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Última métrica</th>
               <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Membresía</th>
               <th scope="col" className="px-6 py-3 text-left text-sm font-semibold">Entrenador</th>
               <th scope="col" className="px-6 py-3 text-center text-sm font-semibold">Acciones</th>
@@ -58,7 +64,12 @@ export function AthletesTable({ athletes, onViewDetails, onAssignTrainer }: Athl
                 </td>
                 <td className="px-6 py-4 text-muted-foreground text-sm">{athlete.email}</td>
                 <td className="px-6 py-4 text-sm">{athlete.age}</td>
-                <td className="px-6 py-4 text-sm">{athlete.weight} kg</td>
+                <td className="px-6 py-4 text-sm">
+                  {(() => {
+                    const m = athlete.latestMetric ?? athlete.metrics;
+                    return m ? `${m.weight} kg · ${m.bodyFat}%` : '—';
+                  })()}
+                </td>
                 <td className="px-6 py-4">
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     athlete.membershipLevel === 'pro'
@@ -100,6 +111,16 @@ export function AthletesTable({ athletes, onViewDetails, onAssignTrainer }: Athl
                       aria-label={`Ver detalle de ${athlete.name}`}
                     >
                       <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEditAthlete?.(athlete)}
+                      disabled={!onEditAthlete}
+                      className="h-8 w-8 p-0 border-secondary/30 hover:bg-secondary/10"
+                      aria-label={`Editar ${athlete.name}`}
+                    >
+                      <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"

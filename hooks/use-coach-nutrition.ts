@@ -9,7 +9,10 @@ import {
 } from '@/lib/data/client';
 import { createDefaultCoachDraft } from '@/lib/nutrition/assigned-storage';
 import { computeMetabolism, GOAL_ADJUSTMENTS } from '@/lib/nutrition/metabolism';
+import { useAthleteForCoach } from '@/hooks/use-athlete-for-coach';
 import { findAthleteById } from '@/lib/nutrition/resolve-athlete-id';
+import { isApiAuthSource, isApiUsersSource } from '@/lib/api/config';
+import type { Athlete } from '@/lib/data/types';
 import type {
   AssignedNutritionPlan,
   CoachNutritionDraft,
@@ -19,19 +22,30 @@ import type {
   MetabolismInput,
   MetabolismResult,
 } from '@/lib/nutrition/types';
-import { canCoachEditAthlete } from '@/lib/auth/guards';
+import { canCoachEditAthlete, resolveTrainerId } from '@/lib/auth/guards';
 import { isProMember as checkProMember } from '@/lib/auth/titan';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 export { canCoachEditAthlete };
 
-export function useCoachNutrition(athleteId: string, metabolismInput: MetabolismInput | null) {
+export function useCoachNutrition(
+  athleteId: string,
+  metabolismInput: MetabolismInput | null,
+  athleteOverride?: Athlete | null,
+) {
   const { user } = useAuth();
-  const athlete = useMemo(() => findAthleteById(athleteId), [athleteId]);
+  const apiMode = isApiAuthSource() || isApiUsersSource();
+  const { athlete: fetchedAthlete } = useAthleteForCoach(athleteId);
+  const athlete = useMemo(() => {
+    if (athleteOverride) return athleteOverride;
+    if (apiMode) return fetchedAthlete;
+    return findAthleteById(athleteId);
+  }, [athleteOverride, apiMode, fetchedAthlete, athleteId]);
+  const trainerScopeId = resolveTrainerId(user);
   const canEdit = useMemo(
-    () => canCoachEditAthlete(user?.role, user?.trainer_id, athlete?.trainerId),
-    [user?.role, user?.trainer_id, athlete?.trainerId],
+    () => canCoachEditAthlete(user?.role, trainerScopeId, athlete?.trainerId),
+    [user?.role, trainerScopeId, athlete?.trainerId],
   );
 
   const [draft, setDraft] = useState<CoachNutritionDraft>(createDefaultCoachDraft);
@@ -60,10 +74,24 @@ export function useCoachNutrition(athleteId: string, metabolismInput: Metabolism
     };
   }, [athleteId]);
 
+  const persistDraftSave = useCallback(
+    (next: CoachNutritionDraft) => {
+      saveCoachNutritionDraft(athleteId, next).catch(() => {
+        toast.error('No se pudo guardar el borrador nutricional');
+      });
+    },
+    [athleteId],
+  );
+
   const persistDraft = useCallback(
     async (next: CoachNutritionDraft) => {
       setDraft(next);
-      await saveCoachNutritionDraft(athleteId, next);
+      try {
+        await saveCoachNutritionDraft(athleteId, next);
+      } catch {
+        toast.error('No se pudo guardar el borrador nutricional');
+        throw new Error('saveCoachNutritionDraft failed');
+      }
     },
     [athleteId],
   );
@@ -72,11 +100,11 @@ export function useCoachNutrition(athleteId: string, metabolismInput: Metabolism
     (updater: (prev: CoachNutritionDraft) => CoachNutritionDraft) => {
       setDraft((prev) => {
         const next = updater(prev);
-        void saveCoachNutritionDraft(athleteId, next);
+        persistDraftSave(next);
         return next;
       });
     },
-    [athleteId],
+    [persistDraftSave],
   );
 
   const saveSettings = useCallback(
@@ -169,7 +197,7 @@ export function useCoachNutrition(athleteId: string, metabolismInput: Metabolism
       }
 
       const publishedBy =
-        user?.role === 'trainer' ? (user.trainer_id ?? user.id) : (user?.id ?? 'admin');
+        user?.role === 'trainer' ? trainerScopeId : (user?.id ?? 'admin');
 
       const plan: AssignedNutritionPlan = {
         athleteId,
@@ -183,12 +211,17 @@ export function useCoachNutrition(athleteId: string, metabolismInput: Metabolism
         publishedBy,
       };
 
-      const published = await publishMealPlan(plan);
-      setAssigned(published);
-      toast.success('Plan nutricional publicado para el atleta.');
-      return true;
+      try {
+        const published = await publishMealPlan(plan);
+        setAssigned(published);
+        toast.success('Plan nutricional publicado para el atleta.');
+        return true;
+      } catch {
+        toast.error('No se pudo publicar el plan nutricional');
+        return false;
+      }
     },
-    [athleteId, canEdit, draft, user],
+    [athleteId, canEdit, draft, user, trainerScopeId],
   );
 
   const state = useMemo(

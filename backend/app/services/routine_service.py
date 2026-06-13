@@ -40,13 +40,15 @@ class RoutineService:
         return exercise
 
     @staticmethod
-    def list_routines_by_trainer(trainer_id: int, active_only: bool = True, session=None):
+    def list_routines_by_trainer(trainer_id: int | None = None, active_only: bool = True, session=None):
         close_session = False
         if session is None:
             session = SessionLocal()
             close_session = True
         try:
-            query = session.query(Routine).filter_by(trainer_id=trainer_id)
+            query = session.query(Routine)
+            if trainer_id is not None:
+                query = query.filter_by(trainer_id=trainer_id)
             if active_only:
                 query = query.filter_by(is_active=True)
             routines = query.order_by(Routine.created_at.desc()).all()

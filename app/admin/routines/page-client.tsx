@@ -4,15 +4,24 @@ import { useState } from 'react';
 import { RoutinesList } from '@/components/admin/routines-list';
 import { RoutineBuilder } from '@/components/admin/routine-builder';
 import { useAdmin } from '@/hooks/use-admin';
+import type { Routine } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 export default function RoutinesPage() {
-  const { routines, exercises, createRoutine, deleteRoutine } = useAdmin();
+  const { routines, exercises, createRoutine, updateRoutine, deleteRoutine } = useAdmin();
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
 
-  const handleCreateRoutine = (data: Parameters<typeof createRoutine>[0]) => {
-    createRoutine(data);
+  const handleCreateRoutine = async (data: Parameters<typeof createRoutine>[0]) => {
+    await createRoutine(data);
+    setIsBuilderOpen(false);
+  };
+
+  const handleUpdateRoutine = async (data: Parameters<typeof createRoutine>[0]) => {
+    if (!editingRoutine) return;
+    await updateRoutine(editingRoutine.id, data);
+    setEditingRoutine(null);
   };
 
   return (
@@ -53,13 +62,28 @@ export default function RoutinesPage() {
         </div>
       </div>
 
-      <RoutinesList routines={routines} onDelete={deleteRoutine} />
+      <RoutinesList
+        routines={routines}
+        onDelete={deleteRoutine}
+        onEdit={(routine) => setEditingRoutine(routine)}
+      />
 
       {isBuilderOpen && (
         <RoutineBuilder
           exercises={exercises}
+          mode="create"
           onSave={handleCreateRoutine}
           onClose={() => setIsBuilderOpen(false)}
+        />
+      )}
+
+      {editingRoutine && (
+        <RoutineBuilder
+          exercises={exercises}
+          mode="edit"
+          initialRoutine={editingRoutine}
+          onSave={handleUpdateRoutine}
+          onClose={() => setEditingRoutine(null)}
         />
       )}
     </div>

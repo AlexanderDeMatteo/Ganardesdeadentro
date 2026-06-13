@@ -1,0 +1,24 @@
+﻿python : Traceback (most recent call last):
+At C:\Users\aldml\AppData\Local\Temp\ps-script-1beb8a80-f05f-43a8-a148-0088419b9c8b.ps1:83 char:1
++ python backend/scripts/run_qa_full.py 2>&1 | Out-File -FilePath backe ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\aldml\OneDrive\Escritorio\database-schema-and-structure\backend\scripts\run_qa_full.py", line 500, in 
+<module>
+    sys.exit(main())
+             ~~~~^^
+  File "C:\Users\aldml\OneDrive\Escritorio\database-schema-and-structure\backend\scripts\run_qa_full.py", line 492, in 
+main
+    run_section_c(report)
+    ~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\aldml\OneDrive\Escritorio\database-schema-and-structure\backend\scripts\run_qa_full.py", line 332, in 
+run_section_c
+    f'{API_BASE}/users/trainers/{user_id_from_token(tok)}',
+                                 ~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\aldml\OneDrive\Escritorio\database-schema-and-structure\backend\scripts\run_qa_full.py", line 349, in 
+user_id_from_token
+    return int(user['user']['id']) if isinstance(user, dict) else 0
+               ~~~~^^^^^^^^
+KeyError: 'user'

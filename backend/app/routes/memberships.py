@@ -2,8 +2,9 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
+from app.models import RoleEnum
 from app.services.membership_service import MembershipService
-from app.utils.authorization import require_athlete_access, role_required
+from app.utils.authorization import get_verified_user, require_athlete_access, role_required
 
 memberships_bp = Blueprint('memberships', __name__)
 
@@ -82,6 +83,30 @@ def delete_plan(plan_id):
         status = 404 if error == 'Plan no encontrado' else 500
         return {'error': error}, status
     return {'message': 'Plan eliminado'}, 200
+
+
+@memberships_bp.route('/subscribe', methods=['POST'])
+@jwt_required()
+def subscribe():
+    user = get_verified_user()
+    if user is None:
+        return {'error': 'La cuenta ha sido desactivada o no existe'}, 401
+    if user.role != RoleEnum.USER:
+        return {'error': 'Solo los atletas pueden suscribirse a un plan'}, 403
+
+    data = request.get_json() or {}
+    plan_id = data.get('planId')
+    if plan_id is None:
+        return {'error': 'planId requerido'}, 400
+    plan_parsed, err = _parse_int(plan_id, 'planId')
+    if err:
+        return err
+
+    membership, error = MembershipService.assign_membership(user.id, plan_parsed)
+    if error:
+        status = 404 if error in ('Atleta no encontrado', 'Plan no encontrado') else 500
+        return {'error': error}, status
+    return {'membership': membership}, 200
 
 
 @memberships_bp.route('/users/<user_id>', methods=['PUT'])

@@ -9,17 +9,11 @@ export interface GuardUser {
   trainer_id?: string;
 }
 
-/**
- * UX guard: trainer can only access athletes assigned to them.
- * Real authorization must be enforced on the backend.
- */
-export function canTrainerAccessAthlete(
-  user: GuardUser | null | undefined,
-  athleteId: string,
-): boolean {
-  if (!user || user.role !== 'trainer' || !user.trainer_id) return false;
-  const athlete = getDataState().athletes.find((a) => a.id === athleteId);
-  return athlete?.trainerId === user.trainer_id;
+/** Trainer scope id: API login exposes user.id, not trainer_id on the user row. */
+export function resolveTrainerId(user: GuardUser | null | undefined): string {
+  if (!user) return '';
+  if (user.role === 'trainer') return user.trainer_id ?? user.id;
+  return user.trainer_id ?? '';
 }
 
 /**
@@ -30,29 +24,6 @@ export function canAdminAccessTrainer(
   _trainerId: string,
 ): boolean {
   return user?.role === 'admin';
-}
-
-/**
- * UX guard: who can read/write athlete-scoped data.
- */
-export function canAccessAthleteData(
-  user: GuardUser | null | undefined,
-  athleteId: string,
-): boolean {
-  if (!user) return false;
-  if (user.role === 'admin') return true;
-  if (user.role === 'user') {
-    const athlete = getDataState().athletes.find((a) => a.id === athleteId);
-    if (!athlete) return false;
-    const email = user.email?.toLowerCase();
-    return (
-      athlete.userId === user.id ||
-      athlete.id === user.id ||
-      (email != null && athlete.email.toLowerCase() === email)
-    );
-  }
-  if (user.role === 'trainer') return canTrainerAccessAthlete(user, athleteId);
-  return false;
 }
 
 /**

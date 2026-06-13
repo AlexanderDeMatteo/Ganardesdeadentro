@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.database import SessionLocal
 from app.models import Membership, RoleEnum, User, UserMembership
-from app.schemas.serializers import _membership_level_from_name, serialize_active_membership, serialize_membership_plan
+from app.schemas.serializers import _membership_level_from_name, serialize_active_membership, serialize_me_membership, serialize_membership_plan
 
 logger = logging.getLogger(__name__)
 GENERIC_ERROR = 'No se pudo completar la operación'
@@ -29,6 +29,29 @@ class MembershipService:
             return serialize_active_membership(active), ''
         except Exception:
             logger.exception('Error getting active membership')
+            return None, GENERIC_ERROR
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
+    def get_me_membership(user_id: int, session=None):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            active = (
+                session.query(UserMembership)
+                .filter_by(user_id=user_id, is_active=True)
+                .order_by(UserMembership.start_date.desc())
+                .first()
+            )
+            if not active:
+                return None, ''
+            return serialize_me_membership(active), ''
+        except Exception:
+            logger.exception('Error getting membership for auth me')
             return None, GENERIC_ERROR
         finally:
             if close_session:

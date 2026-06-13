@@ -1,16 +1,27 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { AthletesTable } from '@/components/admin/athletes-table';
 import { AthleteDetailModal } from '@/components/admin/athlete-detail-modal';
+import { EditAthleteModal } from '@/components/admin/edit-athlete-modal';
 import { TrainerAssignmentModal } from '@/components/admin/trainer-assignment-modal';
 import { useAdmin, AthleteProfile } from '@/hooks/use-admin';
 
 export default function AthletesPage() {
-  const { athletes, trainers, assignTrainerToAthlete } = useAdmin();
+  const {
+    athletes,
+    assignableTrainers,
+    assignTrainerToAthlete,
+    updateAthlete,
+    assignMembershipToAthlete,
+    getTrainerById,
+  } = useAdmin();
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteProfile | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const handleViewDetails = (athlete: AthleteProfile) => {
     setSelectedAthlete(athlete);
@@ -22,11 +33,41 @@ export default function AthletesPage() {
     setIsAssignmentModalOpen(true);
   };
 
-  const handleAssignTrainerConfirm = (trainerId: string) => {
-    if (selectedAthlete) {
-      assignTrainerToAthlete(selectedAthlete.id, trainerId);
+  const handleEditAthlete = (athlete: AthleteProfile) => {
+    setSelectedAthlete(athlete);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSave = async (payload: {
+    athleteId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    planId?: string;
+  }) => {
+    const name = [payload.firstName, payload.lastName].filter(Boolean).join(' ');
+    await updateAthlete(payload.athleteId, { name, email: payload.email });
+    if (payload.planId) {
+      await assignMembershipToAthlete(payload.athleteId, payload.planId);
+    }
+    toast.success('Atleta actualizado');
+    setSelectedAthlete(null);
+    setIsEditModalOpen(false);
+  };
+
+  const handleAssignTrainerConfirm = async (trainerId: string) => {
+    if (!selectedAthlete) return;
+
+    setIsAssigning(true);
+    try {
+      await assignTrainerToAthlete(selectedAthlete.id, trainerId);
+      toast.success('Entrenador asignado correctamente');
       setSelectedAthlete(null);
       setIsAssignmentModalOpen(false);
+    } catch {
+      toast.error('No se pudo asignar el entrenador');
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -44,6 +85,7 @@ export default function AthletesPage() {
           athletes={athletes}
           onViewDetails={handleViewDetails}
           onAssignTrainer={handleAssignTrainer}
+          onEditAthlete={handleEditAthlete}
         />
       </div>
 
@@ -55,11 +97,26 @@ export default function AthletesPage() {
         }}
       />
 
+      <EditAthleteModal
+        athlete={isEditModalOpen ? selectedAthlete : null}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedAthlete(null);
+        }}
+        onSave={handleEditSave}
+      />
+
       <TrainerAssignmentModal
         athlete={isAssignmentModalOpen ? selectedAthlete : null}
-        trainers={trainers}
+        trainers={assignableTrainers}
+        currentTrainerName={
+          selectedAthlete?.trainerId
+            ? getTrainerById(selectedAthlete.trainerId)?.name
+            : undefined
+        }
         onAssign={handleAssignTrainerConfirm}
         onClose={() => {
+          if (isAssigning) return;
           setIsAssignmentModalOpen(false);
           setSelectedAthlete(null);
         }}

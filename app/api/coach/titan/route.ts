@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { applyRouteGuard } from '@/lib/api/titan-route-guard';
+import {
+  applyRouteGuard,
+  isNextResponse,
+  requireTitanMotivationAccess,
+} from '@/lib/api/titan-route-guard';
+import { pickTitanFallbackPhrase } from '@/lib/coach/titan-fallback-phrases';
 import { generateTitanMotivation } from '@/lib/ollama/client';
 import { OllamaParseError, OllamaUnavailableError } from '@/lib/ollama/types';
 
@@ -26,9 +31,14 @@ function validateContext(value: unknown): string | undefined {
 }
 
 export async function POST(request: Request) {
-  const guardResponse = applyRouteGuard(request);
-  if (guardResponse) {
-    return guardResponse;
+  const guardResult = await applyRouteGuard(request);
+  if (isNextResponse(guardResult)) {
+    return guardResult;
+  }
+
+  const motivationAccess = requireTitanMotivationAccess(guardResult);
+  if (motivationAccess) {
+    return motivationAccess;
   }
 
   let body: unknown;
@@ -56,17 +66,19 @@ export async function POST(request: Request) {
 
   try {
     const payload = await generateTitanMotivation(userName, context);
-    return NextResponse.json(payload, { status: 200 });
+    return NextResponse.json({ ...payload, source: 'ollama' }, { status: 200 });
   } catch (err) {
     if (err instanceof OllamaUnavailableError || err instanceof OllamaParseError) {
+      const frase = pickTitanFallbackPhrase();
       return NextResponse.json(
-        { error: 'Coach no disponible en este momento' },
-        { status: 503 },
+        { usuario: userName, frase, source: 'fallback' },
+        { status: 200 },
       );
     }
+    const frase = pickTitanFallbackPhrase();
     return NextResponse.json(
-      { error: 'Coach no disponible en este momento' },
-      { status: 503 },
+      { usuario: userName, frase, source: 'fallback' },
+      { status: 200 },
     );
   }
 }

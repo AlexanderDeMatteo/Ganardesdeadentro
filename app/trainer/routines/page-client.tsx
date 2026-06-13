@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { RoutinesList } from '@/components/admin/routines-list';
 import { RoutineBuilder } from '@/components/admin/routine-builder';
 import { useTrainer } from '@/hooks/use-trainer';
+import type { Routine } from '@/lib/data/types';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 export default function TrainerRoutinesPage() {
-  const { routines, exercises, createRoutine, deleteRoutine } = useTrainer();
+  const { routines, exercises, createRoutine, updateRoutine, deleteRoutine } = useTrainer();
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
 
   return (
     <div className="space-y-8 px-8 py-12">
@@ -46,16 +48,34 @@ export default function TrainerRoutinesPage() {
         </div>
       </div>
 
-      <RoutinesList routines={routines} onDelete={deleteRoutine} />
+      <RoutinesList
+        routines={routines}
+        onDelete={deleteRoutine}
+        onEdit={(routine) => setEditingRoutine(routine)}
+      />
 
       {isBuilderOpen && (
         <RoutineBuilder
           exercises={exercises}
-          onSave={(data) => {
-            createRoutine(data);
+          mode="create"
+          onSave={async (data) => {
+            await createRoutine(data);
             setIsBuilderOpen(false);
           }}
           onClose={() => setIsBuilderOpen(false)}
+        />
+      )}
+
+      {editingRoutine && (
+        <RoutineBuilder
+          exercises={exercises}
+          mode="edit"
+          initialRoutine={editingRoutine}
+          onSave={async (data) => {
+            await updateRoutine(editingRoutine.id, data);
+            setEditingRoutine(null);
+          }}
+          onClose={() => setEditingRoutine(null)}
         />
       )}
     </div>

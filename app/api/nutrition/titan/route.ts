@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   applyRouteGuard,
+  isNextResponse,
   requireTitanNutritionAccess,
 } from '@/lib/api/titan-route-guard';
 import { generateTitanNutritionTurn } from '@/lib/ollama/client';
@@ -48,10 +49,25 @@ function sanitizeDate(value: unknown): string | undefined {
   return trimmed;
 }
 
+function buildNutritionServerFallback() {
+  return {
+    status: 'needs_info' as const,
+    message: 'Titan no está disponible ahora. Registra la comida manualmente en el diario.',
+    quickReplies: ['Registrar manualmente', 'Estimar después'],
+    estimate: null,
+    source: 'fallback' as const,
+  };
+}
+
 export async function POST(request: Request) {
-  const guardResponse = applyRouteGuard(request);
-  if (guardResponse) {
-    return guardResponse;
+  const guardResult = await applyRouteGuard(request);
+  if (isNextResponse(guardResult)) {
+    return guardResult;
+  }
+
+  const accessResponse = requireTitanNutritionAccess(guardResult);
+  if (accessResponse) {
+    return accessResponse;
   }
 
   let body: unknown;
@@ -63,13 +79,6 @@ export async function POST(request: Request) {
 
   if (typeof body !== 'object' || body === null) {
     return NextResponse.json({ error: 'Solicitud inválida' }, { status: 400 });
-  }
-
-  const membershipTier = (body as { membershipTier?: unknown }).membershipTier;
-  const userRole = (body as { userRole?: unknown }).userRole;
-  const accessResponse = requireTitanNutritionAccess(membershipTier, userRole);
-  if (accessResponse) {
-    return accessResponse;
   }
 
   const messages = sanitizeMessages((body as { messages?: unknown }).messages);
@@ -107,11 +116,11 @@ export async function POST(request: Request) {
       targetCalories,
       date,
     });
-    return NextResponse.json(payload, { status: 200 });
+    return NextResponse.json({ ...payload, source: 'ollama' }, { status: 200 });
   } catch (err) {
     if (err instanceof OllamaUnavailableError || err instanceof OllamaParseError) {
-      return NextResponse.json({ error: 'Titan no disponible en este momento' }, { status: 503 });
+      return NextResponse.json(buildNutritionServerFallback(), { status: 200 });
     }
-    return NextResponse.json({ error: 'Titan no disponible en este momento' }, { status: 503 });
+    return NextResponse.json(buildNutritionServerFallback(), { status: 200 });
   }
 }

@@ -1,18 +1,26 @@
 'use client';
 
 import { useAuth } from '@/app/context/auth-context';
-import { getMealPlan } from '@/lib/data/client';
+import { isApiNutritionSource } from '@/lib/api/config';
+import {
+  addDiaryEntry,
+  deleteDiaryEntry,
+  getDiary,
+  getMealPlan,
+  patchDiaryWater,
+  putDiary,
+} from '@/lib/data/client';
 import { getWeeklyAdherence } from '@/lib/nutrition/adherence';
 import { toLocalDateKey } from '@/lib/nutrition/dates';
 import {
   createDefaultDiaryState,
-  loadDiaryState,
+  diaryStorageKey,
   migrateLegacyDiaryIfNeeded,
-  saveDiaryState,
 } from '@/lib/nutrition/diary-storage';
 import { sumMealItemMacros } from '@/lib/nutrition/macros';
 import { computeMetabolism } from '@/lib/nutrition/metabolism';
 import { resolveAthleteId } from '@/lib/nutrition/resolve-athlete-id';
+import { toast } from 'sonner';
 import type {
   ActivityLevel,
   AssignedNutritionPlan,
@@ -55,15 +63,46 @@ export type NutritionContextValue = {
 
 const NutritionContext = createContext<NutritionContextValue | null>(null);
 
+function hasLocalDiaryData(athleteId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  const state = migrateLegacyDiaryIfNeeded(athleteId);
+  return state.foodLog.length > 0 || Object.keys(state.waterByDate).length > 0;
+}
+
+function clearLocalDiary(athleteId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(diaryStorageKey(athleteId));
+  } catch {
+    /* ignore */
+  }
+}
+
 function useNutritionStore(): NutritionContextValue {
   const { user } = useAuth();
   const athleteId = useMemo(() => resolveAthleteId(user), [user]);
+  const apiNutritionMode = isApiNutritionSource();
   const [assigned, setAssigned] = useState<AssignedNutritionPlan | null>(null);
   const [diary, setDiary] = useState<AthleteDiaryState>(createDefaultDiaryState);
   const [isLoading, setIsLoading] = useState(true);
 
   const proMember = isProMember(user);
   const titanNutritionAccess = hasTitanNutritionAccess(user);
+
+  const loadDiaryForAthlete = useCallback(async (id: string) => {
+    if (apiNutritionMode) {
+      let remote = await getDiary(id);
+      const isEmpty =
+        remote.foodLog.length === 0 && Object.keys(remote.waterByDate).length === 0;
+      if (isEmpty && hasLocalDiaryData(id)) {
+        const local = migrateLegacyDiaryIfNeeded(id);
+        remote = await putDiary(id, local);
+        clearLocalDiary(id);
+      }
+      return remote;
+    }
+    return migrateLegacyDiaryIfNeeded(id);
+  }, [apiNutritionMode]);
 
   useEffect(() => {
     if (!athleteId) {
@@ -72,17 +111,20 @@ function useNutritionStore(): NutritionContextValue {
     }
     let cancelled = false;
     void (async () => {
-      const plan = await getMealPlan(athleteId);
+      const [plan, diaryState] = await Promise.all([
+        getMealPlan(athleteId),
+        loadDiaryForAthlete(athleteId),
+      ]);
       if (!cancelled) {
         setAssigned(plan);
-        setDiary(migrateLegacyDiaryIfNeeded(athleteId));
+        setDiary(diaryState);
         setIsLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [athleteId]);
+  }, [athleteId, loadDiaryForAthlete]);
 
   const refreshAssigned = useCallback(async () => {
     if (!athleteId) return;
@@ -111,73 +153,111 @@ function useNutritionStore(): NutritionContextValue {
     };
   }, [athleteId, refreshAssigned]);
 
-  const updateDiary = useCallback(
-    (updater: (prev: AthleteDiaryState) => AthleteDiaryState) => {
+  const persistDiaryChange = useCallback(
+    async (
+      updater: (prev: AthleteDiaryState) => AthleteDiaryState,
+      apiAction?: () => Promise<AthleteDiaryState>,
+    ) => {
       if (!athleteId) return;
-      setDiary((prev) => {
-        const next = updater(prev);
-        saveDiaryState(athleteId, next);
-        return next;
-      });
+      const previous = diary;
+      const optimistic = updater(previous);
+      setDiary(optimistic);
+
+      if (apiNutritionMode && apiAction) {
+        try {
+          const saved = await apiAction();
+          setDiary(saved);
+        } catch {
+          setDiary(previous);
+          toast.error('No se pudo guardar el cambio en el diario');
+        }
+        return;
+      }
+
+      if (!apiNutritionMode) {
+        const { saveDiaryState } = await import('@/lib/nutrition/diary-storage');
+        saveDiaryState(athleteId, optimistic);
+      }
     },
-    [athleteId],
+    [athleteId, apiNutritionMode, diary],
   );
 
   const logFoodItem = useCallback(
     (item: Omit<MealItem, 'id'>, date?: string) => {
       const dateKey = date ?? toLocalDateKey();
-      const newItem: MealItem = {
-        ...item,
-        id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      };
-      updateDiary((prev) => {
-        const idx = prev.foodLog.findIndex((e) => e.date === dateKey);
-        const foodLog = [...prev.foodLog];
-        if (idx >= 0) {
-          foodLog[idx] = { ...foodLog[idx], items: [...foodLog[idx].items, newItem] };
-        } else {
-          foodLog.push({ date: dateKey, items: [newItem] });
-        }
-        return { ...prev, foodLog };
-      });
+      void persistDiaryChange(
+        (prev) => {
+          const newItem: MealItem = {
+            ...item,
+            id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          };
+          const idx = prev.foodLog.findIndex((e) => e.date === dateKey);
+          const foodLog = [...prev.foodLog];
+          if (idx >= 0) {
+            foodLog[idx] = { ...foodLog[idx], items: [...foodLog[idx].items, newItem] };
+          } else {
+            foodLog.push({ date: dateKey, items: [newItem] });
+          }
+          return { ...prev, foodLog };
+        },
+        apiNutritionMode
+          ? () => addDiaryEntry(athleteId!, dateKey, item)
+          : undefined,
+      );
     },
-    [updateDiary],
+    [persistDiaryChange, apiNutritionMode, athleteId],
   );
 
   const removeFoodItem = useCallback(
     (itemId: string, date?: string) => {
       const dateKey = date ?? toLocalDateKey();
-      updateDiary((prev) => ({
-        ...prev,
-        foodLog: prev.foodLog
-          .map((e) =>
-            e.date === dateKey ? { ...e, items: e.items.filter((i) => i.id !== itemId) } : e,
-          )
-          .filter((e) => e.items.length > 0),
-      }));
+      void persistDiaryChange(
+        (prev) => ({
+          ...prev,
+          foodLog: prev.foodLog
+            .map((e) =>
+              e.date === dateKey ? { ...e, items: e.items.filter((i) => i.id !== itemId) } : e,
+            )
+            .filter((e) => e.items.length > 0),
+        }),
+        apiNutritionMode
+          ? () => deleteDiaryEntry(athleteId!, itemId, dateKey)
+          : undefined,
+      );
     },
-    [updateDiary],
+    [persistDiaryChange, apiNutritionMode, athleteId],
   );
 
   const addWater = useCallback(
     (ml: number, date?: string) => {
       const dateKey = date ?? toLocalDateKey();
-      updateDiary((prev) => ({
-        ...prev,
-        waterByDate: {
-          ...prev.waterByDate,
-          [dateKey]: Math.max(0, (prev.waterByDate[dateKey] ?? 0) + ml),
-        },
-      }));
+      void persistDiaryChange(
+        (prev) => ({
+          ...prev,
+          waterByDate: {
+            ...prev.waterByDate,
+            [dateKey]: Math.max(0, (prev.waterByDate[dateKey] ?? 0) + ml),
+          },
+        }),
+        apiNutritionMode
+          ? () => patchDiaryWater(athleteId!, { date: dateKey, mlDelta: ml })
+          : undefined,
+      );
     },
-    [updateDiary],
+    [persistDiaryChange, apiNutritionMode, athleteId],
   );
 
   const setWaterGoalMl = useCallback(
     (ml: number) => {
-      updateDiary((prev) => ({ ...prev, waterGoalMl: ml }));
+      const dateKey = toLocalDateKey();
+      void persistDiaryChange(
+        (prev) => ({ ...prev, waterGoalMl: ml }),
+        apiNutritionMode
+          ? () => patchDiaryWater(athleteId!, { date: dateKey, goalMl: ml })
+          : undefined,
+      );
     },
-    [updateDiary],
+    [persistDiaryChange, apiNutritionMode, athleteId],
   );
 
   const macroTargets = assigned?.macroTargets ?? null;

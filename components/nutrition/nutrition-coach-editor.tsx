@@ -3,12 +3,15 @@
 import { CoachNutritionProvider, useCoachNutritionContext } from '@/app/context/coach-nutrition-context';
 import { AssignedMacrosView } from '@/components/nutrition/assigned-macros-view';
 import { AssignedMealPlanView } from '@/components/nutrition/assigned-meal-plan-view';
+import { CoachDiaryView } from '@/components/nutrition/coach-diary-view';
 import { MacroCalculator } from '@/components/nutrition/macro-calculator';
 import { MealPlanEditor } from '@/components/nutrition/meal-plan-editor';
 import { MetabolismPanel } from '@/components/nutrition/metabolism-panel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AthleteProfile } from '@/hooks/use-admin';
+import { useAthleteBodyProfile } from '@/hooks/use-athlete-body-profile';
+import { useAthleteMetrics } from '@/hooks/use-athlete-metrics';
 import { metabolismInputFromAthlete } from '@/lib/nutrition/athlete-metabolism';
 import type { MetabolismInput } from '@/lib/nutrition/types';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -75,6 +78,7 @@ function CoachEditorInner({
           <TabsTrigger value="metabolism">Metabolismo</TabsTrigger>
           <TabsTrigger value="macros">Macros</TabsTrigger>
           <TabsTrigger value="plan">Plan</TabsTrigger>
+          <TabsTrigger value="diary">Diario</TabsTrigger>
           <TabsTrigger value="preview">Vista previa</TabsTrigger>
         </TabsList>
 
@@ -88,6 +92,10 @@ function CoachEditorInner({
 
         <TabsContent value="plan" className="space-y-6">
           <MealPlanEditor />
+        </TabsContent>
+
+        <TabsContent value="diary" className="space-y-6">
+          <CoachDiaryView athleteId={athlete.id} />
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-6">
@@ -127,10 +135,20 @@ export function NutritionCoachEditor({
   athlete: AthleteProfile;
   backHref: string;
 }) {
-  const metabolismInput = useMemo((): MetabolismInput => metabolismInputFromAthlete(athlete), [athlete]);
+  const { profile: bodyProfile } = useAthleteBodyProfile(athlete.id);
+  const { latest } = useAthleteMetrics(athlete.id);
+
+  const metabolismInput = useMemo((): MetabolismInput => {
+    return metabolismInputFromAthlete(athlete, {
+      heightCm: bodyProfile?.heightCm,
+      age: bodyProfile?.age,
+      sex: bodyProfile?.sex,
+      weightKg: latest?.weight,
+    });
+  }, [athlete, bodyProfile?.heightCm, bodyProfile?.age, bodyProfile?.sex, latest?.weight]);
 
   return (
-    <CoachNutritionProvider athleteId={athlete.id} metabolismInput={metabolismInput}>
+    <CoachNutritionProvider athleteId={athlete.id} metabolismInput={metabolismInput} athlete={athlete}>
       <CoachEditorInner athlete={athlete} backHref={backHref} />
     </CoachNutritionProvider>
   );

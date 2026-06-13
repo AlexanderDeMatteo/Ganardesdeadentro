@@ -38,6 +38,11 @@ class Config:
     RATELIMIT_ENABLED = os.getenv('RATELIMIT_ENABLED', 'True') == 'True'
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
 
+    RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
+    EMAIL_FROM = os.getenv('EMAIL_FROM', 'FitTrack <onboarding@fittrack.local>')
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    INVITATION_EXPIRY_HOURS = int(os.getenv('INVITATION_EXPIRY_HOURS', '72'))
+
 
 class DevelopmentConfig(Config):
     DEBUG = True

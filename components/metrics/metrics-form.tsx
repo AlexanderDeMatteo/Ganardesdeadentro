@@ -194,7 +194,7 @@ export function MetricsForm({
         entry.notes = formData.notes;
       }
 
-      addEntry(entry);
+      await addEntry(entry);
       setFormData({});
       setBodyFatSourceDraft(null);
       setMuscleMassSourceDraft(null);

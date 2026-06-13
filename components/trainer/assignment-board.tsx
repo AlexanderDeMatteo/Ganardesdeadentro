@@ -26,7 +26,7 @@ export function AssignmentBoard({
     <div className="space-y-6">
       {athletes.map((athlete) => {
         const athleteAssignments = assignments.filter((a) => a.athleteId === athlete.id);
-        const active = athleteAssignments.find((a) => !a.isCompleted);
+        const active = athleteAssignments.find((a) => a.isActive);
 
         return (
           <div
@@ -61,7 +61,7 @@ export function AssignmentBoard({
                       <p className="font-medium">{getRoutineName(assignment.routineId)}</p>
                       <p className="text-xs text-muted-foreground">
                         Desde {assignment.assignedDate}
-                        {assignment.isCompleted ? ' · Completada' : ' · Activa'}
+                        {assignment.isActive ? ' · Activa' : ' · Completada'}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -72,7 +72,7 @@ export function AssignmentBoard({
                         className="gap-1"
                       >
                         <CheckCircle2 className="h-4 w-4" />
-                        {assignment.isCompleted ? 'Reactivar' : 'Completar'}
+                        {assignment.isActive ? 'Completar' : 'Reactivar'}
                       </Button>
                       <Button
                         variant="outline"

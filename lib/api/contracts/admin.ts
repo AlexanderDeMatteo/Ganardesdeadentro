@@ -21,3 +21,25 @@ export interface UpdateTrainerProfileRequest {
   specialization?: string;
   bio?: string;
 }
+
+export interface CreateTrainerInviteRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+  specialization?: string;
+}
+
+export interface CreateTrainerInviteResponse {
+  trainer: import('@/lib/data/types').Trainer;
+  message: string;
+}
+
+export type AthleteTrainerAction = {
+  athleteId: string;
+  action: 'reassign' | 'unassign';
+  newTrainerId?: string;
+};
+
+export interface DeactivateTrainerRequest {
+  athleteActions: AthleteTrainerAction[];
+}

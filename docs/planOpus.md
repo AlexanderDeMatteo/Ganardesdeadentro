@@ -1,6 +1,8 @@
 # planOpus — Ruta para culminar el frontend de FitTrack
 
-> Documento de ejecución. Complementa `docs/PROJECT_CONTEXT.md` (estado real del repo).
+> **Documento histórico / parcial (jun 2026).** Varios ítems de la Fase 0 (store unificado) y la integración API están superados o reemplazados por [plan-actual.md](./plan-actual.md) y [API_CONTRACTS.md](./API_CONTRACTS.md). Consultar esos documentos para el estado actual.
+
+Documento de ejecución. Complementa `docs/PROJECT_CONTEXT.md` (estado real del repo).
 > Alcance: **frontend** (vistas Atleta, Entrenador y Admin) bajo la jerarquía de supervisión
 > **Admin → Entrenador → Atleta**. No cubre implementar el backend, pero deja los contratos listos.
 

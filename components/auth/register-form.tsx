@@ -22,8 +22,8 @@ export function RegisterForm() {
     setLocalError(null);
     clearError();
 
-    if (password.length < 6) {
-      setLocalError('La contraseña debe tener al menos 6 caracteres');
+    if (password.length < 8) {
+      setLocalError('La contraseña debe tener al menos 8 caracteres');
       return;
     }
 
@@ -126,7 +126,7 @@ export function RegisterForm() {
               required
               className="h-11 text-base"
             />
-            <p className="text-xs text-muted-foreground mt-1">Mínimo 6 caracteres</p>
+            <p className="text-xs text-muted-foreground mt-1">Mínimo 8 caracteres</p>
           </div>
 
           <Button

@@ -1,3 +1,4 @@
+import { isFullApiMode } from '@/lib/api/config';
 import {
   createEmptyState,
   FITTRACK_DATA_SCHEMA_VERSION,
@@ -269,12 +270,19 @@ function migrateFromLegacy(): FitTrackState {
 
 export function loadFitTrackState(): FitTrackState {
   if (typeof window === 'undefined') {
+    if (isFullApiMode()) {
+      return createEmptyState();
+    }
     return normalizeFitTrackState({
       athletes: [...SEED_ATHLETES],
       trainers: [...SEED_TRAINERS],
       exercises: [...SEED_EXERCISES],
       routines: [...SEED_ROUTINES],
     });
+  }
+
+  if (isFullApiMode()) {
+    return createEmptyState();
   }
 
   try {

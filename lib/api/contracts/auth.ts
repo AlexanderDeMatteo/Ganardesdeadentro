@@ -34,8 +34,20 @@ export interface RegisterResponse {
   message?: string;
 }
 
+export interface MeMembershipResponse {
+  planId: string;
+  name: 'Básica' | 'Premium' | 'Pro' | string;
+  daysRemaining: number;
+  features?: string[];
+  startDate?: string;
+  endDate?: string;
+  price?: number;
+  durationDays?: number;
+}
+
 export interface MeResponse {
   user: AuthUserResponse;
+  membership: MeMembershipResponse | null;
 }
 
 export interface ChangePasswordRequest {
@@ -44,5 +56,20 @@ export interface ChangePasswordRequest {
 }
 
 export interface LogoutResponse {
+  message: string;
+}
+
+export interface InviteValidationResponse {
+  email: string;
+  firstName: string;
+  expiresAt: string;
+}
+
+export interface AcceptInviteRequest {
+  token: string;
+  password: string;
+}
+
+export interface AcceptInviteResponse {
   message: string;
 }

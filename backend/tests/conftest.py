@@ -8,7 +8,7 @@ from flask_jwt_extended import create_access_token
 from app import create_app
 from app.config import TestingConfig
 from app.database import SessionLocal, drop_db, init_db
-from app.models import RoleEnum, User
+from app.models import DifficultyEnum, Exercise, RoleEnum, User
 from app.services.auth_service import AuthService
 
 
@@ -47,6 +47,50 @@ def create_user(email, password='password123', role='user', trainer_id=None):
         finally:
             session.close()
     return user
+
+
+def register_user(client, email='user@example.com', password='password123', role=None):
+    payload = {
+        'email': email,
+        'password': password,
+        'first_name': 'Test',
+        'last_name': 'User',
+    }
+    if role is not None:
+        payload['role'] = role
+    return client.post('/api/auth/register', json=payload)
+
+
+def login_user(client, email='user@example.com', password='password123'):
+    return client.post('/api/auth/login', json={'email': email, 'password': password})
+
+
+def seed_cached_exercise(
+    *,
+    exercise_db_id='bench-press-001',
+    name='Bench Press',
+    target_muscle='chest',
+    equipment='barbell',
+):
+    session = SessionLocal()
+    try:
+        existing = session.query(Exercise).filter_by(exercise_db_id=exercise_db_id).first()
+        if existing:
+            return existing
+        exercise = Exercise(
+            exercise_db_id=exercise_db_id,
+            name=name,
+            target_muscle=target_muscle,
+            equipment=equipment,
+            difficulty=DifficultyEnum.BEGINNER,
+            is_cached=True,
+        )
+        session.add(exercise)
+        session.commit()
+        session.refresh(exercise)
+        return exercise
+    finally:
+        session.close()
 
 
 def auth_headers(user):

@@ -1,44 +1,91 @@
 'use client';
 
 import { useAuth } from '@/app/context/auth-context';
+import { isApiRoutinesSource, isApiUsersSource } from '@/lib/api/config';
+import { resolveTrainerId } from '@/lib/auth/guards';
+import {
+  getTrainerAthletes,
+  getTrainerById,
+  listAssignments,
+  listExercises,
+  listRoutines,
+} from '@/lib/data/client';
+import { SEED_EXERCISES } from '@/lib/data/seeds';
 import { useDataStore } from '@/lib/data/store';
-import { getTrainerAthletes } from '@/lib/data/client';
-import type { Athlete, Routine, RoutineAssignment } from '@/lib/data/types';
+import type { Athlete, Exercise, Routine, RoutineAssignment, Trainer } from '@/lib/data/types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export function useTrainerData() {
   const { user } = useAuth();
   const { state, isHydrated, setState } = useDataStore();
-  const trainerId = user?.trainer_id ?? '';
+  const trainerId = resolveTrainerId(user);
+  const apiRoutinesMode = isApiRoutinesSource();
+  const apiUsersMode = isApiUsersSource();
 
   const [myAthletes, setMyAthletes] = useState<Athlete[]>([]);
+  const [apiRoutines, setApiRoutines] = useState<Routine[]>([]);
+  const [apiAssignments, setApiAssignments] = useState<RoutineAssignment[]>([]);
+  const [apiTrainer, setApiTrainer] = useState<Trainer | null>(null);
+  const [apiExercises, setApiExercises] = useState<Exercise[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isHydrated || !trainerId) {
+  const refresh = useCallback(async () => {
+    if (!trainerId) {
+      setMyAthletes([]);
+      setApiRoutines([]);
+      setApiAssignments([]);
+      setApiTrainer(null);
       setIsLoading(false);
       return;
     }
-    void getTrainerAthletes(trainerId).then((athletes) => {
+    setIsLoading(true);
+    try {
+      const athletes = await getTrainerAthletes(trainerId);
       setMyAthletes(athletes);
+      if (apiUsersMode) {
+        const trainer = await getTrainerById(trainerId);
+        setApiTrainer(trainer);
+      } else {
+        setApiTrainer(null);
+      }
+      if (apiRoutinesMode) {
+        const [routines, assignments, remoteExercises] = await Promise.all([
+          listRoutines(trainerId),
+          listAssignments(trainerId, { activeOnly: false }),
+          listExercises({ perPage: 100 }).catch(() => SEED_EXERCISES),
+        ]);
+        setApiRoutines(routines);
+        setApiAssignments(assignments);
+        setApiExercises(remoteExercises.length > 0 ? remoteExercises : SEED_EXERCISES);
+      } else {
+        setApiExercises(null);
+      }
+    } finally {
       setIsLoading(false);
-    });
-  }, [isHydrated, trainerId, state.athletes]);
+    }
+  }, [trainerId, apiRoutinesMode, apiUsersMode]);
 
-  const routines = useMemo(
-    () => state.routines.filter((r) => !r.trainerId || r.trainerId === trainerId),
-    [state.routines, trainerId],
-  );
+  const storeAthletesKey = apiRoutinesMode ? 'api' : state.athletes;
 
-  const assignments = useMemo(
-    () => state.assignments.filter((a) => a.trainerId === trainerId),
-    [state.assignments, trainerId],
-  );
+  useEffect(() => {
+    if (!isHydrated) return;
+    void refresh();
+  }, [isHydrated, refresh, storeAthletesKey]);
 
-  const trainerInfo = useMemo(
-    () => state.trainers.find((t) => t.id === trainerId),
-    [state.trainers, trainerId],
-  );
+  const routines = useMemo(() => {
+    if (apiRoutinesMode) return apiRoutines;
+    return state.routines.filter((r) => !r.trainerId || r.trainerId === trainerId);
+  }, [apiRoutinesMode, apiRoutines, state.routines, trainerId]);
+
+  const assignments = useMemo(() => {
+    if (apiRoutinesMode) return apiAssignments;
+    return state.assignments.filter((a) => a.trainerId === trainerId);
+  }, [apiRoutinesMode, apiAssignments, state.assignments, trainerId]);
+
+  const trainerInfo = useMemo(() => {
+    if (apiUsersMode) return apiTrainer;
+    return state.trainers.find((t) => t.id === trainerId);
+  }, [apiUsersMode, apiTrainer, state.trainers, trainerId]);
 
   const profile = useMemo(
     () => ({
@@ -54,8 +101,8 @@ export function useTrainerData() {
   );
 
   const getRoutineName = useCallback(
-    (routineId: string) => state.routines.find((r) => r.id === routineId)?.name ?? '—',
-    [state.routines],
+    (routineId: string) => routines.find((r) => r.id === routineId)?.name ?? '—',
+    [routines],
   );
 
   const stats = useMemo(() => {
@@ -76,6 +123,7 @@ export function useTrainerData() {
 
   const persistAssignments = useCallback(
     (next: RoutineAssignment[]) => {
+      if (apiRoutinesMode) return;
       setState((prev) => ({
         ...prev,
         assignments: [
@@ -84,11 +132,12 @@ export function useTrainerData() {
         ],
       }));
     },
-    [setState, trainerId],
+    [apiRoutinesMode, setState, trainerId],
   );
 
   const persistRoutines = useCallback(
     (next: Routine[]) => {
+      if (apiRoutinesMode) return;
       setState((prev) => ({
         ...prev,
         routines: [
@@ -97,17 +146,17 @@ export function useTrainerData() {
         ],
       }));
     },
-    [setState, trainerId],
+    [apiRoutinesMode, setState, trainerId],
   );
 
   return {
     trainerId,
     trainerInfo,
     myAthletes,
-    allAthletes: state.athletes,
+    allAthletes: apiUsersMode ? myAthletes : state.athletes,
     routines,
     assignments,
-    exercises: state.exercises,
+    exercises: apiRoutinesMode && apiExercises !== null ? apiExercises : state.exercises,
     profile,
     stats,
     isHydrated,
@@ -116,6 +165,7 @@ export function useTrainerData() {
     getRoutineName,
     persistAssignments,
     persistRoutines,
+    refresh,
     setState,
   };
 }

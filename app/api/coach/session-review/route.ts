@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { ExerciseReviewItem, ExerciseReviewStatus } from '@/lib/coach/exercise-review';
-import { applyRouteGuard } from '@/lib/api/titan-route-guard';
+import {
+  applyRouteGuard,
+  isNextResponse,
+  requireTitanMotivationAccess,
+} from '@/lib/api/titan-route-guard';
+import { pickSessionReviewFallback } from '@/lib/coach/session-review-fallback';
 import { generateTitanSessionReview } from '@/lib/ollama/client';
 import {
   OllamaParseError,
@@ -133,9 +138,14 @@ function validateMetrics(body: Record<string, unknown>): SessionReviewMetrics | 
 }
 
 export async function POST(request: Request) {
-  const guardResponse = applyRouteGuard(request);
-  if (guardResponse) {
-    return guardResponse;
+  const guardResult = await applyRouteGuard(request);
+  if (isNextResponse(guardResult)) {
+    return guardResult;
+  }
+
+  const motivationAccess = requireTitanMotivationAccess(guardResult);
+  if (motivationAccess) {
+    return motivationAccess;
   }
 
   let body: unknown;
@@ -163,17 +173,43 @@ export async function POST(request: Request) {
 
   try {
     const payload = await generateTitanSessionReview(userName, metrics);
-    return NextResponse.json(payload, { status: 200 });
+    return NextResponse.json({ ...payload, source: 'ollama' }, { status: 200 });
   } catch (err) {
     if (err instanceof OllamaUnavailableError || err instanceof OllamaParseError) {
+      const fallback = pickSessionReviewFallback({
+        userName,
+        ...metrics,
+      });
       return NextResponse.json(
-        { error: 'Coach no disponible en este momento' },
-        { status: 503 },
+        {
+          usuario: userName,
+          tono: fallback.mood,
+          resumen: fallback.frase,
+          fallos: [],
+          ajustes: [],
+          destacados: [],
+          recomendaciones: [],
+          source: 'fallback',
+        },
+        { status: 200 },
       );
     }
+    const fallback = pickSessionReviewFallback({
+      userName,
+      ...metrics,
+    });
     return NextResponse.json(
-      { error: 'Coach no disponible en este momento' },
-      { status: 503 },
+      {
+        usuario: userName,
+        tono: fallback.mood,
+        resumen: fallback.frase,
+        fallos: [],
+        ajustes: [],
+        destacados: [],
+        recomendaciones: [],
+        source: 'fallback',
+      },
+      { status: 200 },
     );
   }
 }

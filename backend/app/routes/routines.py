@@ -58,8 +58,6 @@ def list_assignments():
     trainer_id = request.args.get('trainerId', type=int)
     if role == 'trainer':
         trainer_id = get_current_user_id()
-    elif not trainer_id:
-        return {'error': 'trainerId requerido'}, 400
 
     athlete_id = request.args.get('athleteId', type=int)
     active_only = _parse_active_only()
@@ -202,8 +200,6 @@ def list_routines():
     trainer_id = request.args.get('trainerId', type=int)
     if role == 'trainer':
         trainer_id = get_current_user_id()
-    elif not trainer_id:
-        return {'error': 'trainerId requerido'}, 400
 
     active_only = _parse_active_only()
     routines, error = RoutineService.list_routines_by_trainer(trainer_id, active_only=active_only)

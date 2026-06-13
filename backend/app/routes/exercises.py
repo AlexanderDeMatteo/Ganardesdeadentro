@@ -33,6 +33,7 @@ def get_exercises_by_muscle(muscle):
 
 
 @exercises_bp.route('/search', methods=['GET'])
+@jwt_required()
 def search_exercises():
     query = request.args.get('q', '', type=str).strip()
     limit = request.args.get('limit', 20, type=int)
@@ -56,6 +57,7 @@ def get_exercise(exercise_id):
 
 
 @exercises_bp.route('/cached', methods=['GET'])
+@jwt_required()
 def get_cached_exercises():
     session = SessionLocal()
     try:

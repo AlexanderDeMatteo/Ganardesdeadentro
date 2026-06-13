@@ -1,11 +1,15 @@
 import type { AthleteProfile } from '@/hooks/use-admin';
 import type { MetabolismInput } from './types';
 
-export function metabolismInputFromAthlete(athlete: AthleteProfile): MetabolismInput {
+export function metabolismInputFromAthlete(
+  athlete: AthleteProfile,
+  overrides?: Partial<MetabolismInput>,
+): MetabolismInput {
+  const latest = athlete.latestMetric ?? athlete.metrics;
   return {
-    weightKg: athlete.metrics?.weight ?? athlete.weight,
-    heightCm: athlete.height,
-    age: athlete.age,
-    sex: athlete.gender === 'F' ? 'female' : 'male',
+    weightKg: overrides?.weightKg ?? latest?.weight ?? athlete.weight,
+    heightCm: overrides?.heightCm ?? athlete.height,
+    age: overrides?.age ?? athlete.age,
+    sex: overrides?.sex ?? (athlete.gender === 'F' || athlete.gender === 'female' ? 'female' : 'male'),
   };
 }

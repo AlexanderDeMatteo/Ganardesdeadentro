@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import StaticPool
 from contextlib import contextmanager
@@ -29,9 +29,35 @@ engine = _build_engine()
 SessionLocal = scoped_session(sessionmaker(bind=engine, expire_on_commit=False))
 
 
+def _sync_missing_columns() -> None:
+    """Agrega columnas del modelo que falten en tablas existentes (SQLite/dev)."""
+    inspector = inspect(engine)
+    existing_tables = set(inspector.get_table_names())
+
+    for table_name, table in Base.metadata.tables.items():
+        if table_name not in existing_tables:
+            continue
+
+        existing_columns = {column['name'] for column in inspector.get_columns(table_name)}
+        for column in table.columns:
+            if column.name in existing_columns:
+                continue
+            if not column.nullable and column.server_default is None and column.default is None:
+                continue
+
+            column_type = column.type.compile(dialect=engine.dialect)
+            alter_sql = f'ALTER TABLE {table_name} ADD COLUMN {column.name} {column_type}'
+            with engine.begin() as connection:
+                connection.execute(text(alter_sql))
+
+
 def init_db():
-    """Inicializa la base de datos creando todas las tablas."""
+    """Inicializa la base de datos creando tablas y sincronizando columnas faltantes."""
     Base.metadata.create_all(bind=engine)
+    _sync_missing_columns()
+    from app.services.dev_seed_service import seed_demo_trainers
+
+    seed_demo_trainers()
 
 
 def drop_db():

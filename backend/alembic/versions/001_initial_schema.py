@@ -17,9 +17,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # create_all handles fresh installs; migration documents schema baseline.
-    pass
+    from app.models import Base
+
+    bind = op.get_bind()
+    Base.metadata.create_all(bind)
 
 
 def downgrade() -> None:
-    pass
+    from app.models import Base
+
+    bind = op.get_bind()
+    Base.metadata.drop_all(bind)

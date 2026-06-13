@@ -11,6 +11,7 @@ interface WeeklyPlanStripProps {
   weekSessionLogs: SessionLog[];
   selectedDayIndex: number | null;
   onSelectDay: (dayIndex: number) => void;
+  routineNamesById?: Record<string, string>;
 }
 
 function statusForDay(
@@ -29,11 +30,21 @@ function statusForDay(
   return 'partial';
 }
 
+function dayLabel(
+  day: { routineId: string | null; focus?: string },
+  routineNamesById: Record<string, string>,
+): string {
+  if (!day.routineId) return 'Descanso';
+  if (day.focus) return day.focus;
+  return routineNamesById[day.routineId] ?? 'Entreno';
+}
+
 export function WeeklyPlanStrip({
   weeklyPlan,
   weekSessionLogs,
   selectedDayIndex,
   onSelectDay,
+  routineNamesById = {},
 }: WeeklyPlanStripProps) {
   if (!weeklyPlan) {
     return (
@@ -74,7 +85,7 @@ export function WeeklyPlanStrip({
             >
               <span className="text-xs font-bold">{day.label}</span>
               <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2">
-                {isRest ? 'Descanso' : day.focus ?? 'Entreno'}
+                {dayLabel(day, routineNamesById)}
               </span>
             </button>
           );

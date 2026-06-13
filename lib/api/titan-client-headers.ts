@@ -18,17 +18,3 @@ export function getTitanAuthHeaders(): HeadersInit {
 
   return headers;
 }
-
-export function getTitanMembershipPayload(user: {
-  role?: string;
-  membership?: { name?: string };
-} | null): { membershipTier?: string; userRole?: string } {
-  if (!user) {
-    return {};
-  }
-
-  return {
-    membershipTier: user.membership?.name,
-    userRole: user.role,
-  };
-}

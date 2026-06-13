@@ -82,6 +82,44 @@ class TestRoutineAuthorization:
         response = client.get(f'/api/routines/{routine_id}', headers=athlete_headers)
         assert response.status_code == 403
 
+    def test_admin_lists_all_routines_including_admin_created(
+        self, client, admin_headers, trainer_headers
+    ):
+        admin_routine_id = _create_trainer_routine(client, admin_headers, name='Admin Routine')
+        trainer_routine_id = _create_trainer_routine(client, trainer_headers, name='Trainer Routine')
+
+        response = client.get('/api/routines/', headers=admin_headers)
+        assert response.status_code == 200
+        routine_ids = {item['id'] for item in response.get_json()['routines']}
+        assert admin_routine_id in routine_ids
+        assert trainer_routine_id in routine_ids
+
+    def test_trainer_list_routines_only_own(self, client, admin_headers, trainer_headers):
+        admin_routine_id = _create_trainer_routine(client, admin_headers, name='Admin Only')
+        trainer_routine_id = _create_trainer_routine(client, trainer_headers, name='Trainer Own')
+
+        response = client.get('/api/routines/', headers=trainer_headers)
+        assert response.status_code == 200
+        routine_ids = {item['id'] for item in response.get_json()['routines']}
+        assert trainer_routine_id in routine_ids
+        assert admin_routine_id not in routine_ids
+
+    def test_admin_lists_all_assignments_without_trainer_id(
+        self, client, admin_headers, trainer_headers, athlete_user
+    ):
+        routine_id = _create_trainer_routine(client, trainer_headers)
+        assign = client.post(
+            '/api/routines/assignments',
+            headers=trainer_headers,
+            json={'athleteId': athlete_user.id, 'routineId': routine_id},
+        )
+        assert assign.status_code == 201
+
+        response = client.get('/api/routines/assignments', headers=admin_headers)
+        assert response.status_code == 200
+        assignments = response.get_json()['assignments']
+        assert any(item['athleteId'] == str(athlete_user.id) for item in assignments)
+
 
 class TestInactiveUserAccess:
     def test_inactive_user_rejected_on_protected_route(self, client, athlete_user, athlete_headers):
@@ -101,6 +139,32 @@ class TestInactiveUserAccess:
 
 
 class TestNutritionAuthorization:
+    def test_trainer_cannot_publish_plan_for_unassigned_athlete(self, client, trainer_headers):
+        other_trainer = create_user('foreign-trainer-nutrition@example.com', role='trainer')
+        foreign_athlete = create_user(
+            'foreign-athlete-nutrition@example.com',
+            role='user',
+            trainer_id=other_trainer.id,
+        )
+        response = client.put(
+            '/api/nutrition/plan',
+            headers=trainer_headers,
+            json={
+                'athleteId': foreign_athlete.id,
+                'macroTargets': {'calories': 2000},
+                'mealPlan': {'id': '1', 'name': 'Plan', 'days': []},
+                'slotTimes': {},
+            },
+        )
+        assert response.status_code == 403
+
+    def test_athlete_cannot_read_coach_draft(self, client, athlete_user, athlete_headers):
+        response = client.get(
+            f'/api/nutrition/coach-draft?athleteId={athlete_user.id}',
+            headers=athlete_headers,
+        )
+        assert response.status_code == 403
+
     def test_publish_plan_missing_athlete_returns_404(self, client, trainer_headers):
         response = client.put(
             '/api/nutrition/plan',

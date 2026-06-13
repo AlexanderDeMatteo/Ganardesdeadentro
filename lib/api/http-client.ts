@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from '@/lib/api/config';
 import { ApiError } from '@/lib/api/errors';
+import { handleUnauthorizedResponse } from '@/lib/api/unauthorized-handler';
 import { getAccessToken } from '@/lib/auth/session-store';
 
 export interface HttpRequestOptions extends Omit<RequestInit, 'body'> {
@@ -52,6 +53,9 @@ export async function httpRequest<T>(
       typeof (payload as { error: unknown }).error === 'string'
         ? (payload as { error: string }).error
         : `Error HTTP ${response.status}`;
+    if (response.status === 401 && auth) {
+      handleUnauthorizedResponse();
+    }
     throw new ApiError(message, response.status);
   }
 

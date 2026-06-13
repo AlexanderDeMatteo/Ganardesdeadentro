@@ -2,15 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import { AthleteProfile } from '@/hooks/use-admin';
+import { useAthleteMetrics } from '@/hooks/use-athlete-metrics';
+import { AthleteMetricsChart } from '@/components/metrics/athlete-metrics-chart';
+import { LoadingState } from '@/components/ui/loading-state';
 import { BarChart3, Scale, Percent } from 'lucide-react';
 
 interface ProgressOverviewProps {
   athletes: AthleteProfile[];
 }
 
+function displayMetric(athlete: AthleteProfile) {
+  return athlete.latestMetric ?? athlete.metrics ?? null;
+}
+
 export function ProgressOverview({ athletes }: ProgressOverviewProps) {
   const [selectedId, setSelectedId] = useState(athletes[0]?.id ?? '');
   const selected = athletes.find((a) => a.id === selectedId) ?? athletes[0];
+  const { latest, isLoading, error, getChartData } = useAthleteMetrics(selected?.id);
 
   useEffect(() => {
     if (athletes.length > 0 && !athletes.some((a) => a.id === selectedId)) {
@@ -25,6 +33,8 @@ export function ProgressOverview({ athletes }: ProgressOverviewProps) {
       </p>
     );
   }
+
+  const summary = latest ?? (selected ? displayMetric(selected) : null);
 
   return (
     <div className="space-y-8">
@@ -52,32 +62,53 @@ export function ProgressOverview({ athletes }: ProgressOverviewProps) {
             <p className="text-muted-foreground">{selected.email}</p>
           </div>
 
-          {selected.metrics ? (
+          {isLoading ? (
+            <LoadingState label="Cargando métricas del atleta…" />
+          ) : error ? (
+            <p className="text-destructive">{error}</p>
+          ) : summary ? (
             <div className="grid gap-4 md:grid-cols-3">
               <div className="rounded-xl border border-primary/20 bg-primary/10 p-6">
                 <div className="mb-2 flex items-center gap-2">
                   <Scale className="h-5 w-5 text-primary" />
                   <p className="text-sm text-muted-foreground">Peso</p>
                 </div>
-                <p className="text-3xl font-black text-primary">{selected.metrics.weight} kg</p>
+                <p className="text-3xl font-black text-primary">{summary.weight} kg</p>
               </div>
               <div className="rounded-xl border border-secondary/20 bg-secondary/10 p-6">
                 <div className="mb-2 flex items-center gap-2">
                   <Percent className="h-5 w-5 text-secondary" />
                   <p className="text-sm text-muted-foreground">Grasa corporal</p>
                 </div>
-                <p className="text-3xl font-black text-secondary">{selected.metrics.bodyFat}%</p>
+                <p className="text-3xl font-black text-secondary">{summary.bodyFat}%</p>
               </div>
               <div className="rounded-xl border border-accent/20 bg-accent/10 p-6">
                 <div className="mb-2 flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-accent" />
                   <p className="text-sm text-muted-foreground">Masa muscular</p>
                 </div>
-                <p className="text-3xl font-black text-accent">{selected.metrics.muscleMass} kg</p>
+                <p className="text-3xl font-black text-accent">{summary.muscleMass} kg</p>
               </div>
             </div>
           ) : (
             <p className="text-muted-foreground">Sin métricas registradas para este atleta</p>
+          )}
+
+          {!isLoading && !error && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AthleteMetricsChart
+                title="Evolución peso"
+                data={getChartData('weight')}
+                unit="kg"
+                color="hsl(var(--primary))"
+              />
+              <AthleteMetricsChart
+                title="Evolución grasa corporal"
+                data={getChartData('bodyFat')}
+                unit="%"
+                color="hsl(var(--secondary))"
+              />
+            </div>
           )}
 
           <div className="rounded-xl border border-secondary/20 bg-card/50 p-6">
@@ -95,14 +126,17 @@ export function ProgressOverview({ athletes }: ProgressOverviewProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {athletes.map((a) => (
-                    <tr key={a.id} className="border-b border-secondary/10">
-                      <td className="py-3 pr-4 font-medium">{a.name}</td>
-                      <td className="py-3 pr-4">{a.metrics?.weight ?? '—'} kg</td>
-                      <td className="py-3 pr-4">{a.metrics?.bodyFat ?? '—'}%</td>
-                      <td className="py-3">{a.metrics?.muscleMass ?? '—'} kg</td>
-                    </tr>
-                  ))}
+                  {athletes.map((a) => {
+                    const m = displayMetric(a);
+                    return (
+                      <tr key={a.id} className="border-b border-secondary/10">
+                        <td className="py-3 pr-4 font-medium">{a.name}</td>
+                        <td className="py-3 pr-4">{m?.weight ?? '—'} kg</td>
+                        <td className="py-3 pr-4">{m?.bodyFat ?? '—'}%</td>
+                        <td className="py-3">{m?.muscleMass ?? '—'} kg</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

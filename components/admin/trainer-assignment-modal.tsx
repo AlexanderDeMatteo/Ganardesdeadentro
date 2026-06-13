@@ -8,6 +8,7 @@ import { useState } from 'react';
 interface TrainerAssignmentModalProps {
   athlete: AthleteProfile | null;
   trainers: Trainer[];
+  currentTrainerName?: string;
   onAssign: (trainerId: string) => void;
   onClose: () => void;
 }
@@ -15,6 +16,7 @@ interface TrainerAssignmentModalProps {
 export function TrainerAssignmentModal({
   athlete,
   trainers,
+  currentTrainerName,
   onAssign,
   onClose,
 }: TrainerAssignmentModalProps) {
@@ -48,6 +50,11 @@ export function TrainerAssignmentModal({
           <div className="rounded-lg bg-secondary/10 p-4 border border-secondary/20">
             <p className="text-sm text-muted-foreground mb-1">Asignando entrenador a</p>
             <p className="text-xl font-semibold text-foreground">{athlete.name}</p>
+            {currentTrainerName && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Entrenador actual: <span className="font-medium">{currentTrainerName}</span>
+              </p>
+            )}
           </div>
 
           <div>

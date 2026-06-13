@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { assignWeeklyPlan } from '@/lib/data/client';
+import { assignWeeklyPlan, getWeeklyPlan } from '@/lib/data/client';
 import { WEEK_DAY_LABELS, type WeeklyPlanDay } from '@/lib/data/types';
 import { getMondayOfWeek } from '@/lib/workout/session-utils';
 import type { AthleteProfile } from '@/hooks/use-admin';
@@ -15,37 +15,63 @@ interface WeeklyPlanEditorProps {
   trainerId: string;
 }
 
-function defaultDays(routines: Routine[]): WeeklyPlanDay[] {
+function neutralDefaultDays(): WeeklyPlanDay[] {
   return WEEK_DAY_LABELS.map((label, dayIndex) => ({
     dayIndex,
     label,
-    routineId:
-      dayIndex === 0
-        ? routines[0]?.id ?? null
-        : dayIndex === 2
-          ? routines[0]?.id ?? null
-          : dayIndex === 1 || dayIndex === 4
-            ? routines[1]?.id ?? routines[0]?.id ?? null
-            : null,
-    focus:
-      dayIndex === 0
-        ? 'Tren superior'
-        : dayIndex === 1
-          ? 'Piernas'
-          : dayIndex === 6
-            ? 'Descanso'
-            : undefined,
+    routineId: null,
+    focus: dayIndex === 6 ? 'Descanso' : undefined,
   }));
 }
 
 export function WeeklyPlanEditor({ athletes, routines, trainerId }: WeeklyPlanEditorProps) {
   const [athleteId, setAthleteId] = useState(athletes[0]?.id ?? '');
-  const [days, setDays] = useState<WeeklyPlanDay[]>(() => defaultDays(routines));
+  const [days, setDays] = useState<WeeklyPlanDay[]>(() => neutralDefaultDays());
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingPlan, setIsLoadingPlan] = useState(false);
+  const [loadedPlanMeta, setLoadedPlanMeta] = useState<{ weekStartDate: string } | null>(null);
 
   useEffect(() => {
-    setDays(defaultDays(routines));
-  }, [routines]);
+    if (!athleteId && athletes[0]?.id) {
+      setAthleteId(athletes[0].id);
+    }
+  }, [athletes, athleteId]);
+
+  useEffect(() => {
+    if (!athleteId) return;
+
+    let cancelled = false;
+    setIsLoadingPlan(true);
+
+    void (async () => {
+      try {
+        const plan = await getWeeklyPlan(athleteId);
+        if (cancelled) return;
+
+        if (plan?.days?.length) {
+          setDays(plan.days);
+          setLoadedPlanMeta({ weekStartDate: plan.weekStartDate });
+        } else {
+          setDays(neutralDefaultDays());
+          setLoadedPlanMeta(null);
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error('No se pudo cargar el plan semanal');
+          setDays(neutralDefaultDays());
+          setLoadedPlanMeta(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingPlan(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [athleteId]);
 
   const updateDay = (dayIndex: number, patch: Partial<WeeklyPlanDay>) => {
     setDays((prev) =>
@@ -60,7 +86,9 @@ export function WeeklyPlanEditor({ athletes, routines, trainerId }: WeeklyPlanEd
     }
     setIsSaving(true);
     try {
-      await assignWeeklyPlan(athleteId, trainerId, days, getMondayOfWeek());
+      const weekStart = getMondayOfWeek();
+      await assignWeeklyPlan(athleteId, trainerId, days, weekStart);
+      setLoadedPlanMeta({ weekStartDate: weekStart });
       toast.success('Plan semanal asignado');
     } catch {
       toast.error('No se pudo guardar el plan');
@@ -84,6 +112,15 @@ export function WeeklyPlanEditor({ athletes, routines, trainerId }: WeeklyPlanEd
         <p className="text-sm text-muted-foreground mt-1">
           Asigna qué rutina corresponde a cada día. El atleta verá el calendario en /routines.
         </p>
+        {isLoadingPlan ? (
+          <p className="text-sm text-muted-foreground mt-2">Cargando plan…</p>
+        ) : loadedPlanMeta ? (
+          <p className="text-sm text-primary mt-2">
+            Plan existente (semana del {loadedPlanMeta.weekStartDate})
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-2">Sin plan — creando uno nuevo</p>
+        )}
       </div>
 
       <div>
@@ -91,6 +128,7 @@ export function WeeklyPlanEditor({ athletes, routines, trainerId }: WeeklyPlanEd
         <select
           value={athleteId}
           onChange={(e) => setAthleteId(e.target.value)}
+          disabled={isLoadingPlan}
           className="w-full max-w-md rounded-lg border border-input bg-background px-3 py-2 text-sm"
         >
           {athletes.map((a) => (
@@ -113,6 +151,7 @@ export function WeeklyPlanEditor({ athletes, routines, trainerId }: WeeklyPlanEd
                   focus: e.target.value ? day.focus : 'Descanso',
                 })
               }
+              disabled={isLoadingPlan}
               className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
             >
               <option value="">Descanso</option>
@@ -125,26 +164,36 @@ export function WeeklyPlanEditor({ athletes, routines, trainerId }: WeeklyPlanEd
             <InputFocus
               value={day.focus ?? ''}
               onChange={(focus) => updateDay(day.dayIndex, { focus })}
+              disabled={isLoadingPlan}
             />
           </div>
         ))}
       </div>
 
-      <Button onClick={() => void handleSave()} disabled={isSaving}>
+      <Button onClick={() => void handleSave()} disabled={isSaving || isLoadingPlan}>
         {isSaving ? 'Guardando…' : 'Publicar plan semanal'}
       </Button>
     </div>
   );
 }
 
-function InputFocus({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function InputFocus({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
   return (
     <input
       type="text"
       placeholder="Enfoque (ej. Piernas)"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+      disabled={disabled}
+      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs disabled:opacity-50"
     />
   );
 }

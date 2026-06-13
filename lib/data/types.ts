@@ -29,6 +29,12 @@ export interface Athlete {
     bodyFat: number;
     muscleMass: number;
   };
+  latestMetric?: {
+    weight: number;
+    bodyFat: number;
+    muscleMass: number;
+    date?: string;
+  };
 }
 
 /** @deprecated Use Athlete — kept for backward compatibility with existing imports */
@@ -44,6 +50,9 @@ export interface Trainer {
   rating: number;
   joinDate: string;
   adminId?: string;
+  isActive?: boolean;
+  invitePending?: boolean;
+  maxAthletes?: number;
 }
 
 export interface Exercise {

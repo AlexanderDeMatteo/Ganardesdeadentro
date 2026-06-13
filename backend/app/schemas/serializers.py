@@ -30,7 +30,7 @@ def _membership_level_from_name(name: str | None) -> str:
     return 'basic'
 
 
-def serialize_athlete(user, profile=None, active_membership=None):
+def serialize_athlete(user, profile=None, active_membership=None, latest_metric=None):
     profile = profile or user.profile
     level = 'basic'
     membership_id = None
@@ -38,7 +38,7 @@ def serialize_athlete(user, profile=None, active_membership=None):
         level = _membership_level_from_name(active_membership.membership.name)
         membership_id = str(active_membership.membership_id)
 
-    return {
+    payload = {
         'id': str(user.id),
         'userId': str(user.id),
         'name': f'{user.first_name} {user.last_name}'.strip(),
@@ -52,10 +52,26 @@ def serialize_athlete(user, profile=None, active_membership=None):
         'membershipLevel': level,
         'membershipId': membership_id,
     }
+    if latest_metric is not None:
+        payload['latestMetric'] = serialize_latest_metric(latest_metric)
+    return payload
 
 
-def serialize_trainer(user, profile=None, athlete_count=0):
+def serialize_latest_metric(metric):
+    if metric is None:
+        return None
+    return {
+        'weight': metric.weight,
+        'bodyFat': metric.body_fat_percentage,
+        'muscleMass': metric.muscle_mass,
+        'date': _dt_iso(metric.measurement_date),
+    }
+
+
+def serialize_trainer(user, profile=None, athlete_count=0, invite_pending: bool | None = None):
     profile = profile or user.profile
+    is_active = bool(user.is_active)
+    pending = invite_pending if invite_pending is not None else (not is_active)
     return {
         'id': str(user.id),
         'name': f'{user.first_name} {user.last_name}'.strip(),
@@ -65,6 +81,9 @@ def serialize_trainer(user, profile=None, athlete_count=0):
         'athletes': athlete_count,
         'rating': profile.rating if profile and profile.rating is not None else 0,
         'joinDate': _dt_iso(user.created_at),
+        'isActive': is_active,
+        'invitePending': pending,
+        'maxAthletes': profile.max_athletes if profile and profile.max_athletes is not None else 10,
     }
 
 
@@ -159,6 +178,29 @@ def serialize_active_membership(user_membership):
     }
 
 
+def serialize_me_membership(user_membership):
+    """Membresía activa para GET /api/auth/me (incluye nombre del plan)."""
+    if not user_membership or not user_membership.membership:
+        return None
+    membership = user_membership.membership
+    end_date = user_membership.end_date
+    start_date = user_membership.start_date
+    days_remaining = 0
+    if end_date:
+        days_remaining = max(0, (end_date.date() - datetime.now(timezone.utc).date()).days)
+    features = _json_loads(membership.features, default=[])
+    return {
+        'planId': str(membership.id),
+        'name': membership.name,
+        'daysRemaining': days_remaining,
+        'features': features if isinstance(features, list) else [],
+        'startDate': _dt_iso(start_date) or '',
+        'endDate': _dt_iso(end_date) or '',
+        'price': membership.price or 0,
+        'durationDays': membership.duration_days or 30,
+    }
+
+
 def serialize_session(session):
     return {
         'id': str(session.id),
@@ -229,3 +271,31 @@ def serialize_coach_draft(draft_row):
     if 'updatedAt' not in data:
         data['updatedAt'] = _dt_iso(draft_row.updated_at)
     return data
+
+
+def default_nutrition_diary():
+    return {
+        'foodLog': [],
+        'waterByDate': {},
+        'waterGoalMl': 2500,
+        'updatedAt': datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def serialize_nutrition_diary(diary_row, date: str | None = None):
+    if not diary_row:
+        return default_nutrition_diary()
+    food_log = _json_loads(diary_row.food_log, default=[])
+    water_by_date = _json_loads(diary_row.water_by_date, default={})
+    if not isinstance(food_log, list):
+        food_log = []
+    if not isinstance(water_by_date, dict):
+        water_by_date = {}
+    if date:
+        food_log = [entry for entry in food_log if isinstance(entry, dict) and entry.get('date') == date]
+    return {
+        'foodLog': food_log,
+        'waterByDate': water_by_date,
+        'waterGoalMl': diary_row.water_goal_ml or 2500,
+        'updatedAt': _dt_iso(diary_row.updated_at),
+    }

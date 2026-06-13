@@ -4,40 +4,63 @@ import { ProtectedRoute } from '@/components/auth/protected-route';
 import { Navbar } from '@/components/layout/navbar';
 import { useMemberships } from '@/hooks/use-memberships';
 import { useAuth } from '@/app/context/auth-context';
-import { membershipNameToPlanId } from '@/lib/data/client';
+import { isApiMembershipsSource } from '@/lib/api/config';
+import { membershipNameToPlanId, subscribeMembership } from '@/lib/data/client';
 import { Button } from '@/components/ui/button';
 import { CreditCard, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 function MembershipsContent() {
   const { plans, isLoading } = useMemberships();
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
+  const router = useRouter();
+  const [subscribing, setSubscribing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const currentPlanId = user?.membership
     ? membershipNameToPlanId(user.membership.name)
     : undefined;
 
-  const handleSelectPlan = (planId: string) => {
+  const handleSelectPlan = async (planId: string) => {
     const plan = plans.find((p) => p.id === planId);
     if (!plan) return;
 
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.durationDays);
+    setError(null);
+    setSubscribing(planId);
 
-    const updatedUser = {
-      ...user,
-      membership: {
-        id: planId,
-        name: plan.name,
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
-        daysRemaining: plan.durationDays,
-        price: plan.price,
-        features: plan.features,
-      },
-    };
+    try {
+      if (isApiMembershipsSource()) {
+        await subscribeMembership(planId);
+        await refreshSession();
+        router.push('/dashboard');
+        return;
+      }
 
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    window.location.href = '/dashboard';
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + plan.durationDays);
+
+      const updatedUser = {
+        ...user,
+        membership: {
+          id: planId,
+          name: plan.name,
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0],
+          daysRemaining: plan.durationDays,
+          price: plan.price,
+          features: plan.features,
+        },
+      };
+
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      window.location.href = '/dashboard';
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudo suscribir al plan';
+      setError(message);
+    } finally {
+      setSubscribing(null);
+    }
   };
 
   const colorMap: Record<string, string> = {
@@ -75,11 +98,17 @@ function MembershipsContent() {
                 Plan actual: {user.membership.name} · {user.membership.daysRemaining} días restantes
               </p>
             )}
+            {error && (
+              <p className="text-sm text-destructive font-medium" role="alert">
+                {error}
+              </p>
+            )}
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {plans.map((plan) => {
               const isCurrentPlan = currentPlanId === plan.id;
+              const isBusy = subscribing === plan.id;
 
               return (
                 <div
@@ -118,14 +147,16 @@ function MembershipsContent() {
                   </div>
 
                   <Button
-                    onClick={() => handleSelectPlan(plan.id)}
+                    onClick={() => void handleSelectPlan(plan.id)}
                     className={`w-full h-12 text-base font-semibold transition-all duration-200 ${
                       isCurrentPlan ? 'cursor-not-allowed' : ''
                     }`}
-                    disabled={isCurrentPlan}
+                    disabled={isCurrentPlan || isBusy}
                   >
                     {isCurrentPlan ? (
                       'Tu Plan Actual'
+                    ) : isBusy ? (
+                      'Procesando…'
                     ) : (
                       <>
                         Seleccionar Plan

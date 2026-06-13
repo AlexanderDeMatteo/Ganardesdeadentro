@@ -2,7 +2,9 @@
 
 Fuente de verdad que mapea cada función del cliente frontend (`lib/data/client.ts`, `lib/auth/auth-client.ts`) al endpoint Flask futuro. Tipos TypeScript en `lib/api/contracts/`.
 
-**Estado backend (mayo 2026):** auth implementado; `users`, `routines`, `memberships`, `metrics` son placeholders; nutrición, sesiones y admin overview están **propuestos** (sin blueprint aún).
+**Estado backend (jun 2026):** blueprints implementados en `/api/auth`, `/api/users`, `/api/routines`, `/api/memberships`, `/api/metrics`, `/api/sessions`, `/api/nutrition`, `/api/admin`, `/api/exercises`. Tests: `cd backend && python -m pytest` (102 tests; ver Fase 6). CI: `.github/workflows/ci.yml`.
+
+**Estado adaptador remoto (Fase 1):** `lib/data/client.remote.ts` cableado a Flask para overview admin, CRUD de planes, `updateAthlete`, `assignTrainerToAthlete`, métricas, rutinas, sesiones, nutrición y usuarios (ver tablas por dominio). `membershipLevelToPlanId` / `membershipNameToPlanId` usan mapeo síncrono local (sin endpoint `plan-map`). Validación manual: [TEST_FASE1_API.md](../TEST_FASE1_API.md).
 
 **Convención IDs:** el frontend usa `string`; el ORM Flask usa `number`. El adaptador remoto debe convertir explícitamente (`String(id)` / `Number(id)`).
 
@@ -18,6 +20,8 @@ Fuente de verdad que mapea cada función del cliente frontend (`lib/data/client.
 | `getAuthClient().register` | POST | `/api/auth/register` | — | ✅ |
 | `getAuthClient().refreshSession` | GET | `/api/auth/me` | Bearer JWT | ✅ |
 | `getAuthClient().logout` | POST | `/api/auth/logout` | Bearer JWT | ✅ |
+| `getAuthClient().validateInviteToken` | GET | `/api/auth/invite/:token` | — | ✅ |
+| `getAuthClient().acceptInvite` | POST | `/api/auth/accept-invite` | — | ✅ |
 
 ### auth-login {#auth-login}
 
@@ -36,6 +40,12 @@ Fuente de verdad que mapea cada función del cliente frontend (`lib/data/client.
 
 - **200:** `{ user: AuthUserResponse }`
 - **401:** token inválido o expirado
+
+### auth-invite {#auth-invite}
+
+- **GET `/api/auth/invite/:token`:** `{ email, firstName, expiresAt }` — rate limited
+- **POST `/api/auth/accept-invite`:** `{ token, password }` → `{ message }` — activa cuenta entrenador
+- **400:** enlace inválido o expirado (mensaje genérico)
 
 Tipos: `lib/api/contracts/auth.ts`
 
@@ -90,14 +100,15 @@ Tipos: `lib/api/contracts/metrics.ts`
 | Función frontend | Método | Path | Auth mínima |
 |------------------|--------|------|-------------|
 | `getMembership` | GET | `/api/memberships/active?athleteId=` | owner \| admin |
-| `listMembershipPlans` | GET | `/api/memberships/plans` | admin |
+| `listMembershipPlans` | GET | `/api/memberships/plans` | cualquier autenticado |
 | `createMembershipPlan` | POST | `/api/memberships/plans` | admin |
 | `updateMembershipPlan` | PATCH | `/api/memberships/plans/:id` | admin |
 | `deleteMembershipPlan` | DELETE | `/api/memberships/plans/:id` | admin |
+| `subscribeMembership` | POST | `/api/memberships/subscribe` | atleta (`role=user`) |
 
 ### memberships-plans-list {#memberships-plans-list}
 
-- **200:** `MembershipPlan[]`
+- **200:** `{ "plans": MembershipPlan[] }` — lectura pública para atletas (catálogo en `/memberships`); mutaciones solo admin.
 
 ### memberships-plans-create {#memberships-plans-create}
 
@@ -111,7 +122,7 @@ Tipos: `lib/api/contracts/metrics.ts`
 
 ### memberships-plans-delete {#memberships-plans-delete}
 
-- **204** \| **404**
+- **200:** `{ "message": "Plan eliminado" }` (soft-delete: `is_active=false`) \| **404**
 
 Tipos: `lib/api/contracts/memberships.ts`
 
@@ -128,6 +139,15 @@ Tipos: `lib/api/contracts/memberships.ts`
 | `assignTrainerToAthlete` | PUT | `/api/users/athletes/:id/trainer` | admin |
 | `getMyTrainer` | GET | `/api/users/my-trainer?athleteId=` | owner |
 | `updateTrainerProfile` | PATCH | `/api/users/trainers/:id` | owner trainer \| admin |
+| `getBodyProfile` | GET | `/api/users/me/body-profile` | atleta (`user`) |
+| `updateBodyProfile` | PATCH | `/api/users/me/body-profile` | atleta (`user`) |
+
+### users-body-profile {#users-body-profile}
+
+- **GET 200:** `{ bodyProfile: { heightCm?, age?, sex? } }` — persiste en `user_profiles` (`initial_height`, `age`, `gender`).
+- **PATCH body:** `{ heightCm?: 50–260, age?: 18–120, sex?: 'male' \| 'female' }` — al menos un campo.
+- **403:** trainer o admin (solo el atleta autenticado).
+- Tipos: `lib/api/contracts/body-profile.ts`
 
 ---
 
@@ -152,6 +172,11 @@ Alineado con modelos de sesión en `backend/app/models.py` (extensión futura).
 | `publishMealPlan` | PUT | `/api/nutrition/plan` | trainer \| admin |
 | `getCoachNutritionDraft` | GET | `/api/nutrition/coach-draft?athleteId=` | trainer \| admin |
 | `saveCoachNutritionDraft` | PUT | `/api/nutrition/coach-draft` | trainer \| admin |
+| `getDiary` | GET | `/api/nutrition/diary?athleteId=&date=` | owner \| trainer \| admin |
+| `putDiary` | PUT | `/api/nutrition/diary` | owner \| admin |
+| `addDiaryEntry` | POST | `/api/nutrition/diary/entries` | owner \| admin |
+| `deleteDiaryEntry` | DELETE | `/api/nutrition/diary/entries/:entryId?athleteId=&date=` | owner \| admin |
+| `patchDiaryWater` | PATCH | `/api/nutrition/diary/water` | owner \| admin |
 
 ### nutrition-plan-get {#nutrition-plan-get}
 
@@ -171,7 +196,18 @@ Alineado con modelos de sesión en `backend/app/models.py` (extensión futura).
 - **Body:** `{ athleteId, draft: CoachNutritionDraft }`
 - **200:** borrador guardado
 
-Tipos: `lib/api/contracts/nutrition.ts`
+Tipos: `lib/api/contracts/nutrition.ts`, `lib/api/contracts/nutrition-diary.ts`
+
+---
+
+## Ejercicios (`/api/exercises`) — Implementado (frontend Fase 4)
+
+| Función frontend | Método | Path | Auth mínima |
+|------------------|--------|------|-------------|
+| `listExercises` | GET | `/api/exercises/cached?muscle=&page=&per_page=` | autenticado |
+| `searchExercises` | GET | `/api/exercises/search?q=` | autenticado |
+
+El adaptador mapea `exercise_db_id` → `Exercise.id` para rutinas.
 
 ---
 
@@ -180,6 +216,19 @@ Tipos: `lib/api/contracts/nutrition.ts`
 | Función frontend | Método | Path | Auth mínima |
 |------------------|--------|------|-------------|
 | `getAdminOverview` | GET | `/api/admin/overview` | admin |
+| `listAdminAthletes` | GET | `/api/admin/athletes` | admin |
+| `listAdminTrainers` | GET | `/api/admin/trainers?includeInactive=` | admin |
+| `createAdminTrainer` | POST | `/api/admin/trainers` | admin |
+| `deactivateAdminTrainer` | DELETE | `/api/admin/trainers/:id` | admin |
+| `resendTrainerInvite` | POST | `/api/admin/trainers/:id/resend-invite` | admin |
+| `assignTrainerToAthlete` | PUT | `/api/users/athletes/:id/trainer` | admin |
+| `unassignTrainerFromAthlete` | PUT | `/api/users/athletes/:id/trainer` (`trainerId: null`) | admin |
+
+### admin-trainers {#admin-trainers}
+
+- **POST body:** `{ email, firstName, lastName, specialization? }` — crea entrenador inactivo + envía invitación (Resend)
+- **DELETE body:** `{ athleteActions: [{ athleteId, action: 'reassign'|'unassign', newTrainerId? }] }` — soft delete (`is_active=false`)
+- **Listado:** por defecto activos + pendientes de activación; `includeInactive=true` incluye desactivados
 
 Tipos: `lib/api/contracts/admin.ts`
 
@@ -215,9 +264,10 @@ Cuerpo típico: `{ "error": "mensaje" }` — ver `ApiErrorBody` en `lib/api/cont
 | Variable | Valores | Default | Módulo |
 |----------|---------|---------|--------|
 | `NEXT_PUBLIC_AUTH_SOURCE` | `local` \| `api` | `local` | `lib/auth/auth-client.ts` |
-| `NEXT_PUBLIC_DATA_SOURCE` | `local` \| `api` | `local` | `lib/data/client.ts` |
+| `NEXT_PUBLIC_DATA_SOURCE` | `local` \| `api` | `local` | `lib/data/client.ts` (global; p. ej. `getAdminOverview`) |
+| `NEXT_PUBLIC_DATA_SOURCE_*` | `local` \| `api` | hereda `DATA_SOURCE` | Overrides por dominio: `METRICS`, `ROUTINES`, `USERS`, `NUTRITION`, `MEMBERSHIPS` |
 | `NEXT_PUBLIC_API_BASE_URL` | URL Flask | `http://localhost:5000` | `lib/api/http-client.ts` |
 
-Con `DATA_SOURCE=api`, las funciones de datos lanzan `ApiNotImplementedError` hasta que existan blueprints reales. Con `AUTH_SOURCE=api`, login/register/me usan Flask.
+Con `DATA_SOURCE=api` (y overrides en `api`), el facade en `lib/data/client.ts` resuelve contra `client.remote.ts`, que llama a Flask vía `httpRequest` + Bearer. **Fase 4:** listados admin, `subscribeMembership`, catálogo de ejercicios y diario nutricional cableados en el remoto. El modo **local** (default) sigue usando seeds/`localStorage` donde aplique.
 
 `getStateSnapshot()` solo disponible con `DATA_SOURCE=local` y `NODE_ENV !== 'production'`.

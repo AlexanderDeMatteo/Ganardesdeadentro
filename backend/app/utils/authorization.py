@@ -188,6 +188,32 @@ def require_athlete_access(athlete_id: int, session=None):
     return None
 
 
+def can_modify_athlete_diary(athlete_id: int, session=None) -> bool:
+    close_session = False
+    if session is None:
+        session = SessionLocal()
+        close_session = True
+    try:
+        user = get_verified_user(session=session)
+        if user is None:
+            return False
+        role = _role_value(user.role)
+        if role == RoleEnum.ADMIN.value:
+            return True
+        if role == RoleEnum.USER.value and user.id == athlete_id:
+            return True
+        return False
+    finally:
+        if close_session:
+            session.close()
+
+
+def require_modify_athlete_diary(athlete_id: int, session=None):
+    if not can_modify_athlete_diary(athlete_id, session=session):
+        return {'error': 'No tienes permisos para modificar este diario'}, 403
+    return None
+
+
 def can_manage_athlete(athlete_id: int, session=None) -> bool:
     close_session = False
     if session is None:

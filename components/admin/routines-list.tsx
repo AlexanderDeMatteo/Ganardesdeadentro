@@ -10,9 +10,10 @@ import { Clock, Dumbbell, Trash2, Edit2 } from 'lucide-react';
 interface RoutinesListProps {
   routines: Routine[];
   onDelete: (id: string) => void;
+  onEdit?: (routine: Routine) => void;
 }
 
-export function RoutinesList({ routines, onDelete }: RoutinesListProps) {
+export function RoutinesList({ routines, onDelete, onEdit }: RoutinesListProps) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const getDifficultyColor = (difficulty: string) => {
@@ -67,6 +68,8 @@ export function RoutinesList({ routines, onDelete }: RoutinesListProps) {
                 size="sm"
                 className="h-10 w-10 p-0 border-secondary/30 hover:bg-secondary/10"
                 aria-label={`Editar rutina ${routine.name}`}
+                onClick={() => onEdit?.(routine)}
+                disabled={!onEdit}
               >
                 <Edit2 className="h-4 w-4" />
               </Button>

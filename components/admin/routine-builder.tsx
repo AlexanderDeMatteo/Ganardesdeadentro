@@ -1,14 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Exercise } from '@/hooks/use-admin';
-import type { RoutineExercise } from '@/lib/data/types';
+import type { Routine, RoutineExercise } from '@/lib/data/types';
 import { X, Plus, Trash2 } from 'lucide-react';
 
 interface RoutineBuilderProps {
   exercises: Exercise[];
+  mode?: 'create' | 'edit';
+  initialRoutine?: Routine;
   onSave: (data: {
     name: string;
     description: string;
@@ -26,7 +28,13 @@ function buildWeightArray(count: number, base: number, step: number): number[] {
   });
 }
 
-export function RoutineBuilder({ exercises, onSave, onClose }: RoutineBuilderProps) {
+export function RoutineBuilder({
+  exercises,
+  mode = 'create',
+  initialRoutine,
+  onSave,
+  onClose,
+}: RoutineBuilderProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<'beginner' | 'intermediate' | 'expert'>('intermediate');
@@ -40,6 +48,15 @@ export function RoutineBuilder({ exercises, onSave, onClose }: RoutineBuilderPro
   const [baseWeight, setBaseWeight] = useState('20');
   const [weightStep, setWeightStep] = useState('2.5');
   const [setWeights, setSetWeights] = useState<string[]>(['20', '22.5', '25']);
+
+  useEffect(() => {
+    if (!initialRoutine) return;
+    setName(initialRoutine.name);
+    setDescription(initialRoutine.description);
+    setDifficulty(initialRoutine.difficulty);
+    setDuration(initialRoutine.duration);
+    setSelectedExercises(initialRoutine.exercises);
+  }, [initialRoutine]);
 
   const syncSetWeights = (count: number, weights?: string[]) => {
     if (weights && weights.length === count) {
@@ -113,7 +130,9 @@ export function RoutineBuilder({ exercises, onSave, onClose }: RoutineBuilderPro
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="w-full max-w-4xl rounded-2xl border border-secondary/20 bg-card shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-secondary/20 sticky top-0 bg-card px-8 py-6">
-          <h2 className="text-2xl font-bold">Crear Nueva Rutina</h2>
+          <h2 className="text-2xl font-bold">
+            {mode === 'edit' ? 'Editar Rutina' : 'Crear Nueva Rutina'}
+          </h2>
           <Button variant="outline" size="sm" onClick={onClose} className="h-8 w-8 p-0 border-secondary/30">
             <X className="h-4 w-4" />
           </Button>

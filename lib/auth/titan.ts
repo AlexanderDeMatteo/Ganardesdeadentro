@@ -1,13 +1,15 @@
 /**
  * Gating centralizado para capacidades Titan (IA).
  *
- * - Nutrición Titan: Premium, Pro o admin (cliente y servidor).
- * - Motivación / session-review: solo autenticación por ahora; membresía en servidor pendiente (Fase 5).
+ * - Nutrición Titan: Premium, Pro o admin (cliente y servidor en modo API).
+ * - Motivación / session-review: usuarios autenticados activos (user, trainer, admin).
  */
 
 export const TITAN_NUTRITION_TIERS = ['Premium', 'Pro'] as const;
 
 export type TitanNutritionTier = (typeof TITAN_NUTRITION_TIERS)[number];
+
+export type TitanMembershipName = 'Básica' | 'Premium' | 'Pro';
 
 export type TitanUser = {
   role?: string;
@@ -27,7 +29,13 @@ export function isProMember(user: TitanUser): boolean {
   return user.membership?.name === 'Pro';
 }
 
-/** Motivación y reseña de sesión: hoy cualquier usuario autenticado. */
+export function hasTitanMotivationAccessForRole(
+  role: string,
+): role is 'user' | 'trainer' | 'admin' {
+  return role === 'user' || role === 'trainer' || role === 'admin';
+}
+
+/** Motivación y reseña de sesión: cualquier usuario autenticado (UX cliente). */
 export function hasTitanMotivationAccess(isAuthenticated: boolean): boolean {
   return isAuthenticated;
 }

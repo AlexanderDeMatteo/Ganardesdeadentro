@@ -7,10 +7,7 @@ import { formatSessionReviewForDisplay } from '@/lib/coach/session-review-format
 import { pickSessionReviewFallback } from '@/lib/coach/session-review-fallback';
 import { deriveCoachMoodFromExercises } from '@/lib/coach/session-review-sections';
 import { pickTitanFallbackPhrase } from '@/lib/coach/titan-fallback-phrases';
-import {
-  getTitanAuthHeaders,
-  getTitanMembershipPayload,
-} from '@/lib/api/titan-client-headers';
+import { getTitanAuthHeaders } from '@/lib/api/titan-client-headers';
 import type { CoachMood, CoachTip, SessionReviewRequest } from '@/lib/coach/types';
 import type {
   TitanMotivationPayload,
@@ -451,7 +448,6 @@ export function CoachProvider({ children }: { children: ReactNode }) {
               targetCalories: todaySummary.targets?.calories ?? null,
               date: displayDate,
             },
-            ...getTitanMembershipPayload(userRef.current),
           }),
         });
 

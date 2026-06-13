@@ -30,7 +30,6 @@ import {
   Flame,
   TrendingUp,
   LogOut,
-  Settings,
   User,
   Zap,
   Target,
@@ -140,11 +139,11 @@ export function FitnessDashboardView() {
     weekSessionLogs,
     weekStartDate,
     latestSession,
-    latestMetric,
     mealPlan,
     isLoading: athleteLoading,
   } = useAthleteData();
-  const { getProgressChange, isLoading: metricsLoading } = useMetrics();
+  const { getLatestEntry, getProgressChange, entries, isLoading: metricsLoading } = useMetrics();
+  const latestMetric = getLatestEntry();
   const { getWeeklyAdherence, isLoading: nutritionLoading } = useNutrition();
 
   const displayName = user?.first_name ?? 'Atleta';
@@ -175,6 +174,14 @@ export function FitnessDashboardView() {
       .filter((w): w is number => w != null && w > 0);
     return weights.length > 0 ? Math.max(...weights) : null;
   }, [latestSession]);
+
+  const progressWeightSpark = useMemo(() => {
+    const values = entries
+      .map((entry) => entry.weight)
+      .filter((weight): weight is number => weight != null && weight > 0)
+      .slice(-7);
+    return values.length > 0 ? values : [0];
+  }, [entries]);
 
   const stats = [
     {
@@ -210,7 +217,7 @@ export function FitnessDashboardView() {
         bodyFatChange != null
           ? `Grasa: ${bodyFatChange > 0 ? '+' : ''}${bodyFatChange.toFixed(1)} pts`
           : 'Compara en Métricas',
-      spark: [4, 4.5, 5, 6, 7, 8, 8.5],
+      spark: progressWeightSpark,
       icon: TrendingUp,
       highlight: true,
     },
@@ -224,17 +231,22 @@ export function FitnessDashboardView() {
   const isAdmin = user?.role === 'admin';
   const membership = user?.membership;
 
-  const planName = isAdmin ? 'ADMIN' : (membership?.name ?? 'PREMIUM');
-  const planDays = isAdmin ? null : membership ? membership.daysRemaining : 60;
-  const planFeatures =
-    membership?.features?.length ? membership.features : [...PREMIUM_FEATURES_FALLBACK];
+  const planName = isAdmin ? 'ADMIN' : (membership?.name ?? 'Sin plan');
+  const planDays = isAdmin ? null : membership ? membership.daysRemaining : null;
+  const planFeatures = membership?.features?.length
+    ? membership.features
+    : membership
+      ? []
+      : [...PREMIUM_FEATURES_FALLBACK];
 
   const planBarPct = (() => {
     if (isAdmin) return 100;
     if (membership) {
       const d = planDays ?? 0;
+      const total = membership.durationDays ?? 365;
       if (d <= 0) return 0;
-      return Math.min(100, Math.max(4, (d / 365) * 100));
+      if (total <= 0) return 4;
+      return Math.min(100, Math.max(4, (d / total) * 100));
     }
     return 33;
   })();
@@ -338,12 +350,6 @@ export function FitnessDashboardView() {
                     <span>Mi perfil</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild className="cursor-pointer gap-2">
-                  <Link href="/settings" className="flex">
-                    <Settings className="h-4 w-4" />
-                    <span>Configuración</span>
-                  </Link>
-                </DropdownMenuItem>
                 <div className="my-2 border-t border-border" />
                 <DropdownMenuItem
                   onClick={handleLogout}
@@ -400,9 +406,6 @@ export function FitnessDashboardView() {
                   </span>
                   Mis Rutinas
                 </h2>
-                <span className="rounded-full border border-lime-400/40 bg-lime-400/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime-400">
-                  mejorando
-                </span>
               </div>
               <Link href="/routines" className="text-sm font-medium text-cyan-400 hover:underline">
                 Ver todas

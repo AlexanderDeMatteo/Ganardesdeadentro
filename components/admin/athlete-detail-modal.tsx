@@ -1,7 +1,9 @@
 'use client';
 
 import { AthleteProfile } from '@/hooks/use-admin';
+import { useAthleteMetrics } from '@/hooks/use-athlete-metrics';
 import { Button } from '@/components/ui/button';
+import { LoadingState } from '@/components/ui/loading-state';
 import { X, Mail, Cake, Ruler, Weight, Calendar, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 
@@ -12,12 +14,22 @@ interface AthleteDetailModalProps {
   nutritionBasePath?: string;
 }
 
+function resolveMetrics(athlete: AthleteProfile) {
+  return athlete.latestMetric ?? athlete.metrics ?? null;
+}
+
 export function AthleteDetailModal({
   athlete,
   onClose,
   nutritionBasePath = '/admin/athletes',
 }: AthleteDetailModalProps) {
+  const { latest, isLoading } = useAthleteMetrics(athlete?.id ?? null);
+
   if (!athlete) return null;
+
+  const metrics = latest ?? resolveMetrics(athlete);
+  const metricDate = latest?.date ?? athlete.latestMetric?.date;
+  const profileWeightLabel = 'Peso inicial (perfil)';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -74,7 +86,7 @@ export function AthleteDetailModal({
               <div className="flex items-start gap-3 rounded-lg bg-secondary/5 p-4">
                 <Weight className="h-5 w-5 text-primary flex-shrink-0" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Peso</p>
+                  <p className="text-sm text-muted-foreground">{profileWeightLabel}</p>
                   <p className="font-semibold text-lg">{athlete.weight} kg</p>
                 </div>
               </div>
@@ -89,25 +101,36 @@ export function AthleteDetailModal({
           </div>
 
           {/* Métricas Actuales */}
-          {athlete.metrics && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Métricas Actuales</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="rounded-lg bg-primary/10 p-4 border border-primary/20">
-                  <p className="text-sm text-muted-foreground mb-1">Peso</p>
-                  <p className="text-2xl font-bold text-primary">{athlete.metrics.weight} kg</p>
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Última medición</h3>
+            {isLoading ? (
+              <LoadingState label="Cargando métricas…" />
+            ) : metrics ? (
+              <>
+                {metricDate && (
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Fecha: {new Date(metricDate).toLocaleDateString('es-ES')}
+                  </p>
+                )}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="rounded-lg bg-primary/10 p-4 border border-primary/20">
+                    <p className="text-sm text-muted-foreground mb-1">Peso</p>
+                    <p className="text-2xl font-bold text-primary">{metrics.weight} kg</p>
+                  </div>
+                  <div className="rounded-lg bg-secondary/10 p-4 border border-secondary/20">
+                    <p className="text-sm text-muted-foreground mb-1">Grasa Corporal</p>
+                    <p className="text-2xl font-bold text-secondary">{metrics.bodyFat}%</p>
+                  </div>
+                  <div className="rounded-lg bg-accent/10 p-4 border border-accent/20">
+                    <p className="text-sm text-muted-foreground mb-1">Masa Muscular</p>
+                    <p className="text-2xl font-bold text-accent">{metrics.muscleMass} kg</p>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-secondary/10 p-4 border border-secondary/20">
-                  <p className="text-sm text-muted-foreground mb-1">Grasa Corporal</p>
-                  <p className="text-2xl font-bold text-secondary">{athlete.metrics.bodyFat}%</p>
-                </div>
-                <div className="rounded-lg bg-accent/10 p-4 border border-accent/20">
-                  <p className="text-sm text-muted-foreground mb-1">Masa Muscular</p>
-                  <p className="text-2xl font-bold text-accent">{athlete.metrics.muscleMass} kg</p>
-                </div>
-              </div>
-            </div>
-          )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin métricas registradas.</p>
+            )}
+          </div>
 
           {/* Membresía */}
           <div>

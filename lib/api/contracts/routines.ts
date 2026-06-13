@@ -23,6 +23,23 @@ export interface TrainerAthletesParams {
 
 export type TrainerAthletesResponse = Athlete[];
 
+export interface ListRoutinesQuery {
+  trainerId: string;
+}
+
+export interface ListRoutinesResponse {
+  routines: Routine[];
+}
+
+export interface ListAssignmentsQuery {
+  trainerId: string;
+  athleteId?: string;
+}
+
+export interface ListAssignmentsResponse {
+  assignments: RoutineAssignment[];
+}
+
 export interface AssignWeeklyPlanRequest {
   athleteId: string;
   trainerId: string;
