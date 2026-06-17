@@ -1,0 +1,616 @@
+/* Gainer Prime Protocol — Phosphor Reactor Deck (scoped /admin-v2) */
+
+.gainer-prime-root {
+  --gp-background: #0d1511;
+  --gp-surface: #19211d;
+  --gp-surface-high: #242c27;
+  --gp-surface-variant: #2e3732;
+  --gp-phosphor: #68ca62;
+  --gp-phosphor-bright: #83e77b;
+  --gp-phosphor-core: #95fa8b;
+  --gp-hex-border: #255831;
+  --gp-primary: #83e77b;
+  --gp-primary-container: #68ca62;
+  --gp-on-surface: #dce5de;
+  --gp-on-surface-variant: #becab8;
+  --gp-outline-variant: #3f4a3c;
+  --gp-error: #ffb4ab;
+  --gp-error-core: #ff8a7a;
+  --gp-secondary-fixed: #b8f0bc;
+  --gp-tertiary: #c6d6b1;
+  --gp-glow-spread: 24px;
+  --gp-glow-spread-wide: 48px;
+  --gp-glow-core-alpha: 0.55;
+  --gp-glow-mid-alpha: 0.28;
+  --gp-glow-ambient-alpha: 0.12;
+  --gp-animation-speed: 8s;
+  --gp-animation-speed-fast: 2s;
+  --gp-animation-speed-halo: 3s;
+  --gp-enter-duration: 400ms;
+  --gp-module-radius: 6px;
+  --gp-chamfer-size: 12px;
+  color: var(--gp-on-surface);
+  background-color: var(--gp-background);
+  min-height: 100vh;
+  font-family: var(--font-gainer-body), ui-sans-serif, system-ui, sans-serif;
+}
+
+.gainer-prime-root .gp-display {
+  font-family: var(--font-gainer-display), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.gainer-prime-root .gp-mono {
+  font-family: var(--font-gainer-mono), ui-monospace, monospace;
+  letter-spacing: 0.05em;
+}
+
+.gainer-prime-root .gp-metric {
+  font-family: var(--font-gainer-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.gainer-prime-root .gp-label {
+  font-family: var(--font-gainer-body), ui-sans-serif, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Semantic tokens (Regla 5 — prefer over hex literals in TSX) */
+.gainer-prime-root .gp-text-primary {
+  color: var(--gp-on-surface);
+}
+
+.gainer-prime-root .gp-text-muted {
+  color: var(--gp-on-surface-variant);
+}
+
+.gainer-prime-root .gp-text-dim {
+  color: #899483;
+}
+
+.gainer-prime-root .gp-text-phosphor {
+  color: var(--gp-phosphor-bright);
+}
+
+.gainer-prime-root .gp-text-critical {
+  color: var(--gp-error);
+}
+
+.gainer-prime-root .gp-bg-surface {
+  background-color: var(--gp-surface);
+}
+
+.gainer-prime-root .gp-bg-surface-high {
+  background-color: var(--gp-surface-high);
+}
+
+.gainer-prime-root .gp-bg-surface-variant {
+  background-color: var(--gp-surface-variant);
+}
+
+.gainer-prime-root .gp-border-outline {
+  border-color: var(--gp-outline-variant);
+}
+
+/* Campos de formulario Prime (borde + focus visibles) */
+.gainer-prime-root .gp-field {
+  border: 1px solid var(--gp-outline-variant);
+  background-color: var(--gp-surface-high);
+  color: var(--gp-on-surface);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.gainer-prime-root .gp-field::placeholder {
+  color: #6d7769;
+}
+
+.gainer-prime-root .gp-field:focus,
+.gainer-prime-root .gp-field:focus-visible {
+  outline: none;
+  border-color: var(--gp-phosphor);
+  box-shadow: 0 0 0 1px rgb(104 202 98 / 0.35);
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+.gainer-prime-root input.gp-field,
+.gainer-prime-root textarea.gp-field,
+.gainer-prime-root select.gp-field {
+  box-shadow: none;
+}
+
+.gainer-prime-root select.gp-field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23becab8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2rem;
+}
+
+.gainer-prime-root select.gp-field option {
+  background: var(--gp-surface-high);
+  color: var(--gp-on-surface);
+}
+
+/* Scroll fino phosphor */
+.gainer-prime-root .gp-scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(104 202 98 / 0.35) transparent;
+}
+
+.gainer-prime-root .gp-scroll-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.gainer-prime-root .gp-scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gainer-prime-root .gp-scroll-thin::-webkit-scrollbar-thumb {
+  background: rgb(104 202 98 / 0.35);
+  border-radius: 999px;
+}
+
+.gainer-prime-root .gp-scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: rgb(104 202 98 / 0.55);
+}
+
+/* Paneles internos de modales */
+.gainer-prime-root .gp-form-panel {
+  border: 1px solid rgb(63 74 60 / 0.45);
+  border-radius: var(--gp-module-radius);
+  background: color-mix(in srgb, var(--gp-surface-high) 35%, var(--gp-surface));
+}
+
+.gainer-prime-root .gp-form-subpanel {
+  border: 1px solid rgb(63 74 60 / 0.4);
+  border-radius: var(--gp-module-radius);
+  background: rgb(36 44 39 / 0.55);
+}
+
+.gainer-prime-root .gp-modal-footer {
+  border-top: 1px solid rgb(63 74 60 / 0.55);
+  background: color-mix(in srgb, var(--gp-surface-high) 55%, var(--gp-surface));
+}
+
+.gainer-prime-root .gp-btn-phosphor {
+  border-radius: 999px;
+  background: var(--gp-phosphor);
+  color: #003906;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgb(104 202 98 / 0.22);
+}
+
+.gainer-prime-root .gp-btn-phosphor:hover:not(:disabled) {
+  background: var(--gp-phosphor-bright);
+}
+
+.gainer-prime-root .gp-btn-phosphor:disabled {
+  opacity: 0.45;
+}
+
+.gainer-prime-root .gp-btn-ghost {
+  border: 1px solid var(--gp-outline-variant);
+  background: var(--gp-surface-high);
+  color: var(--gp-on-surface-variant);
+}
+
+.gainer-prime-root .gp-btn-ghost:hover:not(:disabled) {
+  color: var(--gp-phosphor-bright);
+  border-color: rgb(104 202 98 / 0.45);
+}
+
+.gainer-prime-root .gp-section-title {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgb(63 74 60 / 0.45);
+}
+
+.gainer-prime-root .gp-empty-slot {
+  border: 1px dashed rgb(63 74 60 / 0.55);
+  border-radius: var(--gp-module-radius);
+  background: rgb(25 33 29 / 0.45);
+  color: var(--gp-on-surface-variant);
+  font-family: var(--font-gainer-mono), ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 1.25rem 1rem;
+}
+
+.gainer-prime-root .gp-table-row-active {
+  background-color: rgb(32 83 44 / 0.3);
+}
+
+.gainer-prime-root .gp-action-btn {
+  border-color: var(--gp-outline-variant);
+}
+
+.gainer-prime-root .gp-title-metallic {
+  background: linear-gradient(
+    135deg,
+    var(--gp-phosphor-core) 0%,
+    var(--gp-phosphor-bright) 40%,
+    #cedeb9 70%,
+    var(--gp-phosphor) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gainer-prime-root .neon-text-glow {
+  text-shadow:
+    0 0 6px rgb(149 250 139 / 0.5),
+    0 0 16px rgb(104 202 98 / 0.25);
+}
+
+/* Rule 1: multi-layer phosphor glow */
+.gainer-prime-root .gp-phosphor-glow {
+  box-shadow:
+    inset 0 0 0 1px rgb(104 202 98 / 0.45),
+    0 0 4px rgb(149 250 139 / var(--gp-glow-core-alpha)),
+    0 0 var(--gp-glow-spread) rgb(104 202 98 / var(--gp-glow-mid-alpha)),
+    0 0 var(--gp-glow-spread-wide) rgb(104 202 98 / var(--gp-glow-ambient-alpha));
+}
+
+.gainer-prime-root .gp-phosphor-glow-critical {
+  box-shadow:
+    inset 0 0 0 1px rgb(255 180 171 / 0.5),
+    0 0 4px rgb(255 138 122 / var(--gp-glow-core-alpha)),
+    0 0 var(--gp-glow-spread) rgb(255 180 171 / var(--gp-glow-mid-alpha)),
+    0 0 var(--gp-glow-spread-wide) rgb(255 138 122 / var(--gp-glow-ambient-alpha));
+}
+
+.gainer-prime-root .glow-border {
+  box-shadow: inset 0 0 0 1px var(--gp-hex-border);
+}
+
+.gainer-prime-root .glow-border-active {
+  box-shadow:
+    inset 0 0 0 1px var(--gp-phosphor),
+    0 0 4px rgb(149 250 139 / 0.45),
+    0 0 16px rgb(104 202 98 / 0.2);
+}
+
+.gainer-prime-root .gp-canvas-wrap {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.gainer-prime-root .gp-canvas {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 12% 8%, rgb(104 202 98 / 0.07), transparent 28rem),
+    radial-gradient(circle at 88% 18%, rgb(37 88 49 / 0.14), transparent 32rem),
+    radial-gradient(circle at 50% 100%, rgb(104 202 98 / 0.04), transparent 40rem),
+    linear-gradient(rgb(104 202 98 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(104 202 98 / 0.035) 1px, transparent 1px),
+    var(--gp-background);
+  background-size: auto, auto, auto, 24px 24px, 24px 24px, auto;
+}
+
+.gainer-prime-root .gp-canvas::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.gainer-prime-root .gp-vignette::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(ellipse at center, transparent 40%, rgb(8 12 10 / 0.55) 100%);
+}
+
+.gainer-prime-root .gp-scanline {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.gainer-prime-root .gp-scanline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(104 202 98 / 0.15),
+    rgb(149 250 139 / 0.35),
+    rgb(104 202 98 / 0.15),
+    transparent
+  );
+  animation: gp-scanline-sweep var(--gp-animation-speed) linear infinite;
+}
+
+.gainer-prime-root .gp-canvas-content {
+  position: relative;
+  z-index: 3;
+}
+
+@keyframes gp-scanline-sweep {
+  0% {
+    top: -2px;
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.6;
+  }
+  92% {
+    opacity: 0.6;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.gainer-prime-root .gp-module {
+  position: relative;
+  border-radius: var(--gp-module-radius);
+  border: 1px solid var(--gp-hex-border);
+  background: var(--gp-surface);
+  overflow: hidden;
+}
+
+.gainer-prime-root .gp-module.is-reactor {
+  border-color: rgb(104 202 98 / 0.35);
+}
+
+.gainer-prime-root .gp-module.is-critical {
+  border-color: rgb(255 180 171 / 0.35);
+}
+
+.gainer-prime-root .gp-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgb(63 74 60 / 0.5);
+}
+
+.gainer-prime-root .gp-module-id {
+  font-family: var(--font-gainer-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gp-on-surface-variant);
+}
+
+.gainer-prime-root .gp-module-id strong {
+  color: var(--gp-phosphor-bright);
+  font-weight: 600;
+}
+
+.gainer-prime-root .gp-module-corner {
+  position: relative;
+}
+
+.gainer-prime-root .gp-module-corner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 var(--gp-chamfer-size) var(--gp-chamfer-size) 0;
+  border-color: transparent var(--gp-phosphor) transparent transparent;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.gainer-prime-root .gp-module-corner.is-critical::before {
+  border-color: transparent var(--gp-error) transparent transparent;
+}
+
+.gainer-prime-root .gp-chamfer {
+  clip-path: polygon(
+    0 0,
+    calc(100% - var(--gp-chamfer-size)) 0,
+    100% var(--gp-chamfer-size),
+    100% 100%,
+    0 100%
+  );
+}
+
+.gainer-prime-root .gp-power-bar-active {
+  border-left: 4px solid var(--gp-primary-container);
+  background: color-mix(in srgb, #20532c 22%, transparent);
+}
+
+.gainer-prime-root .gp-sidebar-gradient {
+  background: linear-gradient(180deg, #151d19 0%, #0d1511 100%);
+}
+
+.gainer-prime-root .gp-sidebar-header-texture {
+  position: relative;
+}
+
+.gainer-prime-root .gp-sidebar-header-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.25;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 128 128' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.gainer-prime-root .gp-logo-halo {
+  filter: drop-shadow(0 0 8px rgb(104 202 98 / 0.5)) drop-shadow(0 0 20px rgb(104 202 98 / 0.25));
+  animation: gp-halo-breathe var(--gp-animation-speed-halo) ease-in-out infinite;
+}
+
+@keyframes gp-halo-breathe {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgb(104 202 98 / 0.45)) drop-shadow(0 0 18px rgb(104 202 98 / 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgb(149 250 139 / 0.65)) drop-shadow(0 0 32px rgb(104 202 98 / 0.35));
+  }
+}
+
+.gainer-prime-root .gp-power-rail-track {
+  position: relative;
+}
+
+.gainer-prime-root .gp-power-rail-indicator {
+  position: absolute;
+  left: 0;
+  width: 4px;
+  border-radius: 0 2px 2px 0;
+  background: var(--gp-phosphor-core);
+  box-shadow:
+    0 0 4px rgb(149 250 139 / 0.8),
+    0 0 12px rgb(104 202 98 / 0.45);
+  transition: top 280ms cubic-bezier(0.4, 0, 0.2, 1), height 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gainer-prime-root .gp-enter {
+  animation: gp-fade-slide-in var(--gp-enter-duration) ease-out both;
+  animation-delay: var(--gp-delay, 0ms);
+}
+
+@keyframes gp-fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gainer-prime-root .gp-pulse-hardware {
+  animation: gp-pulse-hardware var(--gp-animation-speed-fast) ease-in-out infinite;
+}
+
+@keyframes gp-pulse-hardware {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 4px rgb(104 202 98 / 0.8);
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 10px rgb(149 250 139 / 0.9);
+  }
+}
+
+.gainer-prime-root .gp-search-terminal {
+  border: none;
+  border-bottom: 1px solid var(--gp-outline-variant);
+  border-radius: 0;
+  background: transparent;
+}
+
+.gainer-prime-root .gp-search-terminal:focus {
+  outline: none;
+  border-bottom-color: var(--gp-phosphor);
+  box-shadow: 0 2px var(--gp-glow-spread) rgb(104 202 98 / 0.25);
+}
+
+.gainer-prime-root .gp-progress-segments {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.gainer-prime-root .gp-progress-segment {
+  flex: 1;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gp-hex-border) 80%, var(--gp-background));
+}
+
+.gainer-prime-root .gp-progress-segment.is-filled {
+  background: var(--gp-phosphor);
+  box-shadow:
+    0 0 4px rgb(149 250 139 / 0.6),
+    0 0 10px rgb(104 202 98 / 0.35);
+}
+
+.gainer-prime-root .gp-kpi-satellite {
+  transition: box-shadow 200ms ease;
+}
+
+.gainer-prime-root a:hover .gp-kpi-satellite,
+.gainer-prime-root .gp-kpi-satellite:focus-within {
+  box-shadow:
+    inset 0 0 0 1px rgb(104 202 98 / 0.45),
+    0 0 4px rgb(149 250 139 / var(--gp-glow-core-alpha)),
+    0 0 var(--gp-glow-spread) rgb(104 202 98 / var(--gp-glow-mid-alpha)),
+    0 0 var(--gp-glow-spread-wide) rgb(104 202 98 / var(--gp-glow-ambient-alpha));
+}
+
+.gainer-prime-root .gp-reactor-chart .recharts-cartesian-grid line {
+  stroke: rgb(63 74 60 / 0.35);
+}
+
+.gainer-prime-root .gp-reactor-tooltip {
+  background: #151d19;
+  border: 1px solid var(--gp-hex-border);
+  border-radius: var(--gp-module-radius);
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-gainer-mono), ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--gp-on-surface);
+  position: relative;
+  overflow: hidden;
+}
+
+.gainer-prime-root .gp-reactor-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 8px 8px 0;
+  border-color: transparent var(--gp-phosphor) transparent transparent;
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gainer-prime-root .gp-scanline::after,
+  .gainer-prime-root .gp-logo-halo,
+  .gainer-prime-root .gp-pulse-hardware,
+  .gainer-prime-root .gp-enter {
+    animation: none;
+  }
+
+  .gainer-prime-root .gp-power-rail-indicator {
+    transition: none;
+  }
+}

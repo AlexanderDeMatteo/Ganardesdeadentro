@@ -37,6 +37,8 @@ export function useAdmin() {
     refreshOverview,
     refreshUserLists,
     refreshRoutines,
+    refreshExercises,
+    exercisesError,
   } = useAdminData();
 
   const getAthleteById = useCallback(
@@ -141,10 +143,10 @@ export function useAdmin() {
   const createRoutine = useCallback(
     async (routine: Parameters<typeof clientCreateRoutine>[0]) => {
       const created = await clientCreateRoutine(routine);
-      await refreshRoutines();
+      await Promise.all([refreshRoutines(), refreshExercises()]);
       return created;
     },
-    [refreshRoutines],
+    [refreshRoutines, refreshExercises],
   );
 
   const updateRoutine = useCallback(
@@ -186,5 +188,8 @@ export function useAdmin() {
     updateRoutine,
     deleteRoutine,
     refreshOverview,
+    refreshUserLists,
+    refreshExercises,
+    exercisesError,
   };
 }

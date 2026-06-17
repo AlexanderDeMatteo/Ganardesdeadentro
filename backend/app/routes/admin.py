@@ -25,6 +25,16 @@ def overview():
     return data, 200
 
 
+@admin_bp.route('/dashboard/metrics', methods=['GET'])
+@jwt_required()
+@role_required('admin')
+def dashboard_metrics():
+    data, error = AdminService.get_dashboard_metrics()
+    if error:
+        return {'error': error}, 500
+    return data, 200
+
+
 @admin_bp.route('/athletes', methods=['GET'])
 @jwt_required()
 @role_required('admin')

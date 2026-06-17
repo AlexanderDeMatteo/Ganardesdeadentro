@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 export default function RoutinesPage() {
-  const { routines, exercises, createRoutine, updateRoutine, deleteRoutine } = useAdmin();
+  const { routines, exercises, createRoutine, updateRoutine, deleteRoutine, refreshExercises } = useAdmin();
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
 
@@ -74,6 +74,7 @@ export default function RoutinesPage() {
           mode="create"
           onSave={handleCreateRoutine}
           onClose={() => setIsBuilderOpen(false)}
+          onExercisesChanged={refreshExercises}
         />
       )}
 
@@ -84,6 +85,7 @@ export default function RoutinesPage() {
           initialRoutine={editingRoutine}
           onSave={handleUpdateRoutine}
           onClose={() => setEditingRoutine(null)}
+          onExercisesChanged={refreshExercises}
         />
       )}
     </div>

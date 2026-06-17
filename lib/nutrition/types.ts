@@ -1,4 +1,4 @@
-export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'intense' | 'very_intense';
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
 
 export type NutritionGoal = 'lose' | 'maintain' | 'gain';
 

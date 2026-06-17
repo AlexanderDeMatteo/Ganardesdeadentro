@@ -2,15 +2,45 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy.exc import IntegrityError
+
 from app.database import SessionLocal
 from app.models import Membership, RoleEnum, User, UserMembership
-from app.schemas.serializers import _membership_level_from_name, serialize_active_membership, serialize_me_membership, serialize_membership_plan
+from app.schemas.serializers import (
+    VALID_FUNCTIONAL_TIERS,
+    _membership_level_from_name,
+    _membership_level_from_plan,
+    _normalize_functional_tier,
+    serialize_active_membership,
+    serialize_me_membership,
+    serialize_membership_plan,
+)
 
 logger = logging.getLogger(__name__)
 GENERIC_ERROR = 'No se pudo completar la operación'
+DUPLICATE_NAME_ERROR = 'Ya existe un plan con ese nombre'
+INVALID_NAME_ERROR = 'El nombre no puede superar 120 caracteres'
+INVALID_TIER_ERROR = 'functionalTier inválido; use basic, premium o pro'
 
 
 class MembershipService:
+    @staticmethod
+    def _validate_plan_name(name: str | None) -> tuple[str | None, str]:
+        cleaned = (name or '').strip()
+        if not cleaned:
+            return None, 'name requerido'
+        if len(cleaned) > 120:
+            return None, INVALID_NAME_ERROR
+        return cleaned, ''
+
+    @staticmethod
+    def _validate_functional_tier(value) -> tuple[str | None, str]:
+        if value is None:
+            return 'basic', ''
+        normalized = str(value).lower()
+        if normalized not in VALID_FUNCTIONAL_TIERS:
+            return None, INVALID_TIER_ERROR
+        return normalized, ''
     @staticmethod
     def get_active_membership(athlete_id: int, session=None):
         close_session = False
@@ -80,8 +110,17 @@ class MembershipService:
             session = SessionLocal()
             close_session = True
         try:
+            name, name_error = MembershipService._validate_plan_name(data.get('name'))
+            if name_error:
+                return None, name_error
+            functional_tier, tier_error = MembershipService._validate_functional_tier(data.get('functionalTier'))
+            if tier_error:
+                return None, tier_error
+            if data.get('functionalTier') is None:
+                functional_tier = _membership_level_from_name(name)
             plan = Membership(
-                name=data.get('name'),
+                name=name,
+                functional_tier=functional_tier,
                 description=data.get('description', ''),
                 price=data.get('price', 0),
                 features=json.dumps(data.get('features', [])),
@@ -93,6 +132,9 @@ class MembershipService:
             session.commit()
             session.refresh(plan)
             return serialize_membership_plan(plan), ''
+        except IntegrityError:
+            session.rollback()
+            return None, DUPLICATE_NAME_ERROR
         except Exception:
             session.rollback()
             logger.exception('Error creating membership plan')
@@ -112,7 +154,15 @@ class MembershipService:
             if not plan:
                 return None, 'Plan no encontrado'
             if 'name' in patch:
-                plan.name = patch['name']
+                name, name_error = MembershipService._validate_plan_name(patch['name'])
+                if name_error:
+                    return None, name_error
+                plan.name = name
+            if 'functionalTier' in patch:
+                functional_tier, tier_error = MembershipService._validate_functional_tier(patch['functionalTier'])
+                if tier_error:
+                    return None, tier_error
+                plan.functional_tier = functional_tier
             if 'description' in patch:
                 plan.description = patch['description']
             if 'price' in patch:
@@ -127,6 +177,9 @@ class MembershipService:
             session.commit()
             session.refresh(plan)
             return serialize_membership_plan(plan), ''
+        except IntegrityError:
+            session.rollback()
+            return None, DUPLICATE_NAME_ERROR
         except Exception:
             session.rollback()
             logger.exception('Error updating membership plan')
@@ -161,7 +214,7 @@ class MembershipService:
         normalized = str(level).lower()
         plans = session.query(Membership).filter_by(is_active=True).order_by(Membership.id.asc()).all()
         for plan in plans:
-            if _membership_level_from_name(plan.name) == normalized:
+            if _membership_level_from_plan(plan) == normalized:
                 return plan
         return None
 

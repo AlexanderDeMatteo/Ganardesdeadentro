@@ -16,10 +16,11 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 export function MacroCalculator({ defaultCalories }: { defaultCalories: number }) {
-  const { setMacroTargets, state, canEdit, publish } = useCoachNutritionContext();
+  const { setMacroTargets, saveMacroTargets, state, canEdit, publish } = useCoachNutritionContext();
   const [calories, setCalories] = useState(defaultCalories);
   const [presetId, setPresetId] = useState<MacroPresetId>('balanced');
   const [customSplit, setCustomSplit] = useState({ protein: 30, carbs: 40, fat: 30 });
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
     setCalories(defaultCalories);
@@ -40,25 +41,22 @@ export function MacroCalculator({ defaultCalories }: { defaultCalories: number }
     toast.success('Objetivo de macros guardado en el borrador.');
   };
 
-  const handleSaveForAthlete = () => {
+  const handleSaveForAthlete = async () => {
     if (!canEdit) return;
     if (!preview || !valid) {
       toast.error('Revisa los porcentajes: deben sumar 100% y estar entre 5% y 70%.');
       return;
     }
 
-    // Keep draft and preview in sync before publishing.
-    setMacroTargets(preview);
-
-    const hasActivePlan =
-      state.mealPlans.find((p) => p.id === state.activeMealPlanId) != null || state.mealPlans[0] != null;
-
-    if (!hasActivePlan) {
-      toast.error('Macros guardados en borrador. Crea o selecciona un plan para publicarlo al atleta.');
-      return;
+    setIsPublishing(true);
+    try {
+      await saveMacroTargets(preview);
+      await publish({ macroTargets: preview });
+    } catch {
+      /* persistDraft / publish already toast */
+    } finally {
+      setIsPublishing(false);
     }
-
-    publish({ macroTargets: preview });
   };
 
   return (
@@ -158,8 +156,13 @@ export function MacroCalculator({ defaultCalories }: { defaultCalories: number }
         <Button type="button" onClick={handleApply} disabled={!valid || !canEdit}>
           Guardar objetivo en borrador
         </Button>
-        <Button type="button" variant="secondary" onClick={handleSaveForAthlete} disabled={!valid || !canEdit}>
-          Guardar macros para el atleta
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => void handleSaveForAthlete()}
+          disabled={!valid || !canEdit || isPublishing}
+        >
+          {isPublishing ? 'Guardando…' : 'Guardar macros para el atleta'}
         </Button>
       </div>
 

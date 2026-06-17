@@ -16,6 +16,7 @@ backend/fitness_platform.db
 
 # Common ignores
 node_modules
+.pnpm-store/
 .next/
 .DS_Store
 __pycache__/

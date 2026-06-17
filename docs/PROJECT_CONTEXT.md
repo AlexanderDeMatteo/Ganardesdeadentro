@@ -49,9 +49,9 @@ Hoy el navegador habla principalmente con Next; el backend está disponible en `
 | Área | Ruta(s) | Notas |
 |------|---------|--------|
 | Público | `/`, `/login`, `/register` | Login/register contra usuarios mock en `AuthProvider` |
-| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile` | Protegidas por `ProtectedRoute` (solo cliente). Dashboard principal: [`components/dashboard/fitness-dashboard-view.tsx`](components/dashboard/fitness-dashboard-view.tsx). |
+| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile` | Protegidas por shell Phosphor Prime en `app/(athlete-prime)/*`. Layout: [`components/athlete-prime/`](components/athlete-prime/) + `gainer-prime-theme.css`. Dashboard: [`components/athlete-prime/athlete-prime-dashboard.tsx`](components/athlete-prime/athlete-prime-dashboard.tsx). |
 | Trainer | `/trainer`, `/trainer/*` | Rol `trainer` (cliente). Gestiona atletas, rutinas, asignaciones, progreso y nutrición asignada (`/trainer/athletes/[athleteId]/nutrition`) |
-| Admin | `/admin`, `/admin/*` | Rol `admin` verificado en cliente. Incluye atletas, entrenadores, rutinas, membresías, asignaciones y nutrición por atleta |
+| Admin | `/admin-v2`, `/admin-v2/*` | Plantilla oficial Phosphor V2. Rutas `/admin/*` redirigen aquí. Rol `admin` verificado en cliente. Incluye ejercicios, atletas, entrenadores, rutinas, membresías, asignaciones y nutrición por atleta |
 | API Next (IA) | `/api/coach/titan`, `/api/coach/session-review`, `/api/nutrition/titan` | Route handlers que hablan con Ollama (coach Titan). No dependen de Flask |
 
 ### Backend (prefijo `/api`)
@@ -73,13 +73,15 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 | Auth mock frontend | `app/context/auth-context.tsx` |
 | Rutas protegidas (UX) | `components/auth/protected-route.tsx` |
 | Admin / datos demo | `hooks/use-admin.ts` |
+| Admin V2 (Phosphor Reactor Deck) — **plantilla admin oficial** | `app/admin-v2/*`, `components/admin-v2/*`, `styles/gainer-prime-theme.css` — ver [`docs/PHOSPHOR_REACTOR_CONTEXT.md`](./PHOSPHOR_REACTOR_CONTEXT.md) |
+| Atleta (Phosphor Prime) — **shell usuario oficial** | `app/(athlete-prime)/*`, `components/athlete-prime/*`, mismo tema `gainer-prime-theme.css` |
 | Métricas demo | `hooks/use-metrics.ts` |
 | Membresías demo | `hooks/use-memberships.ts` |
 | Coach IA (estado/orquestación) | `app/context/coach-context.tsx`, `components/coach/coach-mascot.tsx` |
 | Cliente y prompts Ollama | `lib/ollama/client.ts`, `lib/ollama/prompts.ts`, `lib/ollama/types.ts` |
 | Rutas API Titan (Next) | `app/api/coach/titan/route.ts`, `app/api/coach/session-review/route.ts`, `app/api/nutrition/titan/route.ts` |
 | Nutrición (estado/lógica) | `hooks/use-nutrition.ts`, `lib/nutrition/*` (`metabolism.ts`, `types.ts`, `storage.ts`) |
-| Nutrición (UI) | `app/nutrition/*`, `components/nutrition/*` |
+| Nutrición (UI) | `app/(athlete-prime)/nutrition/*`, `components/nutrition/*` |
 | Rutinas atleta (plan semanal) | `hooks/use-athlete-data.ts`, `components/routines/assigned-routine-view.tsx`. Con `ROUTINES=api`, el detalle del día resuelve rutinas vía `getRoutineById` (no `state.routines` local). Si hay plan semanal activo, la UI del atleta prioriza el plan; la asignación única es fallback sin plan. |
 | Factory Flask, CORS, JWT | `backend/app/__init__.py` |
 | Config y env | `backend/app/config.py`, `backend/.env.example` |

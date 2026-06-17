@@ -2,14 +2,17 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { MessageCircle, Minimize2 } from 'lucide-react';
 import { CoachAvatar } from '@/components/coach/coach-avatar';
 import { Button } from '@/components/ui/button';
 import { CoachTitanMessage } from '@/components/coach/coach-titan-message';
 import { useCoach } from '@/app/context/coach-context';
+import { isAdminPreviewPath } from '@/lib/auth/role-routes';
 import { cn } from '@/lib/utils';
 
 export function CoachMascot() {
+  const pathname = usePathname() ?? '';
   const messageScrollRef = useRef<HTMLDivElement>(null);
   const {
     tip,
@@ -31,6 +34,10 @@ export function CoachMascot() {
     confirmNutritionEstimate,
   } = useCoach();
   const [nutritionInput, setNutritionInput] = useState('');
+
+  if (isAdminPreviewPath(pathname)) {
+    return null;
+  }
 
   if (isMinimized) {
     return (

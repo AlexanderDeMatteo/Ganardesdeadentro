@@ -4,7 +4,7 @@ import { handleUnauthorizedResponse } from '@/lib/api/unauthorized-handler';
 import { getAccessToken } from '@/lib/auth/session-store';
 
 export interface HttpRequestOptions extends Omit<RequestInit, 'body'> {
-  body?: unknown;
+  body?: unknown | FormData;
   auth?: boolean;
 }
 
@@ -19,7 +19,9 @@ export async function httpRequest<T>(
   };
 
   if (body !== undefined) {
-    headers['Content-Type'] = 'application/json';
+    if (!(body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
   }
 
   if (auth) {
@@ -32,7 +34,12 @@ export async function httpRequest<T>(
   const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...rest,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body:
+      body === undefined
+        ? undefined
+        : body instanceof FormData
+          ? body
+          : JSON.stringify(body),
   });
 
   const text = await response.text();

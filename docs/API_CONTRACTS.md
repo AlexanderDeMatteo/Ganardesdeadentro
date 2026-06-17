@@ -200,14 +200,32 @@ Tipos: `lib/api/contracts/nutrition.ts`, `lib/api/contracts/nutrition-diary.ts`
 
 ---
 
-## Ejercicios (`/api/exercises`) — Implementado (frontend Fase 4)
+## Ejercicios (`/api/exercises`) — Catálogo híbrido + custom
 
 | Función frontend | Método | Path | Auth mínima |
 |------------------|--------|------|-------------|
-| `listExercises` | GET | `/api/exercises/cached?muscle=&page=&per_page=` | autenticado |
+| `listExercises` / `listExercisesPaginated` | GET | `/api/exercises/cached?muscle=&page=&per_page=&custom_only=&source=&q=` | autenticado |
+| `listExercisesByMuscle` | GET | `/api/exercises/by-muscle/:muscle?limit=` | pública |
 | `searchExercises` | GET | `/api/exercises/search?q=` | autenticado |
+| `getExerciseById` | GET | `/api/exercises/:exerciseId` | pública |
+| `listExerciseMuscles` | GET | `/api/exercises/muscles?source=` | pública |
+| `syncExerciseCatalog` | POST | `/api/exercises/sync-catalog` | admin |
+| `createExercise` | POST | `/api/exercises` | admin, trainer |
+| `updateExercise` | PATCH | `/api/exercises/:exerciseId` | admin (cualquier custom), trainer (solo propios) |
+| `deleteExercise` | DELETE | `/api/exercises/:exerciseId` | admin (cualquier custom), trainer (solo propios) |
+| `matchExerciseAnimation` | POST | `/api/exercises/:exerciseId/match-animation` | admin, trainer (solo propios) |
+| `uploadExerciseMedia` | POST | `/api/exercises/:exerciseId/media` (multipart `file`) | admin, trainer (solo propios) |
+| — | GET | `/api/exercises/media/:filename` | pública |
 
-El adaptador mapea `exercise_db_id` → `Exercise.id` para rutinas.
+Query `source`: `all` (default), `catalog` (solo `is_cached`), `custom` (solo `is_custom`). Trainers que listan `custom` solo ven ejercicios con `created_by_id` propio.
+
+`GET /api/exercises/muscles?source=catalog` devuelve músculos distintos (`target_muscle`) con al menos un ejercicio de catálogo en caché local. `source=api` (default) lista todos los músculos publicados por ExerciseDB OSS (`/api/v1/muscles`). La UI del catálogo debe usar `source=catalog` para no mostrar grupos vacíos.
+
+El adaptador mapea `exercise_db_id` → `Exercise.id` para rutinas. Respuestas incluyen `animation_url`, `animation_type`, `animation_source`, `is_custom`, `created_by_id`.
+
+`POST /api/exercises` crea ejercicio custom (`exercise_db_id` con prefijo `custom-`) e intenta match automático en ExerciseDB. Si no hay GIF, se puede subir media manualmente.
+
+`POST /api/exercises/sync-catalog` recorre músculos de [ExerciseDB V1 OSS](https://oss.exercisedb.dev) (`https://oss.exercisedb.dev/api/v1/...`) y persiste ejercicios con `gifUrl` en caché local. No requiere API key por defecto.
 
 ---
 

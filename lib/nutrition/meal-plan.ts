@@ -66,30 +66,86 @@ export function getBasicMealTemplates(): MealPlan[] {
     }),
     sampleWeek('Definición 1800', {
       breakfast: [
-        createMealItem('Tortilla de claras + pan integral', { calories: 320, proteinG: 28, carbsG: 30, fatG: 8 }),
+        createMealItem('Tortilla de claras + pan integral', {
+          calories: 320,
+          proteinG: 28,
+          carbsG: 30,
+          fatG: 8,
+          quantityG: 280,
+        }),
       ],
       lunch: [
-        createMealItem('Atún con ensalada', { calories: 450, proteinG: 42, carbsG: 15, fatG: 22 }),
+        createMealItem('Atún con ensalada', {
+          calories: 450,
+          proteinG: 42,
+          carbsG: 15,
+          fatG: 22,
+          quantityG: 350,
+        }),
       ],
       dinner: [
-        createMealItem('Pechuga con brócoli', { calories: 380, proteinG: 40, carbsG: 12, fatG: 14 }),
+        createMealItem('Pechuga con brócoli', {
+          calories: 380,
+          proteinG: 40,
+          carbsG: 12,
+          fatG: 14,
+          quantityG: 320,
+        }),
       ],
-      snack: [createMealItem('Manzana + almendras', { calories: 180, proteinG: 5, carbsG: 22, fatG: 9 })],
+      snack: [
+        createMealItem('Manzana + almendras', {
+          calories: 180,
+          proteinG: 5,
+          carbsG: 22,
+          fatG: 9,
+          quantityG: 150,
+        }),
+      ],
     }),
     sampleWeek('Volumen 2800', {
       breakfast: [
-        createMealItem('Huevos revueltos + tostadas', { calories: 550, proteinG: 28, carbsG: 45, fatG: 28 }),
-        createMealItem('Batido de proteína', { calories: 200, proteinG: 30, carbsG: 8, fatG: 4 }),
+        createMealItem('Huevos revueltos + tostadas', {
+          calories: 550,
+          proteinG: 28,
+          carbsG: 45,
+          fatG: 28,
+          quantityG: 380,
+        }),
+        createMealItem('Batido de proteína', {
+          calories: 200,
+          proteinG: 30,
+          carbsG: 8,
+          fatG: 4,
+          quantityG: 300,
+        }),
       ],
       lunch: [
-        createMealItem('Carne magra con pasta', { calories: 780, proteinG: 48, carbsG: 85, fatG: 22 }),
+        createMealItem('Carne magra con pasta', {
+          calories: 780,
+          proteinG: 48,
+          carbsG: 85,
+          fatG: 22,
+          quantityG: 520,
+        }),
       ],
       dinner: [
-        createMealItem('Pavo con patata', { calories: 620, proteinG: 42, carbsG: 55, fatG: 20 }),
+        createMealItem('Pavo con patata', {
+          calories: 620,
+          proteinG: 42,
+          carbsG: 55,
+          fatG: 20,
+          quantityG: 450,
+        }),
       ],
       snack: [
-        createMealItem('Barrita energética', { calories: 250, proteinG: 10, carbsG: 35, fatG: 8 }),
-        createMealItem('Plátano', { calories: 105, proteinG: 1, carbsG: 27, fatG: 0 }),
+        createMealItem('Barrita energética', {
+          calories: 250,
+          proteinG: 10,
+          carbsG: 35,
+          fatG: 8,
+          quantityG: 60,
+        }),
+        createMealItem('Plátano', { calories: 105, proteinG: 1, carbsG: 27, fatG: 0, quantityG: 120 }),
       ],
     }),
   ];
@@ -100,30 +156,86 @@ export function getProMealTemplates(): MealPlan[] {
   return [
     sampleWeek('Alto rendimiento 3000', {
       breakfast: [
-        createMealItem('Pancakes proteicos', { calories: 480, proteinG: 32, carbsG: 52, fatG: 16 }),
+        createMealItem('Pancakes proteicos', {
+          calories: 480,
+          proteinG: 32,
+          carbsG: 52,
+          fatG: 16,
+          quantityG: 320,
+        }),
       ],
       lunch: [
-        createMealItem('Ternera con quinoa', { calories: 850, proteinG: 55, carbsG: 70, fatG: 28 }),
+        createMealItem('Ternera con quinoa', {
+          calories: 850,
+          proteinG: 55,
+          carbsG: 70,
+          fatG: 28,
+          quantityG: 480,
+        }),
       ],
       dinner: [
-        createMealItem('Pescado blanco con boniato', { calories: 580, proteinG: 42, carbsG: 48, fatG: 18 }),
+        createMealItem('Pescado blanco con boniato', {
+          calories: 580,
+          proteinG: 42,
+          carbsG: 48,
+          fatG: 18,
+          quantityG: 420,
+        }),
       ],
       snack: [
-        createMealItem('Frutos secos', { calories: 220, proteinG: 6, carbsG: 8, fatG: 18 }),
-        createMealItem('Batido post-entreno', { calories: 280, proteinG: 35, carbsG: 30, fatG: 4 }),
+        createMealItem('Frutos secos', {
+          calories: 220,
+          proteinG: 6,
+          carbsG: 8,
+          fatG: 18,
+          quantityG: 40,
+        }),
+        createMealItem('Batido post-entreno', {
+          calories: 280,
+          proteinG: 35,
+          carbsG: 30,
+          fatG: 4,
+          quantityG: 350,
+        }),
       ],
     }),
     sampleWeek('Vegetariano 2100', {
       breakfast: [
-        createMealItem('Tofu scramble + aguacate', { calories: 400, proteinG: 22, carbsG: 18, fatG: 28 }),
+        createMealItem('Tofu scramble + aguacate', {
+          calories: 400,
+          proteinG: 22,
+          carbsG: 18,
+          fatG: 28,
+          quantityG: 300,
+        }),
       ],
       lunch: [
-        createMealItem('Bowl de legumbres', { calories: 520, proteinG: 24, carbsG: 62, fatG: 16 }),
+        createMealItem('Bowl de legumbres', {
+          calories: 520,
+          proteinG: 24,
+          carbsG: 62,
+          fatG: 16,
+          quantityG: 400,
+        }),
       ],
       dinner: [
-        createMealItem('Curry de garbanzos', { calories: 480, proteinG: 18, carbsG: 55, fatG: 20 }),
+        createMealItem('Curry de garbanzos', {
+          calories: 480,
+          proteinG: 18,
+          carbsG: 55,
+          fatG: 20,
+          quantityG: 380,
+        }),
       ],
-      snack: [createMealItem('Hummus con zanahoria', { calories: 180, proteinG: 6, carbsG: 20, fatG: 9 })],
+      snack: [
+        createMealItem('Hummus con zanahoria', {
+          calories: 180,
+          proteinG: 6,
+          carbsG: 20,
+          fatG: 9,
+          quantityG: 180,
+        }),
+      ],
     }),
   ];
 }

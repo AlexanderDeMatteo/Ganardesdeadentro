@@ -309,6 +309,32 @@ class RoutineService:
                 session.close()
 
     @staticmethod
+    def list_active_weekly_plans(trainer_id: int | None = None, session=None):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            query = session.query(WeeklyPlan).filter_by(is_active=True)
+            if trainer_id is not None:
+                query = query.filter_by(trainer_id=trainer_id)
+            plans = query.order_by(WeeklyPlan.created_at.desc()).all()
+            seen_athletes: set[int] = set()
+            unique_plans = []
+            for plan in plans:
+                if plan.user_id in seen_athletes:
+                    continue
+                seen_athletes.add(plan.user_id)
+                unique_plans.append(plan)
+            return [serialize_weekly_plan(plan) for plan in unique_plans], ''
+        except Exception:
+            logger.exception('Error listing active weekly plans')
+            return None, GENERIC_ERROR
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
     def get_weekly_plan(athlete_id: int, session=None):
         close_session = False
         if session is None:

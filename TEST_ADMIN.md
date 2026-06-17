@@ -1,5 +1,7 @@
 # Guía de Pruebas - Panel de Administración
 
+> **Deprecado:** el panel oficial es **Phosphor V2** en `/admin-v2`. Las rutas `/admin/*` redirigen automáticamente. Usa [`TEST_ADMIN_V2.md`](TEST_ADMIN_V2.md) para la revisión actual.
+
 ## Credenciales de Prueba
 
 Para acceder al panel de administración, usa:

@@ -50,11 +50,9 @@ export function FitnessDashboardWeekConsistency({
     plannedDays > 0 ? Math.round((activeCount / plannedDays) * 100) : 0;
 
   return (
-    <div className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-6">
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-widest text-[#9ca3af]">
-        Consistencia semanal
-      </h3>
-      <p className="mb-4 text-sm font-bold text-white">
+    <div className="gp-module gp-module-corner p-6">
+      <h3 className="gp-label gp-text-muted">Consistencia semanal</h3>
+      <p className="mb-4 text-sm font-bold gp-text-primary">
         {weeklyPlan ? 'Plan del entrenador' : 'Esta semana'}
       </p>
       <div className="mb-6 flex justify-between gap-1">
@@ -63,22 +61,22 @@ export function FitnessDashboardWeekConsistency({
             <span
               className={
                 on
-                  ? 'size-3 rounded-full bg-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.6)]'
-                  : 'size-3 rounded-full bg-[#374151]'
+                  ? 'size-3 rounded-full bg-[var(--gp-phosphor)] gp-phosphor-glow'
+                  : 'size-3 rounded-full gp-bg-surface-variant'
               }
               aria-label={on ? `${DAY_LABELS[i]}: actividad` : `${DAY_LABELS[i]}: sin actividad`}
             />
-            <span className="text-[10px] text-[#9ca3af]">{DAY_LABELS[i]}</span>
+            <span className="gp-mono text-[10px] gp-text-muted">{DAY_LABELS[i]}</span>
           </div>
         ))}
       </div>
-      <div className="mb-2 flex justify-between text-xs text-[#d1d5db]">
+      <div className="mb-2 flex justify-between text-xs gp-text-muted">
         <span>Consistencia</span>
-        <span className="text-lime-400">{consistencyPct}%</span>
+        <span className="gp-text-phosphor">{consistencyPct}%</span>
       </div>
-      <div className="h-1.5 w-full rounded-full bg-[#374151]">
+      <div className="h-1.5 w-full rounded-full gp-bg-surface-variant">
         <div
-          className="h-full rounded-full bg-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.45)]"
+          className="h-full rounded-full bg-[var(--gp-phosphor)] gp-phosphor-glow"
           style={{ width: `${consistencyPct}%` }}
         />
       </div>

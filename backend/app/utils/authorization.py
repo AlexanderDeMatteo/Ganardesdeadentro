@@ -59,6 +59,27 @@ def role_required(*roles):
     return decorator
 
 
+def can_manage_custom_exercise(user: User, exercise) -> bool:
+    """Admin puede gestionar cualquier custom; trainer solo los que creó."""
+    role = _role_value(user.role)
+    if role == RoleEnum.ADMIN.value:
+        return bool(exercise.is_custom)
+    if role == RoleEnum.TRAINER.value:
+        return bool(exercise.is_custom) and exercise.created_by_id == user.id
+    return False
+
+
+def _get_custom_exercise_or_forbidden(session, exercise_id: str, user: User):
+    from app.models import Exercise
+
+    exercise = session.query(Exercise).filter_by(exercise_db_id=exercise_id).first()
+    if exercise is None or not exercise.is_active:
+        return None, 'Ejercicio no encontrado', 404
+    if not can_manage_custom_exercise(user, exercise):
+        return None, 'No tienes permisos para esta acción', 403
+    return exercise, '', 200
+
+
 def _get_user(session, user_id: int) -> User | None:
     return session.query(User).filter_by(id=user_id).first()
 

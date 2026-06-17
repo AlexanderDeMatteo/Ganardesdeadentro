@@ -55,12 +55,21 @@ export interface Trainer {
   maxAthletes?: number;
 }
 
+export type ExerciseAnimationType = 'gif' | 'video' | 'none';
+export type ExerciseAnimationSource = 'exercisedb' | 'upload' | 'none';
+
 export interface Exercise {
   id: string;
   name: string;
   targetMuscle: string;
   difficulty: Difficulty;
   equipment: string;
+  description?: string;
+  animationUrl?: string;
+  animationType?: ExerciseAnimationType;
+  animationSource?: ExerciseAnimationSource;
+  isCustom?: boolean;
+  createdById?: number;
 }
 
 export interface RoutineExercise {

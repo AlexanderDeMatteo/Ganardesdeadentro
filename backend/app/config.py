@@ -27,9 +27,10 @@ class Config:
 
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5000').split(',')
 
-    EXERCISEDB_API_URL = 'https://exercisedb.p.rapidapi.com'
+    EXERCISEDB_API_URL = os.getenv('EXERCISEDB_API_URL', 'https://oss.exercisedb.dev')
     EXERCISEDB_API_KEY = os.getenv('EXERCISEDB_API_KEY', '')
-    EXERCISEDB_API_HOST = 'exercisedb.p.rapidapi.com'
+    EXERCISEDB_API_HOST = os.getenv('EXERCISEDB_API_HOST', '')
+    EXERCISEDB_SSL_VERIFY = os.getenv('EXERCISEDB_SSL_VERIFY', 'true').lower() == 'true'
 
     ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
     DEBUG = ENVIRONMENT == 'development'
@@ -42,6 +43,13 @@ class Config:
     EMAIL_FROM = os.getenv('EMAIL_FROM', 'FitTrack <onboarding@fittrack.local>')
     FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
     INVITATION_EXPIRY_HOURS = int(os.getenv('INVITATION_EXPIRY_HOURS', '72'))
+
+    EXERCISE_MEDIA_UPLOAD_DIR = os.getenv('EXERCISE_MEDIA_UPLOAD_DIR', '/data/exercise_media')
+    EXERCISE_MEDIA_MAX_BYTES = int(os.getenv('EXERCISE_MEDIA_MAX_BYTES', '10485760'))
+    EXERCISE_MEDIA_ALLOWED_MIME = os.getenv(
+        'EXERCISE_MEDIA_ALLOWED_MIME',
+        'image/gif,video/mp4,image/webp',
+    )
 
 
 class DevelopmentConfig(Config):
@@ -65,6 +73,7 @@ class TestingConfig(Config):
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'test-secret-key-for-pytest-only')
     RATELIMIT_ENABLED = False
     AUTH_RATE_LIMIT = '1000 per minute'
+    EXERCISE_MEDIA_UPLOAD_DIR = os.getenv('EXERCISE_MEDIA_UPLOAD_DIR', 'exercise_media_test')
 
 
 config = {

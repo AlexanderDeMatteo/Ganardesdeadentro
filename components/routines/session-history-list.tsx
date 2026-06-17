@@ -99,8 +99,8 @@ export function SessionHistoryList({
 
   if (recent.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-center">
-        <p className="text-sm text-muted-foreground">
+      <div className="gp-module gp-module-corner border-dashed p-6 text-center">
+        <p className="text-sm gp-text-muted">
           Aún no hay sesiones registradas. Completa tu primer entrenamiento para ver el historial.
         </p>
       </div>
@@ -117,8 +117,8 @@ export function SessionHistoryList({
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-card/70 p-6">
-      <h3 className="mb-4 text-lg font-bold uppercase text-foreground">Historial de sesiones</h3>
+    <div className="gp-module gp-module-corner p-6">
+      <h3 className="gp-label mb-4 gp-text-primary">Historial de sesiones</h3>
       <ul className="space-y-3">
         {recent.map((session) => {
           const name = routineNames[session.routineId] ?? 'Rutina';
@@ -135,40 +135,40 @@ export function SessionHistoryList({
           );
 
           return (
-            <li key={session.id} className="rounded-lg border border-border">
+            <li key={session.id} className="rounded-lg border gp-border-outline gp-bg-surface-variant">
               <button
                 type="button"
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                 onClick={() => setExpandedId(isOpen ? null : session.id)}
               >
                 <div>
-                  <p className="font-semibold text-foreground">{name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="font-semibold gp-text-primary">{name}</p>
+                  <p className="text-xs gp-text-muted">
                     {session.scheduledDate} · {pct}% completado
                     {failed > 0 && (
-                      <span className="text-amber-400"> · {failed} fallos</span>
+                      <span className="text-[var(--gp-error-core)]"> · {failed} fallos</span>
                     )}
                   </p>
                 </div>
                 <span
                   className={
                     session.sessionOutcome === 'completed'
-                      ? 'text-xs text-lime-400'
-                      : 'text-xs text-muted-foreground'
+                      ? 'text-xs gp-text-phosphor'
+                      : 'text-xs gp-text-muted'
                   }
                 >
                   {session.sessionOutcome === 'completed' ? 'Completada' : 'Parcial'}
                 </span>
               </button>
               {isOpen && (
-                <div className="border-t border-border px-4 py-3">
+                <div className="border-t gp-border-outline px-4 py-3">
                   <ul className="space-y-2 text-sm">
                     {(session.setLogs ?? []).map((l) => (
                       <li key={`${l.exerciseId}-${l.setNumber}`} className="flex justify-between gap-2">
-                        <span>
+                        <span className="gp-text-primary">
                           {l.exerciseName} s{l.setNumber}
                         </span>
-                        <span className="text-muted-foreground">
+                        <span className="gp-text-muted">
                           {l.repsLogged}/{l.repsTarget}
                           {l.weightKg != null ? ` · ${l.weightKg} kg` : ''}
                           {l.result === 'failed' && ' · Me rindo'}
@@ -182,7 +182,7 @@ export function SessionHistoryList({
                         <div key={exId}>
                           <button
                             type="button"
-                            className="text-xs font-medium text-cyan-400 hover:underline"
+                            className="text-xs font-medium gp-text-phosphor hover:underline"
                             onClick={() => void loadProgress(exId)}
                           >
                             Ver progresión: {exName}

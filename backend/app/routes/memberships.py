@@ -8,6 +8,21 @@ from app.utils.authorization import get_verified_user, require_athlete_access, r
 
 memberships_bp = Blueprint('memberships', __name__)
 
+_PLAN_CLIENT_ERRORS = frozenset({
+    'name requerido',
+    'Ya existe un plan con ese nombre',
+    'El nombre no puede superar 120 caracteres',
+    'functionalTier inválido; use basic, premium o pro',
+})
+
+
+def _plan_error_status(error: str) -> int:
+    if error == 'Plan no encontrado':
+        return 404
+    if error in _PLAN_CLIENT_ERRORS:
+        return 400
+    return 500
+
 
 def _parse_int(value, name='id'):
     try:
@@ -49,11 +64,9 @@ def list_plans():
 @role_required('admin')
 def create_plan():
     data = request.get_json() or {}
-    if not data.get('name'):
-        return {'error': 'name requerido'}, 400
     plan, error = MembershipService.create_plan(data)
     if error:
-        return {'error': error}, 500
+        return {'error': error}, _plan_error_status(error)
     return {'plan': plan}, 201
 
 
@@ -66,8 +79,7 @@ def update_plan(plan_id):
         return err
     plan, error = MembershipService.update_plan(parsed, request.get_json() or {})
     if error:
-        status = 404 if error == 'Plan no encontrado' else 500
-        return {'error': error}, status
+        return {'error': error}, _plan_error_status(error)
     return {'plan': plan}, 200
 
 

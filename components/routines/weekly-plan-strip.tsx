@@ -48,8 +48,8 @@ export function WeeklyPlanStrip({
 }: WeeklyPlanStripProps) {
   if (!weeklyPlan) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-center">
-        <p className="text-sm text-muted-foreground">
+      <div className="gp-module gp-module-corner border-dashed p-6 text-center">
+        <p className="text-sm gp-text-muted">
           Tu entrenador aún no armó tu plan semanal. Mientras tanto puedes usar tu rutina activa.
         </p>
       </div>
@@ -57,9 +57,9 @@ export function WeeklyPlanStrip({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card/70 p-4 sm:p-6">
-      <h3 className="mb-2 text-sm font-bold uppercase tracking-wider text-foreground">Semana</h3>
-      <p className="mb-4 text-xs text-muted-foreground">
+    <div className="gp-module gp-module-corner p-4 sm:p-6">
+      <h3 className="gp-label gp-text-primary">Semana</h3>
+      <p className="mb-4 text-xs gp-text-muted">
         Toca un día para entrenar o revisar tu registro.
       </p>
       <div className="grid grid-cols-7 gap-2">
@@ -74,17 +74,17 @@ export function WeeklyPlanStrip({
               disabled={isRest}
               onClick={() => onSelectDay(day.dayIndex)}
               className={cn(
-                'flex min-h-16 flex-col items-center justify-center rounded-xl border p-2 text-center transition-colors',
-                isRest && 'cursor-default opacity-60 border-border bg-muted/20',
-                !isRest && 'hover:border-cyan-400/50',
-                isSelected && 'border-cyan-400 ring-2 ring-cyan-400/30',
-                status === 'completed' && !isRest && 'bg-lime-400/10 border-lime-400/40',
-                status === 'partial' && !isRest && 'bg-amber-400/10 border-amber-400/40',
-                status === 'pending' && !isRest && 'border-border',
+                'flex min-h-16 flex-col items-center justify-center rounded-lg border p-2 text-center transition-colors',
+                isRest && 'cursor-default opacity-60 gp-border-outline gp-bg-surface-variant',
+                !isRest && 'hover:border-[var(--gp-phosphor)]/50',
+                isSelected && 'border-[var(--gp-phosphor)] ring-2 ring-[var(--gp-phosphor)]/30',
+                status === 'completed' && !isRest && 'border-[var(--gp-phosphor)]/40 gp-bg-surface-variant',
+                status === 'partial' && !isRest && 'border-[var(--gp-error-core)]/40 gp-bg-surface-variant',
+                status === 'pending' && !isRest && 'gp-border-outline',
               )}
             >
-              <span className="text-xs font-bold">{day.label}</span>
-              <span className="mt-1 text-[10px] text-muted-foreground line-clamp-2">
+              <span className="gp-mono text-xs font-bold gp-text-primary">{day.label}</span>
+              <span className="mt-1 line-clamp-2 text-[10px] gp-text-muted">
                 {dayLabel(day, routineNamesById)}
               </span>
             </button>

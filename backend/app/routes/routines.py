@@ -135,6 +135,24 @@ def unassign_routine(assignment_id):
     return {'message': 'Asignación eliminada'}, 200
 
 
+@routines_bp.route('/weekly-plans/active', methods=['GET'])
+@jwt_required()
+@role_required('trainer', 'admin')
+def list_active_weekly_plans():
+    role = get_current_role()
+    trainer_id = request.args.get('trainerId', type=int)
+    if role == 'trainer':
+        trainer_id = get_current_user_id()
+    session = SessionLocal()
+    try:
+        plans, error = RoutineService.list_active_weekly_plans(trainer_id=trainer_id, session=session)
+    finally:
+        session.close()
+    if error:
+        return {'error': error}, 500
+    return {'plans': plans}, 200
+
+
 @routines_bp.route('/weekly-plan', methods=['GET'])
 @jwt_required()
 def get_weekly_plan():

@@ -9,7 +9,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { markSessionComplete } from '@/lib/data/client';
+import { ExerciseAnimationPlayer } from '@/components/exercises/exercise-animation-player';
+import { getExerciseById, markSessionComplete } from '@/lib/data/client';
 import {
   getSuggestedWeightForSet,
   taskUsesWeightLogging,
@@ -19,7 +20,7 @@ import {
 } from '@/lib/data/routine-ui-adapter';
 import { buildExerciseReviewItemsFromSetLogs } from '@/lib/coach/exercise-review';
 import type { SessionReviewRequest } from '@/lib/coach/types';
-import type { SessionLog, SetLogEntry } from '@/lib/data/types';
+import type { Exercise, SessionLog, SetLogEntry } from '@/lib/data/types';
 import {
   countSetResults,
   deriveSessionOutcome,
@@ -95,8 +96,15 @@ export function ActiveWorkoutPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [techniqueOpen, setTechniqueOpen] = useState(false);
+  const [animationOpen, setAnimationOpen] = useState(true);
+  const [exerciseDetail, setExerciseDetail] = useState<Exercise | null>(null);
+  const [exerciseDetailLoading, setExerciseDetailLoading] = useState(false);
+  const exerciseCacheRef = useRef<Map<string, Exercise | null>>(new Map());
   const [showCelebration, setShowCelebration] = useState(false);
+  const [setValidationError, setSetValidationError] = useState<string | null>(null);
+  const [yieldMode, setYieldMode] = useState(false);
   const savedRef = useRef(false);
+  const repsEditedRef = useRef(false);
   const liveRef = useRef<HTMLDivElement>(null);
 
   const currentTask = uiRoutine.tasks[currentExerciseIndex];
@@ -154,6 +162,9 @@ export function ActiveWorkoutPanel({
 
   useEffect(() => {
     if (!sessionActive || !currentTask) return;
+    repsEditedRef.current = false;
+    setYieldMode(false);
+    setSetValidationError(null);
     setSetDraft({
       reps: currentTask.repsTarget,
       weightKg: defaultWeightForSet(currentTask, currentSet, sessionLogs),
@@ -201,9 +212,40 @@ export function ActiveWorkoutPanel({
     [uiRoutine.tasks],
   );
 
+  const validateFailedSet = useCallback((): string | null => {
+    if (!currentTask) return 'No hay ejercicio activo';
+    const repsRaw = setDraft.reps.trim();
+    if (!repsRaw) {
+      return 'Indica cuántas repeticiones lograste antes de rendirte';
+    }
+    const repsNum = Number.parseInt(repsRaw, 10);
+    if (!Number.isFinite(repsNum) || repsNum < 0) {
+      return 'Las repeticiones deben ser un número válido (0 o más)';
+    }
+    if (!repsEditedRef.current && repsRaw === currentTask.repsTarget) {
+      return 'Ajusta las repeticiones logradas: no puede ser solo el objetivo sin confirmar';
+    }
+    if (usesWeight) {
+      if (parsedWeight == null || Number.isNaN(parsedWeight) || parsedWeight <= 0) {
+        return 'Indica el peso (kg) que usaste en esta serie';
+      }
+    }
+    return null;
+  }, [currentTask, setDraft.reps, parsedWeight, usesWeight]);
+
   const recordSet = useCallback(
     (result: 'completed' | 'failed') => {
       if (!currentTask) return;
+      if (result === 'failed') {
+        const validationError = validateFailedSet();
+        if (validationError) {
+          setSetValidationError(validationError);
+          setYieldMode(true);
+          return;
+        }
+      }
+      setSetValidationError(null);
+      setYieldMode(false);
       const entry: SetLogEntry = {
         exerciseId: currentTask.id,
         exerciseName: currentTask.label,
@@ -232,8 +274,14 @@ export function ActiveWorkoutPanel({
       setLogs,
       advanceAfterSet,
       currentExerciseIndex,
+      validateFailedSet,
     ],
   );
+
+  const handleYieldClick = () => {
+    setYieldMode(true);
+    recordSet('failed');
+  };
 
   const saveSession = useCallback(async () => {
     if (savedRef.current) return;
@@ -306,6 +354,32 @@ export function ActiveWorkoutPanel({
     }
   }, [sessionDone, saveSession]);
 
+  useEffect(() => {
+    if (!currentTask) {
+      setExerciseDetail(null);
+      return;
+    }
+    const cached = exerciseCacheRef.current.get(currentTask.id);
+    if (cached !== undefined) {
+      setExerciseDetail(cached);
+      return;
+    }
+    let cancelled = false;
+    setExerciseDetailLoading(true);
+    void getExerciseById(currentTask.id)
+      .then((detail) => {
+        if (cancelled) return;
+        exerciseCacheRef.current.set(currentTask.id, detail);
+        setExerciseDetail(detail);
+      })
+      .finally(() => {
+        if (!cancelled) setExerciseDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTask]);
+
   const startSession = () => {
     const restored = restoreDraft();
     if (!restored) {
@@ -329,7 +403,7 @@ export function ActiveWorkoutPanel({
 
   if (!sessionActive && !sessionDone) {
     return (
-      <div className="rounded-xl border border-border bg-card/50 p-4">
+      <div className="rounded-xl border gp-border-outline gp-bg-surface-variant p-4">
         <p className="text-sm text-muted-foreground">
           {uiRoutine.name} · {totalSets} series planificadas
         </p>
@@ -347,7 +421,7 @@ export function ActiveWorkoutPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold uppercase text-cyan-400">Sesión en curso</p>
+        <p className="text-xs font-bold uppercase gp-text-phosphor">Sesión en curso</p>
         <span className="text-xs text-muted-foreground">
           {completedSets}/{totalSets} series ({progressPct}%)
         </span>
@@ -382,38 +456,98 @@ export function ActiveWorkoutPanel({
             )}
           </p>
 
+          <Collapsible open={animationOpen} onOpenChange={setAnimationOpen} className="mt-4">
+            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border gp-border-outline px-3 py-2 text-sm font-medium">
+              Animación del ejercicio
+              <ChevronDown
+                className={cn('size-4 transition-transform', animationOpen && 'rotate-180')}
+                aria-hidden
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              {exerciseDetailLoading ? (
+                <div className="flex h-32 items-center justify-center rounded-lg border border-dashed gp-border-outline">
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden />
+                </div>
+              ) : (
+                <ExerciseAnimationPlayer
+                  name={currentTask.label}
+                  animationUrl={exerciseDetail?.animationUrl}
+                  animationType={exerciseDetail?.animationType}
+                />
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+
           {restSecondsLeft > 0 && (
-            <p className="mt-2 flex items-center gap-2 text-sm text-amber-400">
-              <Clock className="size-4" aria-hidden />
-              Descanso: {restSecondsLeft}s
-            </p>
+            <div
+              className="mt-3 rounded-lg border border-amber-400/30 bg-amber-400/5 p-3"
+              aria-live="polite"
+            >
+              <p className="flex items-center gap-2 text-sm font-medium text-amber-400">
+                <Clock className="size-4 shrink-0" aria-hidden />
+                Descanso: {restSecondsLeft}s
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-400/40 text-amber-300 hover:bg-amber-400/10"
+                  onClick={() => setRestSecondsLeft((s) => s + 15)}
+                >
+                  +15s
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-400/40 text-amber-300 hover:bg-amber-400/10"
+                  onClick={() => setRestSecondsLeft(0)}
+                >
+                  Saltar descanso
+                </Button>
+              </div>
+            </div>
           )}
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
               <label htmlFor="workout-reps" className="text-xs font-medium text-muted-foreground">
-                Reps logueadas
+                {yieldMode ? 'Reps logradas' : 'Reps logueadas'}
               </label>
               <Input
                 id="workout-reps"
                 type="text"
                 inputMode="numeric"
                 value={setDraft.reps}
-                onChange={(e) => setSetDraft((d) => ({ ...d, reps: e.target.value }))}
+                onChange={(e) => {
+                  repsEditedRef.current = true;
+                  setSetValidationError(null);
+                  setSetDraft((d) => ({ ...d, reps: e.target.value }));
+                }}
                 className="mt-1"
               />
+              {yieldMode && (
+                <p className="mt-1 text-xs text-amber-400">
+                  Indica lo que alcanzaste antes de rendirte
+                </p>
+              )}
             </div>
             {usesWeight && (
               <div>
                 <label htmlFor="workout-weight" className="text-xs font-medium text-muted-foreground">
-                  Peso (kg)
+                  {yieldMode ? 'Peso usado (kg)' : 'Peso (kg)'}
                 </label>
                 <Input
                   id="workout-weight"
                   type="text"
                   inputMode="decimal"
                   value={setDraft.weightKg}
-                  onChange={(e) => setSetDraft((d) => ({ ...d, weightKg: e.target.value }))}
+                  onChange={(e) => {
+                    setSetValidationError(null);
+                    setSetDraft((d) => ({ ...d, weightKg: e.target.value }));
+                  }}
                   className="mt-1"
                 />
                 {suggestedWeight != null && parsedWeight != null && !Number.isNaN(parsedWeight) && (
@@ -429,7 +563,7 @@ export function ActiveWorkoutPanel({
           </div>
 
           <Collapsible open={techniqueOpen} onOpenChange={setTechniqueOpen} className="mt-4">
-            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2 text-sm font-medium">
+            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border gp-border-outline px-3 py-2 text-sm font-medium">
               Técnica del entrenador
               <ChevronDown
                 className={cn('size-4 transition-transform', techniqueOpen && 'rotate-180')}
@@ -440,6 +574,12 @@ export function ActiveWorkoutPanel({
               {currentTask.technique}
             </CollapsibleContent>
           </Collapsible>
+
+          {setValidationError && (
+            <p className="mt-3 text-sm text-destructive" role="alert">
+              {setValidationError}
+            </p>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
@@ -455,7 +595,7 @@ export function ActiveWorkoutPanel({
               type="button"
               variant="outline"
               disabled={restSecondsLeft > 0}
-              onClick={() => recordSet('failed')}
+              onClick={handleYieldClick}
             >
               Me rindo
             </Button>

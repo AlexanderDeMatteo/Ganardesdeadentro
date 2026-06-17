@@ -3,10 +3,10 @@ import logging
 from datetime import datetime, timezone
 
 from app.database import SessionLocal
-from app.models import Routine, UserRoutineAssignment, WorkoutSession
+from app.models import Routine, WorkoutSession
 from app.schemas.request_schemas import CompleteSessionSchema, parse_schema
 from app.schemas.serializers import serialize_session
-from app.utils.authorization import can_read_routine
+from app.utils.authorization import _athlete_has_routine_access
 
 logger = logging.getLogger(__name__)
 GENERIC_ERROR = 'No se pudo completar la operación'
@@ -18,14 +18,7 @@ class SessionService:
         routine = session.query(Routine).filter_by(id=routine_id).first()
         if not routine:
             return 'Rutina no encontrada'
-        if not can_read_routine(routine_id, session=session):
-            return 'Rutina no asignada al atleta'
-        assignment = (
-            session.query(UserRoutineAssignment)
-            .filter_by(user_id=athlete_id, routine_id=routine_id, is_active=True)
-            .first()
-        )
-        if assignment is None:
+        if not _athlete_has_routine_access(session, athlete_id, routine_id):
             return 'Rutina no asignada al atleta'
         return None
 

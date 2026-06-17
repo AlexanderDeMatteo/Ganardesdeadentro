@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { AthletesList } from '@/components/trainer/athletes-list';
 import { AthleteDetailModal } from '@/components/admin/athlete-detail-modal';
+import { PrimeAthletePerformanceModal } from '@/components/admin-v2/prime-athlete-performance-modal';
 import { useTrainer } from '@/hooks/use-trainer';
 import type { AthleteProfile } from '@/hooks/use-admin';
 
 export default function TrainerAthletesPage() {
   const { myAthletes, getActiveAssignmentForAthlete, getRoutineName } = useTrainer();
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteProfile | null>(null);
+  const [performanceAthlete, setPerformanceAthlete] = useState<AthleteProfile | null>(null);
 
   const getRoutineLabel = (athleteId: string) => {
     const assignment = getActiveAssignmentForAthlete(athleteId);
@@ -28,12 +30,18 @@ export default function TrainerAthletesPage() {
           athletes={myAthletes}
           getRoutineLabel={getRoutineLabel}
           onViewDetails={(a) => setSelectedAthlete(a)}
+          onViewPerformance={(a) => setPerformanceAthlete(a)}
         />
       </div>
       <AthleteDetailModal
         athlete={selectedAthlete}
         onClose={() => setSelectedAthlete(null)}
         nutritionBasePath="/trainer/athletes"
+      />
+      <PrimeAthletePerformanceModal
+        athlete={performanceAthlete}
+        getRoutineName={getRoutineName}
+        onClose={() => setPerformanceAthlete(null)}
       />
     </div>
   );

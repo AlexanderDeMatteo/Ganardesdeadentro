@@ -1,4 +1,8 @@
 import type { Membership } from '@/app/context/auth-context';
+import type {
+  CreateExercisePayload,
+  UpdateExercisePayload,
+} from '@/lib/api/contracts/exercises';
 import { isDevDataSnapshotEnabled } from '@/lib/api/config';
 import { getDataState, setDataState } from '@/lib/data/store';
 import { SEED_EXERCISES } from '@/lib/data/seeds';
@@ -268,6 +272,22 @@ export async function getRoutineById(routineId: string): Promise<Routine | null>
 }
 
 /**
+ * GET /api/routines/weekly-plans/active?trainerId=
+ */
+export async function listActiveWeeklyPlansForTrainer(trainerId: string): Promise<WeeklyPlan[]> {
+  await delay();
+  const plans = getDataState().weeklyPlans.filter(
+    (p) => p.trainerId === trainerId && p.isActive,
+  );
+  const seen = new Set<string>();
+  return plans.filter((plan) => {
+    if (seen.has(plan.athleteId)) return false;
+    seen.add(plan.athleteId);
+    return true;
+  });
+}
+
+/**
  * GET /api/weekly-plan?athleteId=
  */
 export async function getWeeklyPlan(athleteId: string): Promise<WeeklyPlan | null> {
@@ -447,6 +467,81 @@ export async function getAdminOverview(): Promise<{
     assignmentCount: activeAssignments.length,
     athletesWithoutTrainer,
     trainersWithoutAthletes,
+  };
+}
+
+const DAY_LABELS_ES = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const;
+
+function priorityFromLevel(level: string): 'ALTA' | 'MEDIA' | 'BAJA' {
+  if (level === 'pro') return 'ALTA';
+  if (level === 'premium') return 'MEDIA';
+  return 'BAJA';
+}
+
+function buildWeeklyBars(): Array<{ day: string; count: number }> {
+  const today = new Date();
+  return Array.from({ length: 7 }, (_, index) => {
+    const offset = 6 - index;
+    const day = new Date(today);
+    day.setDate(today.getDate() - offset);
+    const weekday = (day.getDay() + 6) % 7;
+    return { day: DAY_LABELS_ES[weekday], count: Math.max(0, 2 + (index % 3)) };
+  });
+}
+
+/**
+ * GET /api/admin/dashboard/metrics
+ */
+export async function getAdminDashboardMetrics(): Promise<import('@/lib/api/contracts/admin').AdminDashboardMetricsResponse> {
+  await delay();
+  const state = getDataState();
+  const activeTrainers = state.trainers.filter((t) => t.isActive !== false);
+  const totalSlots = activeTrainers.reduce((sum, t) => sum + (t.maxAthletes ?? 10), 0);
+  const currentLoad = state.athletes.filter((a) => a.trainerId).length;
+  const loadPercent = totalSlots > 0 ? Math.round((currentLoad / totalSlots) * 100) : 0;
+  const unassigned = state.athletes
+    .filter((a) => !a.trainerId)
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      joinDate: a.joinDate ?? new Date().toISOString(),
+      priority: priorityFromLevel(a.membershipLevel),
+    }));
+
+  const weeklyBars = buildWeeklyBars();
+  const trend7d = weeklyBars.map((bar) => ({ day: bar.day, load: bar.count }));
+
+  return {
+    memberships: {
+      activeCount: state.athletes.filter((a) => a.membershipLevel !== 'basic').length,
+      estimatedMrr: state.athletes.length * 29.9,
+      mrrTrendPercent: 8,
+    },
+    capacity: {
+      totalSlots,
+      currentLoad,
+      loadPercent,
+      trend7d,
+    },
+    retention: {
+      atRisk: state.athletes.slice(0, 3).map((a, index) => ({
+        athleteId: a.id,
+        name: a.name,
+        email: a.email,
+        reason: index % 2 === 0 ? 'expiring' : 'inactive',
+        daysRemaining: index % 2 === 0 ? 3 : undefined,
+        inactiveDays: index % 2 === 1 ? 9 : undefined,
+      })),
+    },
+    telemetry: {
+      workoutsCompletedThisWeek: weeklyBars.reduce((sum, bar) => sum + bar.count, 0),
+      metricsLoggedToday: Math.min(state.athletes.length, 4),
+      weeklyBars,
+    },
+    operations: {
+      unassigned,
+    },
   };
 }
 
@@ -648,6 +743,7 @@ const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
     id: '1',
     name: 'Básica',
+    functionalTier: 'basic',
     price: 9.99,
     description: 'Acceso a rutinas básicas y seguimiento de peso',
     features: ['Rutinas prehechas', 'Seguimiento de peso', 'Comunidad'],
@@ -658,6 +754,7 @@ const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
     id: '2',
     name: 'Premium',
+    functionalTier: 'premium',
     price: 29.99,
     description: 'Rutinas personalizadas con seguimiento completo de métricas',
     features: [
@@ -673,6 +770,7 @@ const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
     id: '3',
     name: 'Pro',
+    functionalTier: 'pro',
     price: 59.99,
     description: 'Acceso total con sesiones privadas y plan nutricional',
     features: [
@@ -688,6 +786,21 @@ const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   },
 ];
 
+function normalizeStoredMembershipPlan(plan: MembershipPlan): MembershipPlan {
+  if (plan.functionalTier) {
+    return plan;
+  }
+  const inferred: Record<string, MembershipPlan['functionalTier']> = {
+    Básica: 'basic',
+    Premium: 'premium',
+    Pro: 'pro',
+  };
+  return {
+    ...plan,
+    functionalTier: inferred[plan.name] ?? 'basic',
+  };
+}
+
 function loadMembershipPlansFromStorage(): MembershipPlan[] {
   if (typeof window === 'undefined') return DEFAULT_MEMBERSHIP_PLANS;
   const stored = localStorage.getItem(MEMBERSHIP_PLANS_KEY);
@@ -696,7 +809,8 @@ function loadMembershipPlansFromStorage(): MembershipPlan[] {
     return DEFAULT_MEMBERSHIP_PLANS;
   }
   try {
-    return JSON.parse(stored) as MembershipPlan[];
+    const parsed = JSON.parse(stored) as MembershipPlan[];
+    return parsed.map(normalizeStoredMembershipPlan);
   } catch {
     return DEFAULT_MEMBERSHIP_PLANS;
   }
@@ -774,12 +888,6 @@ export async function assignUserMembership(userId: string, planId: string): Prom
   const plan = plans.find((p) => p.id === planId);
   if (!plan) return;
 
-  const levelMap: Record<MembershipPlan['name'], Athlete['membershipLevel']> = {
-    Básica: 'basic',
-    Premium: 'premium',
-    Pro: 'pro',
-  };
-
   setDataState((prev) => ({
     ...prev,
     athletes: prev.athletes.map((a) =>
@@ -787,7 +895,7 @@ export async function assignUserMembership(userId: string, planId: string): Prom
         ? {
             ...a,
             membershipId: planId,
-            membershipLevel: levelMap[plan.name] ?? a.membershipLevel,
+            membershipLevel: plan.functionalTier ?? a.membershipLevel,
           }
         : a,
     ),
@@ -838,24 +946,205 @@ export async function saveCoachNutritionDraft(
   return draft;
 }
 
-export async function listExercises(_opts?: {
+export type ExercisesPagination = {
+  page: number;
+  perPage: number;
+  total: number;
+  pages: number;
+};
+
+export type ExercisesListResult = {
+  exercises: Exercise[];
+  pagination: ExercisesPagination;
+};
+
+export type ExerciseSource = 'all' | 'catalog' | 'custom';
+
+export async function listExercisesPaginated(opts?: {
   muscle?: string;
   page?: number;
   perPage?: number;
-}): Promise<Exercise[]> {
+  customOnly?: boolean;
+  source?: ExerciseSource;
+  q?: string;
+}): Promise<ExercisesListResult> {
   await delay();
-  return [...SEED_EXERCISES];
+  const state = getDataState();
+  let items = [...state.exercises];
+  if (opts?.customOnly || opts?.source === 'custom') {
+    items = items.filter((ex) => ex.isCustom);
+  } else if (opts?.source === 'catalog') {
+    items = items.filter((ex) => !ex.isCustom);
+  }
+  if (opts?.muscle) {
+    items = items.filter((ex) => ex.targetMuscle === opts.muscle);
+  }
+  if (opts?.q) {
+    const q = opts.q.toLowerCase();
+    items = items.filter((ex) => ex.name.toLowerCase().includes(q));
+  }
+  const page = opts?.page ?? 1;
+  const perPage = opts?.perPage ?? 20;
+  const total = items.length;
+  const start = (page - 1) * perPage;
+  return {
+    exercises: items.slice(start, start + perPage),
+    pagination: {
+      page,
+      perPage,
+      total,
+      pages: Math.ceil(total / perPage) || 0,
+    },
+  };
+}
+
+export async function listExercises(opts?: {
+  muscle?: string;
+  page?: number;
+  perPage?: number;
+  customOnly?: boolean;
+  source?: ExerciseSource;
+  q?: string;
+}): Promise<Exercise[]> {
+  const result = await listExercisesPaginated(opts);
+  return result.exercises;
+}
+
+export async function listExercisesByMuscle(muscle: string, _limit = 50): Promise<Exercise[]> {
+  await delay();
+  const state = getDataState();
+  return state.exercises.filter((ex) => ex.targetMuscle === muscle);
+}
+
+export async function syncExerciseCatalog(): Promise<{
+  syncedMuscles: number;
+  totalCached: number;
+  added: number;
+}> {
+  await delay();
+  return { syncedMuscles: 6, totalCached: SEED_EXERCISES.length, added: 0 };
 }
 
 export async function searchExercises(query: string): Promise<Exercise[]> {
   await delay();
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  return SEED_EXERCISES.filter(
+  const state = getDataState();
+  return state.exercises.filter(
     (ex) =>
       ex.name.toLowerCase().includes(q) ||
       ex.targetMuscle.toLowerCase().includes(q),
   );
+}
+
+export async function getExerciseById(exerciseId: string): Promise<Exercise | null> {
+  await delay();
+  const state = getDataState();
+  return state.exercises.find((ex) => ex.id === exerciseId) ?? null;
+}
+
+export async function createExercise(payload: CreateExercisePayload): Promise<Exercise> {
+  await delay();
+  const id = `custom-${crypto.randomUUID()}`;
+  const created: Exercise = {
+    id,
+    name: payload.name,
+    targetMuscle: payload.targetMuscle,
+    equipment: payload.equipment ?? 'Ninguno',
+    difficulty: payload.difficulty ?? 'beginner',
+    description: payload.description,
+    isCustom: true,
+    animationType: undefined,
+    animationSource: 'none',
+  };
+  setDataState((prev) => ({ ...prev, exercises: [...prev.exercises, created] }));
+  return created;
+}
+
+export async function updateExercise(
+  exerciseId: string,
+  payload: UpdateExercisePayload,
+): Promise<Exercise> {
+  await delay();
+  const state = getDataState();
+  const index = state.exercises.findIndex((ex) => ex.id === exerciseId);
+  if (index < 0) throw new Error('Ejercicio no encontrado');
+  const updated: Exercise = {
+    ...state.exercises[index],
+    ...payload,
+  };
+  setDataState((prev) => {
+    const exercises = [...prev.exercises];
+    exercises[index] = updated;
+    return { ...prev, exercises };
+  });
+  return updated;
+}
+
+export async function deleteExercise(exerciseId: string): Promise<void> {
+  await delay();
+  setDataState((prev) => ({
+    ...prev,
+    exercises: prev.exercises.filter((ex) => ex.id !== exerciseId),
+  }));
+}
+
+export async function matchExerciseAnimation(exerciseId: string): Promise<Exercise> {
+  await delay();
+  const state = getDataState();
+  const index = state.exercises.findIndex((ex) => ex.id === exerciseId);
+  if (index < 0) throw new Error('Ejercicio no encontrado');
+  const current = state.exercises[index];
+  const updated: Exercise = {
+    ...current,
+    animationUrl: 'https://example.com/demo.gif',
+    animationType: 'gif',
+    animationSource: 'exercisedb',
+  };
+  setDataState((prev) => {
+    const exercises = [...prev.exercises];
+    exercises[index] = updated;
+    return { ...prev, exercises };
+  });
+  return updated;
+}
+
+export async function uploadExerciseMedia(exerciseId: string, file: File): Promise<Exercise> {
+  await delay();
+  const state = getDataState();
+  const index = state.exercises.findIndex((ex) => ex.id === exerciseId);
+  if (index < 0) throw new Error('Ejercicio no encontrado');
+  const objectUrl = URL.createObjectURL(file);
+  const animationType = file.type.startsWith('video/') ? 'video' : 'gif';
+  const updated: Exercise = {
+    ...state.exercises[index],
+    animationUrl: objectUrl,
+    animationType,
+    animationSource: 'upload',
+  };
+  setDataState((prev) => {
+    const exercises = [...prev.exercises];
+    exercises[index] = updated;
+    return { ...prev, exercises };
+  });
+  return updated;
+}
+
+export type ExerciseMusclesSource = 'api' | 'catalog';
+
+export async function listExerciseMuscles(
+  options?: { source?: ExerciseMusclesSource },
+): Promise<string[]> {
+  await delay();
+  if (options?.source === 'catalog') {
+    const muscles = new Set(
+      getDataState().exercises
+        .filter((ex: Exercise) => !ex.isCustom)
+        .map((ex: Exercise) => ex.targetMuscle.toLowerCase()),
+    );
+    return [...muscles].sort();
+  }
+  return ['chest', 'back', 'legs', 'shoulders', 'arms', 'abs'];
 }
 
 export async function getDiary(athleteId: string, _date?: string): Promise<AthleteDiaryState> {

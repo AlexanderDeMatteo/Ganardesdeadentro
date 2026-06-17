@@ -8,6 +8,8 @@ import {
   saveCoachNutritionDraft,
 } from '@/lib/data/client';
 import { createDefaultCoachDraft } from '@/lib/nutrition/assigned-storage';
+import { normalizeActivityLevel } from '@/lib/nutrition/activity-level';
+import { createEmptyWeekPlan } from '@/lib/nutrition/meal-plan';
 import { computeMetabolism, GOAL_ADJUSTMENTS } from '@/lib/nutrition/metabolism';
 import { useAthleteForCoach } from '@/hooks/use-athlete-for-coach';
 import { findAthleteById } from '@/lib/nutrition/resolve-athlete-id';
@@ -64,7 +66,10 @@ export function useCoachNutrition(
         getMealPlan(athleteId),
       ]);
       if (!cancelled) {
-        setDraft(loadedDraft);
+        setDraft({
+          ...loadedDraft,
+          activityLevel: normalizeActivityLevel(loadedDraft.activityLevel),
+        });
         setAssigned(loadedPlan);
         setIsLoading(false);
       }
@@ -128,6 +133,14 @@ export function useCoachNutrition(
     [updateDraft],
   );
 
+  const saveMacroTargets = useCallback(
+    async (targets: MacroTargets | null) => {
+      const next = { ...draft, macroTargets: targets };
+      await persistDraft(next);
+    },
+    [draft, persistDraft],
+  );
+
   const setSlotTimes = useCallback(
     (slotTimes: MealSlotTimes) => {
       updateDraft((prev) => ({ ...prev, slotTimes }));
@@ -184,17 +197,15 @@ export function useCoachNutrition(
         toast.error('No tienes permiso para publicar el plan de este atleta.');
         return false;
       }
-      const activePlan =
-        draft.mealPlans.find((p) => p.id === draft.activeMealPlanId) ?? draft.mealPlans[0] ?? null;
-      if (!activePlan) {
-        toast.error('Crea o selecciona un plan de alimentación antes de publicar.');
-        return false;
-      }
       const macroTargets = options?.macroTargets ?? draft.macroTargets;
       if (!macroTargets) {
         toast.error('Define y aplica los macros objetivo antes de publicar.');
         return false;
       }
+
+      const draftMealPlan =
+        draft.mealPlans.find((p) => p.id === draft.activeMealPlanId) ?? draft.mealPlans[0] ?? null;
+      const mealPlan = draftMealPlan ?? assigned?.mealPlan ?? createEmptyWeekPlan('Plan base');
 
       const publishedBy =
         user?.role === 'trainer' ? trainerScopeId : (user?.id ?? 'admin');
@@ -202,9 +213,9 @@ export function useCoachNutrition(
       const plan: AssignedNutritionPlan = {
         athleteId,
         macroTargets,
-        mealPlan: activePlan,
+        mealPlan,
         slotTimes: draft.slotTimes,
-        activityLevel: draft.activityLevel,
+        activityLevel: normalizeActivityLevel(draft.activityLevel),
         goal: draft.goal,
         calorieAdjustment: draft.calorieAdjustment,
         publishedAt: new Date().toISOString(),
@@ -221,7 +232,7 @@ export function useCoachNutrition(
         return false;
       }
     },
-    [athleteId, canEdit, draft, user, trainerScopeId],
+    [athleteId, assigned, canEdit, draft, user, trainerScopeId],
   );
 
   const state = useMemo(
@@ -252,6 +263,7 @@ export function useCoachNutrition(
     canAddMealPlan,
     saveSettings,
     setMacroTargets,
+    saveMacroTargets,
     setSlotTimes,
     upsertMealPlan,
     deleteMealPlan,

@@ -1,8 +1,9 @@
 'use client';
 
+import { LayoutDashboard } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { LucideIcon } from 'lucide-react';
 import { Navbar } from '@/components/layout/navbar';
 import { cn } from '@/lib/utils';
 import { isNavItemActive, type RoleNavItem } from '@/lib/auth/role-routes';
@@ -49,6 +50,8 @@ export function RolePanelShell({
 }: RolePanelShellProps) {
   const pathname = usePathname() ?? '';
   const mobileNavItems = navItems.slice(0, 4);
+  const isAdminPanel = pathname.startsWith('/admin');
+  const isTrainerPanel = pathname.startsWith('/trainer') && !pathname.startsWith('/trainer-v2');
 
   return (
     <>
@@ -68,6 +71,28 @@ export function RolePanelShell({
             );
           })}
         </nav>
+        {isAdminPanel && (
+          <div className="border-t border-primary/20 px-4 py-4">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:bg-sidebar-accent/10 hover:text-primary"
+            >
+              <LayoutDashboard className="h-5 w-5 shrink-0" aria-hidden />
+              Vista atleta
+            </Link>
+          </div>
+        )}
+        {isTrainerPanel && (
+          <div className="border-t border-primary/20 px-4 py-4">
+            <Link
+              href="/trainer-v2"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-xs font-extrabold uppercase tracking-[0.12em] text-primary transition-colors hover:bg-sidebar-accent/10"
+            >
+              <LayoutDashboard className="h-5 w-5 shrink-0" aria-hidden />
+              Probar Gainer Prime
+            </Link>
+          </div>
+        )}
       </aside>
 
       <div className="min-h-screen lg:ml-64">

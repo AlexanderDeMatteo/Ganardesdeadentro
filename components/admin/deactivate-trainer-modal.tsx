@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Athlete, Trainer } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { ScrollableModal } from '@/components/ui/scrollable-modal';
+import { PrimeScrollableModal } from '@/components/admin-v2/prime-scrollable-modal';
+import { cn } from '@/lib/utils';
 
 type AthleteAction = {
   athleteId: string;
@@ -23,6 +25,7 @@ interface DeactivateTrainerModalProps {
     }>,
   ) => Promise<void>;
   onClose: () => void;
+  prime?: boolean;
 }
 
 export function DeactivateTrainerModal({
@@ -31,6 +34,7 @@ export function DeactivateTrainerModal({
   otherTrainers,
   onConfirm,
   onClose,
+  prime = false,
 }: DeactivateTrainerModalProps) {
   const assignedAthletes = useMemo(
     () => (trainer ? athletes.filter((a) => a.trainerId === trainer.id) : []),
@@ -105,126 +109,183 @@ export function DeactivateTrainerModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-secondary/20 bg-card shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-secondary/20 px-8 py-6">
-          <h2 className="text-2xl font-bold">Eliminar entrenador</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="h-8 w-8 p-0 border-secondary/30"
+  const athleteCards = assignedAthletes.length > 0 && (
+    <div
+      className={cn(
+        'space-y-3',
+        prime && 'max-h-[min(40dvh,16rem)] overflow-y-auto pr-1',
+      )}
+    >
+      {assignedAthletes.map((athlete) => {
+        const actionState = actions.find((a) => a.athleteId === athlete.id);
+        return (
+          <div
+            key={athlete.id}
+            className={cn(
+              'space-y-3 rounded-xl border p-4',
+              prime ? 'gp-border-outline gp-bg-surface-high' : 'border-secondary/20',
+            )}
           >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="px-8 py-8 space-y-6">
-          <p className="text-muted-foreground">
-            Vas a desactivar a <span className="font-semibold text-foreground">{trainer.name}</span>.
-            {assignedAthletes.length > 0
-              ? ' Indica qué hacer con sus atletas antes de confirmar.'
-              : ' Este entrenador no tiene atletas asignados.'}
-          </p>
-
-          {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
-
-          {assignedAthletes.length > 0 && (
-            <div className="space-y-4">
-              {assignedAthletes.map((athlete) => {
-                const actionState = actions.find((a) => a.athleteId === athlete.id);
-                return (
-                  <div
-                    key={athlete.id}
-                    className="rounded-xl border border-secondary/20 p-4 space-y-3"
-                  >
-                    <div>
-                      <p className="font-medium">{athlete.name}</p>
-                      <p className="text-sm text-muted-foreground">{athlete.email}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={actionState?.action === 'reassign' ? 'default' : 'outline'}
-                        onClick={() =>
-                          setActions((prev) =>
-                            prev.map((a) =>
-                              a.athleteId === athlete.id
-                                ? { ...a, action: 'reassign', newTrainerId: a.newTrainerId }
-                                : a,
-                            ),
-                          )
-                        }
-                      >
-                        Reasignar
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={actionState?.action === 'unassign' ? 'default' : 'outline'}
-                        onClick={() =>
-                          setActions((prev) =>
-                            prev.map((a) =>
-                              a.athleteId === athlete.id
-                                ? { ...a, action: 'unassign', newTrainerId: undefined }
-                                : a,
-                            ),
-                          )
-                        }
-                      >
-                        Dejar sin entrenador
-                      </Button>
-                    </div>
-                    {actionState?.action === 'reassign' && (
-                      <select
-                        className="w-full rounded-lg border border-secondary/30 bg-background px-3 py-2 text-sm"
-                        value={actionState.newTrainerId ?? ''}
-                        onChange={(e) =>
-                          setActions((prev) =>
-                            prev.map((a) =>
-                              a.athleteId === athlete.id
-                                ? { ...a, newTrainerId: e.target.value }
-                                : a,
-                            ),
-                          )
-                        }
-                      >
-                        <option value="">Selecciona entrenador</option>
-                        {otherTrainers.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} ({t.specialization})
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                );
-              })}
+            <div>
+              <p className={cn('font-medium', prime && 'gp-text-primary')}>{athlete.name}</p>
+              <p className={cn('text-sm', prime ? 'gp-mono gp-text-muted' : 'text-muted-foreground')}>
+                {athlete.email}
+              </p>
             </div>
-          )}
-
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isSubmitting || !allResolved}
-              onClick={handleConfirm}
-            >
-              {isSubmitting ? 'Procesando...' : 'Confirmar baja'}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={actionState?.action === 'reassign' ? 'default' : 'outline'}
+                onClick={() =>
+                  setActions((prev) =>
+                    prev.map((a) =>
+                      a.athleteId === athlete.id
+                        ? { ...a, action: 'reassign', newTrainerId: a.newTrainerId }
+                        : a,
+                    ),
+                  )
+                }
+                className={
+                  prime && actionState?.action === 'reassign'
+                    ? 'gp-mono bg-[var(--gp-phosphor)] text-[#003906]'
+                    : prime
+                      ? 'gp-mono gp-border-outline gp-text-muted'
+                      : undefined
+                }
+              >
+                Reasignar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={actionState?.action === 'unassign' ? 'default' : 'outline'}
+                onClick={() =>
+                  setActions((prev) =>
+                    prev.map((a) =>
+                      a.athleteId === athlete.id
+                        ? { ...a, action: 'unassign', newTrainerId: undefined }
+                        : a,
+                    ),
+                  )
+                }
+                className={
+                  prime && actionState?.action === 'unassign'
+                    ? 'gp-mono bg-[var(--gp-phosphor)] text-[#003906]'
+                    : prime
+                      ? 'gp-mono gp-border-outline gp-text-muted'
+                      : undefined
+                }
+              >
+                Dejar sin entrenador
+              </Button>
+            </div>
+            {actionState?.action === 'reassign' && (
+              <select
+                className={cn(
+                  'w-full rounded-lg border px-3 py-2 text-sm',
+                  prime
+                    ? 'gp-mono gp-border-outline gp-bg-surface-high gp-text-primary'
+                    : 'border-secondary/30 bg-background',
+                )}
+                value={actionState.newTrainerId ?? ''}
+                onChange={(e) =>
+                  setActions((prev) =>
+                    prev.map((a) =>
+                      a.athleteId === athlete.id
+                        ? { ...a, newTrainerId: e.target.value }
+                        : a,
+                    ),
+                  )
+                }
+              >
+                <option value="">Selecciona entrenador</option>
+                {otherTrainers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.specialization})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
-        </div>
-      </div>
+        );
+      })}
     </div>
+  );
+
+  const body = (
+    <div className={prime ? 'space-y-4' : 'space-y-6'}>
+      <p className={prime ? 'gp-mono gp-text-muted' : 'text-muted-foreground'}>
+        Vas a desactivar a{' '}
+        <span className={cn('font-semibold', prime ? 'gp-text-phosphor' : 'text-foreground')}>
+          {trainer.name}
+        </span>
+        .
+        {assignedAthletes.length > 0
+          ? ' Indica qué hacer con sus atletas antes de confirmar.'
+          : ' Este entrenador no tiene atletas asignados.'}
+      </p>
+
+      {error && (
+        <p className={cn('text-sm', prime ? 'text-[#ffb4ab]' : 'text-destructive')} role="alert">
+          {error}
+        </p>
+      )}
+
+      {athleteCards}
+    </div>
+  );
+
+  const footer = (
+    <div className="flex justify-end gap-3">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onClose}
+        disabled={isSubmitting}
+        className={
+          prime
+            ? 'gp-mono gp-border-outline gp-bg-surface-high gp-text-muted hover:gp-text-phosphor'
+            : undefined
+        }
+      >
+        Cancelar
+      </Button>
+      <Button
+        type="button"
+        variant="destructive"
+        disabled={isSubmitting || !allResolved}
+        onClick={handleConfirm}
+        className={prime ? 'gp-mono' : undefined}
+      >
+        {isSubmitting ? 'Procesando...' : 'Confirmar baja'}
+      </Button>
+    </div>
+  );
+
+  if (prime) {
+    return (
+      <PrimeScrollableModal
+        title="Eliminar entrenador"
+        modId="22"
+        onClose={onClose}
+        footer={footer}
+        size="wide"
+        fitContent
+      >
+        {body}
+      </PrimeScrollableModal>
+    );
+  }
+
+  return (
+    <ScrollableModal
+      title="Eliminar entrenador"
+      onClose={onClose}
+      footer={footer}
+      size="xl"
+    >
+      {body}
+    </ScrollableModal>
   );
 }

@@ -111,6 +111,7 @@ class Membership(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(120), unique=True, nullable=False, index=True)
+    functional_tier = Column(String(20), nullable=False, default='basic', server_default='basic')
     description = Column(Text)
     price = Column(Float)
     features = Column(Text)
@@ -165,6 +166,12 @@ class Exercise(Base):
     description = Column(Text)
     difficulty = Column(SQLEnum(DifficultyEnum), default=DifficultyEnum.BEGINNER)
     is_cached = Column(Boolean, default=True)
+    is_custom = Column(Boolean, default=False, nullable=False, server_default='0')
+    is_active = Column(Boolean, default=True, nullable=False, server_default='1')
+    created_by_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+    animation_type = Column(String(20), default='none', nullable=False, server_default='none')
+    animation_source = Column(String(20), default='none', nullable=False, server_default='none')
+    animation_url = Column(String(512))
     synced_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
@@ -175,10 +182,12 @@ class Exercise(Base):
     )
 
     routine_exercises = relationship('RoutineExercise', back_populates='exercise', cascade='all, delete-orphan')
+    created_by = relationship('User', foreign_keys=[created_by_id])
 
     __table_args__ = (
         Index('idx_exercise_muscle', 'target_muscle'),
         Index('idx_exercise_equipment', 'equipment'),
+        Index('idx_exercise_custom_active', 'is_custom', 'is_active', 'name'),
     )
 
 

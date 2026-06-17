@@ -4,8 +4,8 @@ export const ACTIVITY_FACTORS: Record<ActivityLevel, { factor: number; label: st
   sedentary: { factor: 1.2, label: 'Sedentario' },
   light: { factor: 1.375, label: 'Ligero' },
   moderate: { factor: 1.55, label: 'Moderado' },
-  intense: { factor: 1.725, label: 'Intenso' },
-  very_intense: { factor: 1.9, label: 'Muy intenso' },
+  active: { factor: 1.725, label: 'Intenso' },
+  very_active: { factor: 1.9, label: 'Muy intenso' },
 };
 
 export const GOAL_ADJUSTMENTS: Record<NutritionGoal, { defaultAdjustment: number; label: string }> = {

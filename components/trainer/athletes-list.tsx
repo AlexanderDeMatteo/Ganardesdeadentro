@@ -3,7 +3,7 @@
 import { AthleteProfile } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Eye, Search, UtensilsCrossed } from 'lucide-react';
+import { Dumbbell, Eye, Search, UtensilsCrossed } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -11,9 +11,15 @@ interface AthletesListProps {
   athletes: AthleteProfile[];
   getRoutineLabel: (athleteId: string) => string;
   onViewDetails: (athlete: AthleteProfile) => void;
+  onViewPerformance: (athlete: AthleteProfile) => void;
 }
 
-export function AthletesList({ athletes, getRoutineLabel, onViewDetails }: AthletesListProps) {
+export function AthletesList({
+  athletes,
+  getRoutineLabel,
+  onViewDetails,
+  onViewPerformance,
+}: AthletesListProps) {
   const [search, setSearch] = useState('');
 
   const filtered = athletes.filter(
@@ -90,6 +96,15 @@ export function AthletesList({ athletes, getRoutineLabel, onViewDetails }: Athle
                       >
                         <UtensilsCrossed className="h-4 w-4" />
                       </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onViewPerformance(athlete)}
+                      className="h-8 w-8 border-primary/30 p-0 hover:bg-primary/10"
+                      aria-label={`Ver entrenamientos de ${athlete.name}`}
+                    >
+                      <Dumbbell className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"

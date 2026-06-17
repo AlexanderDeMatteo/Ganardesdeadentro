@@ -8,9 +8,14 @@ import {
   updateMembershipPlan,
 } from '@/lib/data/client';
 
+import type { MembershipLevel } from '@/lib/data/types';
+
+export type MembershipFunctionalTier = MembershipLevel;
+
 export interface MembershipPlan {
   id: string;
-  name: 'Básica' | 'Premium' | 'Pro';
+  name: string;
+  functionalTier: MembershipFunctionalTier;
   price: number;
   description: string;
   features: string[];

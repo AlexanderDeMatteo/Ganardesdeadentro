@@ -91,9 +91,15 @@ class WeeklyPlanSchema(BaseModel):
 
 
 class SetLogSchema(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+
     exerciseId: str
+    exerciseName: str = ''
     setNumber: int = Field(ge=1)
+    repsTarget: str = ''
+    repsLogged: str | None = None
     weightKg: float | None = Field(default=None, ge=0)
+    suggestedWeightKg: float | None = Field(default=None, ge=0)
     result: str = 'completed'
 
     @field_validator('result')
@@ -240,12 +246,75 @@ class AcceptInviteSchema(BaseModel):
     password: str = Field(min_length=8, max_length=128)
 
 
+class CreateCustomExerciseSchema(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    target_muscle: str = Field(min_length=2, max_length=120)
+    equipment: str = Field(default='body weight', max_length=120)
+    difficulty: str = Field(default='beginner')
+    description: str | None = Field(default=None, max_length=2000)
+
+    @field_validator('name', 'target_muscle', 'equipment')
+    @classmethod
+    def strip_required(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError('Campo requerido')
+        return cleaned
+
+    @field_validator('difficulty')
+    @classmethod
+    def validate_difficulty(cls, value: str) -> str:
+        normalized = value.lower().strip()
+        if normalized not in {'beginner', 'intermediate', 'expert'}:
+            raise ValueError('difficulty debe ser beginner, intermediate o expert')
+        return normalized
+
+
+class UpdateCustomExerciseSchema(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    target_muscle: str | None = Field(default=None, min_length=2, max_length=120)
+    equipment: str | None = Field(default=None, max_length=120)
+    difficulty: str | None = None
+    description: str | None = Field(default=None, max_length=2000)
+
+    @field_validator('name', 'target_muscle', 'equipment')
+    @classmethod
+    def strip_optional(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError('No puede estar vacío')
+        return cleaned
+
+    @field_validator('difficulty')
+    @classmethod
+    def validate_difficulty(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.lower().strip()
+        if normalized not in {'beginner', 'intermediate', 'expert'}:
+            raise ValueError('difficulty debe ser beginner, intermediate o expert')
+        return normalized
+
+
 def parse_schema(schema_cls, data: dict):
     try:
         return schema_cls.model_validate(data), None
     except Exception as exc:
+        from pydantic import ValidationError
+
+        if isinstance(exc, ValidationError):
+            for error in exc.errors():
+                if error.get('type') == 'value_error':
+                    ctx = error.get('ctx') or {}
+                    if 'error' in ctx:
+                        return None, str(ctx['error'])
+                msg = error.get('msg', '')
+                if msg and 'pydantic.dev' not in msg and 'value_error' not in msg:
+                    return None, msg
+            return None, 'Datos inválidos'
         message = str(exc)
-        if 'validation error' in message.lower():
-            first_line = message.split('\n')[-1].strip()
-            return None, first_line or 'Datos inválidos'
+        if 'pydantic.dev' in message:
+            return None, 'Datos inválidos'
         return None, message or 'Datos inválidos'

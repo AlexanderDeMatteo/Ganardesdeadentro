@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X } from 'lucide-react';
+import { ScrollableModal } from '@/components/ui/scrollable-modal';
+import { PrimeScrollableModal } from '@/components/admin-v2/prime-scrollable-modal';
+import { cn } from '@/lib/utils';
 
 interface CreateTrainerModalProps {
   open: boolean;
@@ -14,9 +16,15 @@ interface CreateTrainerModalProps {
     lastName: string;
     specialization?: string;
   }) => Promise<void>;
+  prime?: boolean;
 }
 
-export function CreateTrainerModal({ open, onClose, onSubmit }: CreateTrainerModalProps) {
+export function CreateTrainerModal({
+  open,
+  onClose,
+  onSubmit,
+  prime = false,
+}: CreateTrainerModalProps) {
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -53,89 +61,126 @@ export function CreateTrainerModal({ open, onClose, onSubmit }: CreateTrainerMod
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-secondary/20 bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-secondary/20 px-8 py-6">
-          <h2 className="text-2xl font-bold">Invitar entrenador</h2>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="h-8 w-8 p-0 border-secondary/30"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+  const labelClass = prime
+    ? 'gp-mono mb-1.5 block text-xs uppercase gp-text-dim'
+    : 'text-sm font-medium mb-2 block';
+  const inputClass = prime
+    ? 'gp-mono h-9 gp-border-outline gp-bg-surface-high gp-text-primary'
+    : undefined;
 
-        <form onSubmit={handleSubmit} className="px-8 py-8 space-y-4">
-          {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
-          <div>
-            <label htmlFor="trainer-email" className="text-sm font-medium mb-2 block">
-              Email personal
-            </label>
-            <Input
-              id="trainer-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="entrenador@ejemplo.com"
-              required
-            />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="trainer-first-name" className="text-sm font-medium mb-2 block">
-                Nombre
-              </label>
-              <Input
-                id="trainer-first-name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="trainer-last-name" className="text-sm font-medium mb-2 block">
-                Apellido
-              </label>
-              <Input
-                id="trainer-last-name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="trainer-specialization" className="text-sm font-medium mb-2 block">
-              Especialización (opcional)
-            </label>
-            <Input
-              id="trainer-specialization"
-              value={specialization}
-              onChange={(e) => setSpecialization(e.target.value)}
-              placeholder="Fuerza, HIIT, Nutrición..."
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Se enviará un correo con un enlace para que el entrenador active su cuenta y defina su contraseña.
-          </p>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-gradient-to-r from-primary to-secondary">
-              {isSubmitting ? 'Enviando...' : 'Enviar invitación'}
-            </Button>
-          </div>
-        </form>
+  const formBody = (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <p className={cn('text-sm', prime ? 'text-[#ffb4ab]' : 'text-destructive')} role="alert">
+          {error}
+        </p>
+      )}
+      <div>
+        <label htmlFor="trainer-email" className={labelClass}>
+          Email personal
+        </label>
+        <Input
+          id="trainer-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="entrenador@ejemplo.com"
+          required
+          className={inputClass}
+        />
       </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="trainer-first-name" className={labelClass}>
+            Nombre
+          </label>
+          <Input
+            id="trainer-first-name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="trainer-last-name" className={labelClass}>
+            Apellido
+          </label>
+          <Input
+            id="trainer-last-name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            required
+            className={inputClass}
+          />
+        </div>
+      </div>
+      <div>
+        <label htmlFor="trainer-specialization" className={labelClass}>
+          Especialización (opcional)
+        </label>
+        <Input
+          id="trainer-specialization"
+          value={specialization}
+          onChange={(e) => setSpecialization(e.target.value)}
+          placeholder="Fuerza, HIIT, Nutrición..."
+          className={inputClass}
+        />
+      </div>
+      <p className={cn('text-sm', prime ? 'gp-mono gp-text-muted' : 'text-muted-foreground')}>
+        Se enviará un correo con un enlace para que el entrenador active su cuenta y defina su contraseña.
+      </p>
+    </form>
+  );
+
+  const footer = (
+    <div className="flex justify-end gap-3">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onClose}
+        disabled={isSubmitting}
+        className={
+          prime
+            ? 'gp-mono gp-border-outline gp-bg-surface-high gp-text-muted hover:gp-text-phosphor'
+            : undefined
+        }
+      >
+        Cancelar
+      </Button>
+      <Button
+        type="button"
+        onClick={(e) => void handleSubmit(e as unknown as React.FormEvent)}
+        disabled={isSubmitting}
+        className={
+          prime
+            ? 'gp-mono rounded-full bg-[var(--gp-phosphor)] font-bold text-[#003906] hover:bg-[var(--gp-phosphor-bright)]'
+            : 'bg-gradient-to-r from-primary to-secondary'
+        }
+      >
+        {isSubmitting ? 'Enviando...' : 'Enviar invitación'}
+      </Button>
     </div>
+  );
+
+  if (prime) {
+    return (
+      <PrimeScrollableModal
+        title="Invitar entrenador"
+        modId="21"
+        onClose={onClose}
+        footer={footer}
+        size="wide"
+        fitContent
+      >
+        {formBody}
+      </PrimeScrollableModal>
+    );
+  }
+
+  return (
+    <ScrollableModal title="Invitar entrenador" onClose={onClose} footer={footer} size="md">
+      {formBody}
+    </ScrollableModal>
   );
 }

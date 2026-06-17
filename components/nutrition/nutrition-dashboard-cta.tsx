@@ -11,13 +11,13 @@ export function NutritionDashboardCta() {
   return (
     <Link
       href="/nutrition"
-      className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-4 transition-colors hover:border-amber-400/40"
+      className="gp-module gp-module-corner block p-4 transition-colors hover:gp-phosphor-glow"
     >
-      <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-amber-400/15 text-amber-400">
+      <div className="mb-3 flex size-10 items-center justify-center rounded-lg gp-bg-surface-variant text-[var(--gp-error-core)]">
         <Apple className="size-5" aria-hidden />
       </div>
-      <h3 className="text-sm font-bold uppercase text-white">Nutrición</h3>
-      <p className="mt-1 text-xs text-[#9ca3af]">
+      <h3 className="gp-mono text-sm font-bold uppercase gp-text-primary">Nutrición</h3>
+      <p className="mt-1 text-xs gp-text-muted">
         {targetKcal
           ? `Objetivo: ${targetKcal.toLocaleString('es-ES')} kcal/día`
           : hasAssignedPlan

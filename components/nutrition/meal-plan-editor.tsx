@@ -55,7 +55,9 @@ export function MealPlanEditor() {
       toast.error('Con tu plan actual solo puedes tener 1 plan activo. Mejora a Pro para más.');
       return;
     }
-    upsertMealPlan({ ...template, id: `plan-${Date.now()}`, createdAt: new Date().toISOString() });
+    const planId = `plan-${Date.now()}`;
+    upsertMealPlan({ ...template, id: planId, createdAt: new Date().toISOString() });
+    setActiveMealPlan(planId);
     toast.success(`Plantilla "${template.name}" aplicada.`);
   };
 

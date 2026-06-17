@@ -1,0 +1,128 @@
+/* COMANDO LIFE HUD — scoped to /admin-v3 */
+.gainer-hud-root {
+  --hud-background: #0a0d0b;
+  --hud-panel: rgb(18 26 22 / 0.55);
+  --hud-border: rgb(104 202 98 / 0.25);
+  --hud-text: #dce5de;
+  --hud-muted: #8fa88a;
+  --hud-accent: #68ca62;
+  --hud-critical: #ffb4ab;
+  color: var(--hud-text);
+  min-height: 100vh;
+  font-family: var(--font-gainer-mono), ui-monospace, monospace;
+}
+
+.gainer-hud-root .hud-canvas-bg {
+  background-color: var(--hud-background);
+  background-image:
+    linear-gradient(rgb(104 202 98 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(104 202 98 / 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.gainer-hud-root .hud-watermark {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.12;
+}
+
+.gainer-hud-root .hud-panel {
+  background: var(--hud-panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+}
+
+.gainer-hud-root .hud-panel-header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hud-muted);
+  border-bottom: 1px solid rgb(104 202 98 / 0.15);
+  padding: 0.75rem 1rem;
+}
+
+.gainer-hud-root .hud-stat-value {
+  font-family: var(--font-gainer-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--hud-accent);
+  text-shadow: 0 0 12px rgb(104 202 98 / 0.35);
+}
+
+.gainer-hud-root .hud-dock {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  background: rgb(13 21 17 / 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--hud-border);
+  border-radius: 999px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.45);
+}
+
+.gainer-hud-root .hud-dock-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.85rem;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-muted);
+  border-radius: 999px;
+  transition: color 150ms, background 150ms;
+}
+
+.gainer-hud-root .hud-dock-link:hover {
+  color: var(--hud-accent);
+}
+
+.gainer-hud-root .hud-dock-link.is-active {
+  color: var(--hud-accent);
+  background: rgb(104 202 98 / 0.12);
+}
+
+.gainer-hud-root .hud-load-bar {
+  height: 6px;
+  border-radius: 2px;
+  background: rgb(37 88 49 / 0.6);
+  overflow: hidden;
+}
+
+.gainer-hud-root .hud-load-bar-fill {
+  height: 100%;
+  background: var(--hud-accent);
+  box-shadow: 0 0 8px rgb(104 202 98 / 0.5);
+}
+
+.gainer-hud-root .hud-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hud-accent);
+  box-shadow: 0 0 8px rgb(104 202 98 / 0.6);
+}
+
+.gainer-hud-root .hud-pulse-dot.is-warning {
+  background: #f2b84b;
+  box-shadow: 0 0 8px rgb(242 184 75 / 0.5);
+}
+
+.gainer-hud-root .hud-pulse-dot.is-offline {
+  background: var(--hud-muted);
+  box-shadow: none;
+}

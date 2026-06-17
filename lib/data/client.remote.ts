@@ -1,5 +1,12 @@
+import type { AdminDashboardMetricsResponse } from '@/lib/api/contracts/admin';
 import { ApiError } from '@/lib/api/errors';
+import { getApiBaseUrl } from '@/lib/api/config';
 import { httpRequest } from '@/lib/api/http-client';
+import type {
+  ApiExerciseResponse,
+  CreateExercisePayload,
+  UpdateExercisePayload,
+} from '@/lib/api/contracts/exercises';
 import type { Membership } from '@/app/context/auth-context';
 import type { MembershipPlan } from '@/hooks/use-memberships';
 import type {
@@ -24,6 +31,7 @@ import type {
   DiaryWaterPatchRequest,
 } from '@/lib/api/contracts/nutrition-diary';
 import type { AssignedNutritionPlan, AthleteDiaryState, CoachNutritionDraft } from '@/lib/nutrition/types';
+import { normalizeActivityLevel } from '@/lib/nutrition/activity-level';
 import { getMondayOfWeek } from '@/lib/workout/session-utils';
 
 type ApiMetricPayload = {
@@ -128,7 +136,7 @@ type ApiSessionPayload = {
   completedSets: number;
   failedSets: number;
   totalSets: number;
-  sessionOutcome: SessionLog['sessionOutcome'];
+  sessionOutcome: string;
 };
 
 type ApiWeeklyPlanPayload = {
@@ -190,6 +198,21 @@ function mapApiSetLog(raw: ApiSetLogPayload): SetLogEntry {
   };
 }
 
+function mapApiSessionOutcome(
+  outcome: string,
+): SessionLog['sessionOutcome'] {
+  if (outcome === 'partial' || outcome === 'skipped') return 'abandoned';
+  if (outcome === 'completed' || outcome === 'abandoned') {
+    return outcome;
+  }
+  return 'abandoned';
+}
+
+function toApiSessionOutcome(outcome: SessionLog['sessionOutcome']): string {
+  if (outcome === 'abandoned') return 'partial';
+  return outcome;
+}
+
 function mapApiSession(raw: ApiSessionPayload): SessionLog {
   return {
     id: raw.id,
@@ -204,7 +227,7 @@ function mapApiSession(raw: ApiSessionPayload): SessionLog {
     completedSets: raw.completedSets,
     failedSets: raw.failedSets,
     totalSets: raw.totalSets,
-    sessionOutcome: raw.sessionOutcome,
+    sessionOutcome: mapApiSessionOutcome(raw.sessionOutcome),
   };
 }
 
@@ -278,6 +301,7 @@ type ApiActiveMembershipPayload = {
 type ApiMembershipPlanPayload = {
   id: string;
   name: string;
+  functionalTier?: string;
   price: number;
   description: string;
   features: string[];
@@ -294,15 +318,7 @@ type AdminOverviewPayload = {
   trainersWithoutAthletes: number;
 };
 
-type ApiExercisePayload = {
-  id?: number | string;
-  exercise_db_id?: string;
-  name: string;
-  target_muscle?: string;
-  target?: string;
-  equipment?: string;
-  difficulty?: string | null;
-};
+type ApiExercisePayload = ApiExerciseResponse;
 
 function normalizeDifficulty(value: unknown): Difficulty {
   if (typeof value === 'string') {
@@ -314,14 +330,32 @@ function normalizeDifficulty(value: unknown): Difficulty {
   return 'beginner';
 }
 
+function resolveAnimationUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/api/')) return `${getApiBaseUrl()}${url}`;
+  return url;
+}
+
 function mapApiExercise(raw: ApiExercisePayload): Exercise {
   const externalId = raw.exercise_db_id ?? (raw.id != null ? String(raw.id) : '');
+  const animationUrl = resolveAnimationUrl(raw.animation_url ?? raw.gif_url);
+  let animationType = raw.animation_type ?? undefined;
+  if (!animationType && animationUrl) {
+    animationType = animationUrl.toLowerCase().includes('.mp4') ? 'video' : 'gif';
+  }
   return {
     id: externalId,
     name: raw.name,
     targetMuscle: raw.target_muscle ?? raw.target ?? 'General',
     difficulty: normalizeDifficulty(raw.difficulty),
     equipment: raw.equipment ?? 'Ninguno',
+    description: raw.description ?? undefined,
+    animationUrl,
+    animationType: animationType === 'none' ? undefined : animationType,
+    animationSource: raw.animation_source ?? undefined,
+    isCustom: raw.is_custom ?? false,
+    createdById: raw.created_by_id ?? undefined,
   };
 }
 
@@ -374,12 +408,19 @@ function mapApiTrainer(raw: ApiTrainerPayload): Trainer {
   };
 }
 
+function normalizeFunctionalTier(value: unknown): MembershipPlan['functionalTier'] {
+  if (value === 'premium' || value === 'pro' || value === 'basic') {
+    return value;
+  }
+  return 'basic';
+}
+
 function mapApiMembershipPlan(raw: ApiMembershipPlanPayload): MembershipPlan {
-  const name = raw.name as MembershipPlan['name'];
   const color = raw.color as MembershipPlan['color'];
   return {
     id: raw.id,
-    name,
+    name: raw.name,
+    functionalTier: normalizeFunctionalTier(raw.functionalTier),
     price: raw.price,
     description: raw.description,
     features: raw.features,
@@ -499,7 +540,11 @@ export async function markSessionComplete(
 ): Promise<SessionLog> {
   const response = await httpRequest<{ session: ApiSessionPayload }>('/api/sessions/complete', {
     method: 'POST',
-    body: { athleteId, ...payload },
+    body: {
+      athleteId,
+      ...payload,
+      sessionOutcome: toApiSessionOutcome(payload.sessionOutcome),
+    },
   });
   return mapApiSession(response.session);
 }
@@ -546,6 +591,13 @@ export async function getRoutineById(routineId: string): Promise<Routine | null>
     }
     throw err;
   }
+}
+
+export async function listActiveWeeklyPlansForTrainer(trainerId: string): Promise<WeeklyPlan[]> {
+  const response = await httpRequest<{ plans: ApiWeeklyPlanPayload[] }>(
+    `/api/routines/weekly-plans/active?trainerId=${encodeURIComponent(trainerId)}`,
+  );
+  return response.plans.map(mapApiWeeklyPlan);
 }
 
 export async function getWeeklyPlan(athleteId: string): Promise<WeeklyPlan | null> {
@@ -661,6 +713,10 @@ export async function getTrainerAthletes(trainerId: string): Promise<Athlete[]> 
 
 export async function getAdminOverview(): Promise<AdminOverviewPayload> {
   return httpRequest<AdminOverviewPayload>('/api/admin/overview');
+}
+
+export async function getAdminDashboardMetrics(): Promise<AdminDashboardMetricsResponse> {
+  return httpRequest<AdminDashboardMetricsResponse>('/api/admin/dashboard/metrics');
 }
 
 export async function listAdminAthletes(): Promise<Athlete[]> {
@@ -925,7 +981,10 @@ export async function getCoachNutritionDraft(athleteId: string): Promise<CoachNu
   const response = await httpRequest<{ draft: CoachNutritionDraft }>(
     `/api/nutrition/coach-draft?athleteId=${encodeURIComponent(athleteId)}`,
   );
-  return response.draft;
+  return {
+    ...response.draft,
+    activityLevel: normalizeActivityLevel(response.draft.activityLevel),
+  };
 }
 
 export async function saveCoachNutritionDraft(
@@ -942,19 +1001,85 @@ export async function saveCoachNutritionDraft(
   return response.draft;
 }
 
+export type ExercisesPagination = {
+  page: number;
+  perPage: number;
+  total: number;
+  pages: number;
+};
+
+export type ExercisesListResult = {
+  exercises: Exercise[];
+  pagination: ExercisesPagination;
+};
+
+export type ExerciseSource = 'all' | 'catalog' | 'custom';
+
+export async function listExercisesPaginated(opts?: {
+  muscle?: string;
+  page?: number;
+  perPage?: number;
+  customOnly?: boolean;
+  source?: ExerciseSource;
+  q?: string;
+}): Promise<ExercisesListResult> {
+  const params = new URLSearchParams();
+  if (opts?.muscle) params.set('muscle', opts.muscle);
+  if (opts?.customOnly) params.set('custom_only', 'true');
+  if (opts?.source) params.set('source', opts.source);
+  if (opts?.q) params.set('q', opts.q);
+  params.set('page', String(opts?.page ?? 1));
+  params.set('per_page', String(opts?.perPage ?? 20));
+  const response = await httpRequest<{
+    exercises: ApiExercisePayload[];
+    pagination: { page: number; per_page: number; total: number; pages: number };
+  }>(`/api/exercises/cached?${params.toString()}`);
+  return {
+    exercises: response.exercises.map(mapApiExercise),
+    pagination: {
+      page: response.pagination.page,
+      perPage: response.pagination.per_page,
+      total: response.pagination.total,
+      pages: response.pagination.pages,
+    },
+  };
+}
+
 export async function listExercises(opts?: {
   muscle?: string;
   page?: number;
   perPage?: number;
+  customOnly?: boolean;
+  source?: ExerciseSource;
+  q?: string;
 }): Promise<Exercise[]> {
-  const params = new URLSearchParams();
-  if (opts?.muscle) params.set('muscle', opts.muscle);
-  params.set('page', String(opts?.page ?? 1));
-  params.set('per_page', String(opts?.perPage ?? 100));
+  const result = await listExercisesPaginated(opts);
+  return result.exercises;
+}
+
+export async function listExercisesByMuscle(muscle: string, limit = 50): Promise<Exercise[]> {
   const response = await httpRequest<{ exercises: ApiExercisePayload[] }>(
-    `/api/exercises/cached?${params.toString()}`,
+    `/api/exercises/by-muscle/${encodeURIComponent(muscle)}?limit=${limit}`,
+    { auth: false },
   );
   return response.exercises.map(mapApiExercise);
+}
+
+export async function syncExerciseCatalog(): Promise<{
+  syncedMuscles: number;
+  totalCached: number;
+  added: number;
+}> {
+  const response = await httpRequest<{
+    synced_muscles: number;
+    total_cached: number;
+    added: number;
+  }>('/api/exercises/sync-catalog', { method: 'POST' });
+  return {
+    syncedMuscles: response.synced_muscles,
+    totalCached: response.total_cached,
+    added: response.added,
+  };
 }
 
 export async function searchExercises(query: string): Promise<Exercise[]> {
@@ -962,6 +1087,101 @@ export async function searchExercises(query: string): Promise<Exercise[]> {
     `/api/exercises/search?q=${encodeURIComponent(query)}&limit=50`,
   );
   return response.exercises.map(mapApiExercise);
+}
+
+export async function getExerciseById(exerciseId: string): Promise<Exercise | null> {
+  try {
+    const response = await httpRequest<{ exercise: ApiExercisePayload }>(
+      `/api/exercises/${encodeURIComponent(exerciseId)}`,
+      { auth: false },
+    );
+    return mapApiExercise(response.exercise);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function createExercise(payload: CreateExercisePayload): Promise<Exercise> {
+  const response = await httpRequest<{ exercise: ApiExercisePayload }>('/api/exercises', {
+    method: 'POST',
+    body: {
+      name: payload.name,
+      target_muscle: payload.targetMuscle,
+      equipment: payload.equipment,
+      difficulty: payload.difficulty,
+      description: payload.description,
+    },
+  });
+  return mapApiExercise(response.exercise);
+}
+
+export async function updateExercise(
+  exerciseId: string,
+  payload: UpdateExercisePayload,
+): Promise<Exercise> {
+  const response = await httpRequest<{ exercise: ApiExercisePayload }>(
+    `/api/exercises/${encodeURIComponent(exerciseId)}`,
+    {
+      method: 'PATCH',
+      body: {
+        ...(payload.name !== undefined ? { name: payload.name } : {}),
+        ...(payload.targetMuscle !== undefined ? { target_muscle: payload.targetMuscle } : {}),
+        ...(payload.equipment !== undefined ? { equipment: payload.equipment } : {}),
+        ...(payload.difficulty !== undefined ? { difficulty: payload.difficulty } : {}),
+        ...(payload.description !== undefined ? { description: payload.description } : {}),
+      },
+    },
+  );
+  return mapApiExercise(response.exercise);
+}
+
+export async function deleteExercise(exerciseId: string): Promise<void> {
+  await httpRequest(`/api/exercises/${encodeURIComponent(exerciseId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function matchExerciseAnimation(exerciseId: string): Promise<Exercise> {
+  const response = await httpRequest<{ exercise: ApiExercisePayload }>(
+    `/api/exercises/${encodeURIComponent(exerciseId)}/match-animation`,
+    { method: 'POST' },
+  );
+  return mapApiExercise(response.exercise);
+}
+
+export async function uploadExerciseMedia(exerciseId: string, file: File): Promise<Exercise> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await httpRequest<{ exercise: ApiExercisePayload }>(
+    `/api/exercises/${encodeURIComponent(exerciseId)}/media`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+  );
+  return mapApiExercise(response.exercise);
+}
+
+export type ExerciseMusclesSource = 'api' | 'catalog';
+
+export async function listExerciseMuscles(
+  options?: { source?: ExerciseMusclesSource },
+): Promise<string[]> {
+  const params = new URLSearchParams();
+  if (options?.source) {
+    params.set('source', options.source);
+  }
+  const query = params.toString();
+  const response = await httpRequest<{ muscles: string[] }>(
+    `/api/exercises/muscles${query ? `?${query}` : ''}`,
+    {
+      auth: false,
+    },
+  );
+  return response.muscles;
 }
 
 export async function getDiary(athleteId: string, date?: string): Promise<AthleteDiaryState> {

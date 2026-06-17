@@ -41,9 +41,12 @@ export function useTrainer() {
     isHydrated,
     isLoading,
     getActiveAssignmentForAthlete,
+    getActiveWeeklyPlanForAthlete,
+    athleteHasRoutine,
     getRoutineName,
     setState,
     refresh,
+    exercisesError,
   } = useTrainerData();
 
   const createRoutine = useCallback(
@@ -97,8 +100,13 @@ export function useTrainer() {
 
   const unassignRoutine = useCallback(
     async (assignmentId: string) => {
-      await clientUnassignRoutine(assignmentId);
-      await refresh();
+      try {
+        await clientUnassignRoutine(assignmentId);
+        await refresh();
+        toast.success('Asignación directa eliminada');
+      } catch {
+        toast.error('No se pudo desasignar la rutina');
+      }
     },
     [refresh],
   );
@@ -167,6 +175,8 @@ export function useTrainer() {
     isHydrated,
     isLoading,
     getActiveAssignmentForAthlete,
+    getActiveWeeklyPlanForAthlete,
+    athleteHasRoutine,
     getRoutineName,
     createRoutine,
     deleteRoutine,
@@ -176,5 +186,6 @@ export function useTrainer() {
     toggleAssignmentCompleted,
     updateProfile,
     refreshAthletes,
+    exercisesError,
   };
 }

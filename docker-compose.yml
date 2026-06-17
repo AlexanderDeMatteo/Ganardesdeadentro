@@ -13,7 +13,15 @@ services:
       dockerfile: Dockerfile.frontend
     ports:
       - "3000:3000"
+    volumes:
+      # Dev: sincroniza código local (admin-v2, componentes, estilos) sin rebuild completo
+      - .:/app
+      - fittrack_frontend_node_modules:/app/node_modules
+      - fittrack_frontend_next:/app/.next
     environment:
+      # HMR en Windows + bind mount (OneDrive/Docker)
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
       # Piloto híbrido: auth + métricas + rutinas + users/nutrition/memberships vía API
       # Con AUTH_SOURCE=api, athleteId === user.id del JWT (no usar IDs del seed demo)
       NEXT_PUBLIC_API_BASE_URL: http://localhost:5000
@@ -48,11 +56,22 @@ services:
       FLASK_PORT: 5000
       DATABASE_URL: sqlite:////data/fitness_platform.db
       CORS_ORIGINS: http://localhost:3000
+      EXERCISEDB_API_URL: https://oss.exercisedb.dev
+      # Docker Desktop en Windows puede fallar verificación SSL hacia APIs externas
+      EXERCISEDB_SSL_VERIFY: "false"
     ports:
       - "5000:5000"
     volumes:
+      # Dev: sincroniza código de la app sin pisar entrypoint/deps de la imagen
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+      - ./backend/scripts:/app/scripts
       - fittrack_backend_data:/data
 
 volumes:
   fittrack_backend_data:
     name: fittrack_backend_data
+  fittrack_frontend_node_modules:
+    name: fittrack_frontend_node_modules
+  fittrack_frontend_next:
+    name: fittrack_frontend_next

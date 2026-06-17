@@ -93,12 +93,15 @@ def seed_cached_exercise(
         session.close()
 
 
-def auth_headers(user):
+def auth_headers(user, *, json_content: bool = True):
     token = create_access_token(
         identity=str(user.id),
         additional_claims={'email': user.email, 'role': user.role.value if hasattr(user.role, 'value') else user.role},
     )
-    return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    headers = {'Authorization': f'Bearer {token}'}
+    if json_content:
+        headers['Content-Type'] = 'application/json'
+    return headers
 
 
 @pytest.fixture

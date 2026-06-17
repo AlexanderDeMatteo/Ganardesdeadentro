@@ -3,9 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Exercise } from '@/hooks/use-admin';
+import { PrimeScrollableModal } from '@/components/admin-v2/prime-scrollable-modal';
+import { ExerciseAnimationPlayer } from '@/components/exercises/exercise-animation-player';
+import { ExerciseFormModal } from '@/components/exercises/exercise-form-modal';
+import { cn } from '@/lib/utils';
+import { searchExercises } from '@/lib/data/client';
 import type { Routine, RoutineExercise } from '@/lib/data/types';
 import { X, Plus, Trash2 } from 'lucide-react';
+
+import type { Exercise } from '@/lib/data/types';
 
 interface RoutineBuilderProps {
   exercises: Exercise[];
@@ -19,6 +25,8 @@ interface RoutineBuilderProps {
     exercises: RoutineExercise[];
   }) => void;
   onClose: () => void;
+  onExercisesChanged?: () => void | Promise<void>;
+  prime?: boolean;
 }
 
 function buildWeightArray(count: number, base: number, step: number): number[] {
@@ -34,6 +42,8 @@ export function RoutineBuilder({
   initialRoutine,
   onSave,
   onClose,
+  onExercisesChanged,
+  prime = false,
 }: RoutineBuilderProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -48,6 +58,35 @@ export function RoutineBuilder({
   const [baseWeight, setBaseWeight] = useState('20');
   const [weightStep, setWeightStep] = useState('2.5');
   const [setWeights, setSetWeights] = useState<string[]>(['20', '22.5', '25']);
+  const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
+  const [exerciseQuery, setExerciseQuery] = useState('');
+  const [searchedExercises, setSearchedExercises] = useState<Exercise[]>([]);
+
+  const pickerExercises = useMemo(() => {
+    const byId = new Map<string, Exercise>();
+    for (const ex of exercises) byId.set(ex.id, ex);
+    for (const ex of searchedExercises) byId.set(ex.id, ex);
+    return Array.from(byId.values());
+  }, [exercises, searchedExercises]);
+
+  useEffect(() => {
+    const q = exerciseQuery.trim();
+    if (q.length < 2) {
+      setSearchedExercises([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void searchExercises(q)
+        .then(setSearchedExercises)
+        .catch(() => setSearchedExercises([]));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [exerciseQuery]);
+
+  const selectedExercise = useMemo(
+    () => pickerExercises.find((exercise) => exercise.id === selectedExerciseId) ?? null,
+    [pickerExercises, selectedExerciseId],
+  );
 
   useEffect(() => {
     if (!initialRoutine) return;
@@ -80,7 +119,7 @@ export function RoutineBuilder({
 
   const handleAddExercise = () => {
     if (!selectedExerciseId) return;
-    const exercise = exercises.find((e) => e.id === selectedExerciseId);
+    const exercise = pickerExercises.find((e) => e.id === selectedExerciseId);
     if (!exercise) return;
 
     const suggestedWeightsKg = setWeights
@@ -126,234 +165,433 @@ export function RoutineBuilder({
     [setWeights],
   );
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-4xl rounded-2xl border border-secondary/20 bg-card shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-secondary/20 sticky top-0 bg-card px-8 py-6">
-          <h2 className="text-2xl font-bold">
-            {mode === 'edit' ? 'Editar Rutina' : 'Crear Nueva Rutina'}
-          </h2>
-          <Button variant="outline" size="sm" onClick={onClose} className="h-8 w-8 p-0 border-secondary/30">
-            <X className="h-4 w-4" />
-          </Button>
+  const labelClass = prime
+    ? 'gp-mono mb-1.5 block text-xs uppercase gp-text-dim'
+    : 'block text-sm font-medium mb-2';
+  const sectionTitle = prime
+    ? 'gp-label gp-section-title gp-text-phosphor'
+    : 'text-lg font-semibold mb-4';
+  const inputClass = prime
+    ? 'gp-field gp-mono h-9 rounded-lg px-3 text-sm'
+    : 'h-10 bg-background border-secondary/30';
+  const inputClassLg = prime
+    ? 'gp-field gp-mono h-9 rounded-lg px-3 text-sm'
+    : 'h-11 bg-background border-secondary/30';
+  const selectClass = prime
+    ? 'gp-field gp-mono h-9 w-full rounded-lg px-3 text-sm'
+    : 'w-full rounded-lg bg-background border border-secondary/30 px-4 py-2 text-sm';
+  const textareaClass = prime
+    ? 'gp-field gp-mono w-full rounded-lg px-3 py-2 text-sm resize-y min-h-[4.5rem]'
+    : 'w-full rounded-lg bg-background border border-secondary/30 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+  const panelClass = prime
+    ? 'gp-form-panel space-y-4 p-4 sm:p-5'
+    : 'space-y-4 rounded-xl border border-secondary/20 bg-secondary/5 p-6';
+  const itemClass = prime
+    ? 'flex items-start justify-between gap-3 rounded-lg border gp-border-outline gp-bg-surface-high p-3'
+    : 'flex items-start justify-between rounded-lg bg-secondary/5 p-4 border border-secondary/20';
+
+  const progressionPanelClass = cn(
+    'space-y-3 rounded-lg p-4',
+    prime ? 'gp-form-subpanel' : 'border border-border bg-background/50',
+  );
+  const weightInputClass = prime ? inputClass : 'h-9';
+
+  const basicInfoSection = (
+    <div>
+      <h3 className={sectionTitle}>Información Básica</h3>
+      <div className="space-y-4">
+        <div>
+          <label className={labelClass}>Nombre de la Rutina</label>
+          <Input
+            placeholder="ej: Upper Body A"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={inputClassLg}
+          />
         </div>
-
-        <div className="px-8 py-8 space-y-8">
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Información Básica</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Nombre de la Rutina</label>
-                <Input
-                  placeholder="ej: Upper Body A"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="h-11 bg-background border-secondary/30"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Descripción</label>
-                <textarea
-                  placeholder="Describe los objetivos de esta rutina..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-lg bg-background border border-secondary/30 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Dificultad</label>
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}
-                    className="w-full rounded-lg bg-background border border-secondary/30 px-4 py-2 text-sm"
-                  >
-                    <option value="beginner">Principiante</option>
-                    <option value="intermediate">Intermedio</option>
-                    <option value="expert">Experto</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Duración (minutos)</label>
-                  <Input
-                    type="number"
-                    min={15}
-                    max={180}
-                    value={duration}
-                    onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-                    className="h-11 bg-background border-secondary/30"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Agregar Ejercicios</h3>
-            <div className="space-y-4 rounded-xl border border-secondary/20 bg-secondary/5 p-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-2">Ejercicio</label>
-                  <select
-                    value={selectedExerciseId}
-                    onChange={(e) => setSelectedExerciseId(e.target.value)}
-                    className="w-full rounded-lg bg-background border border-secondary/30 px-4 py-2 text-sm"
-                  >
-                    <option value="">Selecciona un ejercicio</option>
-                    {exercises.map((ex) => (
-                      <option key={ex.id} value={ex.id}>
-                        {ex.name} ({ex.targetMuscle})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Series</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={sets}
-                    onChange={(e) => handleSetsChange(parseInt(e.target.value, 10))}
-                    className="h-10 bg-background border-secondary/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Repeticiones</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={reps}
-                    onChange={(e) => setReps(parseInt(e.target.value, 10))}
-                    className="h-10 bg-background border-secondary/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Descanso (seg)</label>
-                  <Input
-                    type="number"
-                    min={30}
-                    max={300}
-                    step={30}
-                    value={rest}
-                    onChange={(e) => setRest(parseInt(e.target.value, 10))}
-                    className="h-10 bg-background border-secondary/30"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Técnica (opcional)</label>
-                  <Input
-                    placeholder="Puntos clave de ejecución"
-                    value={technique}
-                    onChange={(e) => setTechnique(e.target.value)}
-                    className="h-10 bg-background border-secondary/30"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-background/50 p-4 space-y-3">
-                <div className="flex flex-wrap items-end gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Peso base (kg)</label>
-                    <Input
-                      value={baseWeight}
-                      onChange={(e) => setBaseWeight(e.target.value)}
-                      className="h-9 w-24"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1">Progresión (+kg/serie)</label>
-                    <Input
-                      value={weightStep}
-                      onChange={(e) => setWeightStep(e.target.value)}
-                      className="h-9 w-24"
-                    />
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={applyProgression}>
-                    Aplicar progresión
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">Peso sugerido por serie</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {setWeights.map((w, i) => (
-                    <div key={i}>
-                      <label className="text-xs text-muted-foreground">Serie {i + 1}</label>
-                      <Input
-                        value={w}
-                        onChange={(e) => {
-                          const next = [...setWeights];
-                          next[i] = e.target.value;
-                          setSetWeights(next);
-                        }}
-                        className="h-9 mt-1"
-                        inputMode="decimal"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-cyan-600 dark:text-cyan-400">{weightPreview}</p>
-              </div>
-
-              <Button
-                onClick={handleAddExercise}
-                disabled={!selectedExerciseId}
-                className="w-full bg-gradient-to-r from-primary to-secondary"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Ejercicio
-              </Button>
-            </div>
-          </div>
-
-          {selectedExercises.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Ejercicios Seleccionados</h3>
-              <div className="space-y-2">
-                {selectedExercises.map((ex, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-start justify-between rounded-lg bg-secondary/5 p-4 border border-secondary/20"
-                  >
-                    <div>
-                      <p className="font-medium">{ex.exerciseName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {ex.sets} x {ex.reps} · {ex.rest}s descanso
-                      </p>
-                      {ex.suggestedWeightsKg?.length ? (
-                        <p className="text-xs text-cyan-600 dark:text-cyan-400 mt-1">
-                          Pesos: {ex.suggestedWeightsKg.map((w, i) => `S${i + 1} ${w}kg`).join(' · ')}
-                        </p>
-                      ) : null}
-                      {ex.technique ? (
-                        <p className="text-xs text-muted-foreground mt-1">{ex.technique}</p>
-                      ) : null}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveExercise(idx)}
-                      className="h-8 w-8 p-0 border-destructive/30 text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        <div>
+          <label className={labelClass}>Descripción</label>
+          <textarea
+            placeholder="Describe los objetivos de esta rutina..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className={textareaClass}
+            rows={prime ? 2 : 3}
+          />
         </div>
-
-        <div className="border-t border-secondary/20 sticky bottom-0 bg-card px-8 py-4 flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} className="bg-gradient-to-r from-primary to-secondary">
-            Crear Rutina
-          </Button>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Dificultad</label>
+            <select
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value as typeof difficulty)}
+              className={selectClass}
+            >
+              <option value="beginner">Principiante</option>
+              <option value="intermediate">Intermedio</option>
+              <option value="expert">Experto</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>Duración (minutos)</label>
+            <Input
+              type="number"
+              min={15}
+              max={180}
+              value={duration}
+              onChange={(e) => setDuration(parseInt(e.target.value, 10))}
+              className={inputClassLg}
+            />
+          </div>
         </div>
       </div>
     </div>
+  );
+
+  const addExerciseSection = (
+    <div>
+      <h3 className={sectionTitle}>Agregar Ejercicios</h3>
+      <div className={panelClass}>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className={labelClass}>Ejercicio</label>
+            <Input
+              placeholder="Buscar en catálogo (mín. 2 caracteres)..."
+              value={exerciseQuery}
+              onChange={(e) => setExerciseQuery(e.target.value)}
+              className={cn(inputClass, 'mb-2')}
+            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <select
+                value={selectedExerciseId}
+                onChange={(e) => setSelectedExerciseId(e.target.value)}
+                className={cn(selectClass, 'flex-1')}
+              >
+                <option value="">Selecciona un ejercicio</option>
+                {pickerExercises.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name} ({ex.targetMuscle})
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                variant="outline"
+                className={prime ? 'gp-mono shrink-0' : 'shrink-0'}
+                onClick={() => setIsExerciseFormOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Crear ejercicio
+              </Button>
+            </div>
+            {selectedExercise ? (
+              <div className="mt-3">
+                <ExerciseAnimationPlayer
+                  name={selectedExercise.name}
+                  animationUrl={selectedExercise.animationUrl}
+                  animationType={selectedExercise.animationType}
+                  compact
+                />
+              </div>
+            ) : null}
+          </div>
+          <div>
+            <label className={labelClass}>Series</label>
+            <Input
+              type="number"
+              min={1}
+              max={10}
+              value={sets}
+              onChange={(e) => handleSetsChange(parseInt(e.target.value, 10))}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Repeticiones</label>
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              value={reps}
+              onChange={(e) => setReps(parseInt(e.target.value, 10))}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Descanso (seg)</label>
+            <Input
+              type="number"
+              min={30}
+              max={300}
+              step={30}
+              value={rest}
+              onChange={(e) => setRest(parseInt(e.target.value, 10))}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Técnica (opcional)</label>
+            <Input
+              placeholder="Puntos clave de ejecución"
+              value={technique}
+              onChange={(e) => setTechnique(e.target.value)}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className={progressionPanelClass}>
+          <p className={cn('text-xs', prime ? 'gp-label gp-text-phosphor' : 'font-medium')}>
+            Progresión de peso
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <div>
+              <label className={labelClass}>Peso base (kg)</label>
+              <Input
+                value={baseWeight}
+                onChange={(e) => setBaseWeight(e.target.value)}
+                className={weightInputClass}
+                inputMode="decimal"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Progresión (+kg/serie)</label>
+              <Input
+                value={weightStep}
+                onChange={(e) => setWeightStep(e.target.value)}
+                className={weightInputClass}
+                inputMode="decimal"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={applyProgression}
+              className={prime ? 'gp-btn-ghost gp-mono h-9 px-3 text-xs uppercase' : undefined}
+            >
+              Aplicar progresión
+            </Button>
+          </div>
+          <p className={cn('text-xs', prime ? 'gp-mono gp-text-dim' : 'text-muted-foreground')}>
+            Peso sugerido por serie
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {setWeights.map((w, i) => (
+              <div key={i}>
+                <label className={cn('text-xs', prime ? 'gp-mono gp-text-dim' : 'text-muted-foreground')}>
+                  Serie {i + 1}
+                </label>
+                <Input
+                  value={w}
+                  onChange={(e) => {
+                    const next = [...setWeights];
+                    next[i] = e.target.value;
+                    setSetWeights(next);
+                  }}
+                  className={cn(weightInputClass, 'mt-1')}
+                  inputMode="decimal"
+                />
+              </div>
+            ))}
+          </div>
+          <p className={cn('text-xs', prime ? 'gp-mono gp-text-phosphor' : 'text-cyan-600 dark:text-cyan-400')}>
+            {weightPreview}
+          </p>
+        </div>
+
+        <Button
+          onClick={handleAddExercise}
+          disabled={!selectedExerciseId}
+          className={
+            prime
+              ? 'gp-btn-phosphor gp-mono h-10 w-full text-xs uppercase'
+              : 'w-full bg-gradient-to-r from-primary to-secondary'
+          }
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Agregar Ejercicio
+        </Button>
+      </div>
+    </div>
+  );
+
+  const selectedExercisesSection = prime ? (
+    <div>
+      <h3 className={sectionTitle}>
+        Ejercicios seleccionados
+        <span className="gp-mono ml-2 text-xs gp-text-dim">({selectedExercises.length})</span>
+      </h3>
+      {selectedExercises.length > 0 ? (
+        <div className="gp-scroll-thin max-h-[min(24dvh,12rem)] space-y-2 overflow-y-auto pr-1">
+          {selectedExercises.map((ex, idx) => (
+            <div key={idx} className={itemClass}>
+              <div className="min-w-0">
+                <p className="gp-mono truncate gp-text-primary">{ex.exerciseName}</p>
+                <p className="gp-mono text-sm gp-text-muted">
+                  {ex.sets} x {ex.reps} · {ex.rest}s descanso
+                </p>
+                {ex.suggestedWeightsKg?.length ? (
+                  <p className="gp-mono mt-1 text-xs gp-text-phosphor">
+                    Pesos: {ex.suggestedWeightsKg.map((w, i) => `S${i + 1} ${w}kg`).join(' · ')}
+                  </p>
+                ) : null}
+                {ex.technique ? (
+                  <p className="gp-mono mt-1 text-xs gp-text-dim">{ex.technique}</p>
+                ) : null}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRemoveExercise(idx)}
+                className="gp-btn-ghost h-8 w-8 shrink-0 p-0 text-[#ffb4ab] hover:border-[#ffb4ab]/50"
+                aria-label={`Quitar ${ex.exerciseName}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="gp-empty-slot">Agrega al menos un ejercicio para crear la rutina.</p>
+      )}
+    </div>
+  ) : selectedExercises.length > 0 ? (
+    <div>
+      <h3 className={sectionTitle}>Ejercicios Seleccionados ({selectedExercises.length})</h3>
+      <div className="space-y-2">
+        {selectedExercises.map((ex, idx) => (
+          <div key={idx} className={itemClass}>
+            <div>
+              <p className="font-medium">{ex.exerciseName}</p>
+              <p className="text-sm text-muted-foreground">
+                {ex.sets} x {ex.reps} · {ex.rest}s descanso
+              </p>
+              {ex.suggestedWeightsKg?.length ? (
+                <p className="text-xs mt-1 text-cyan-600 dark:text-cyan-400">
+                  Pesos: {ex.suggestedWeightsKg.map((w, i) => `S${i + 1} ${w}kg`).join(' · ')}
+                </p>
+              ) : null}
+              {ex.technique ? (
+                <p className="text-xs mt-1 text-muted-foreground">{ex.technique}</p>
+              ) : null}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleRemoveExercise(idx)}
+              className="h-8 w-8 p-0 border-destructive/30 text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const body = prime ? (
+    <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+      <div className="gp-form-panel p-4 sm:p-5">{basicInfoSection}</div>
+      <div className="space-y-5">
+        {addExerciseSection}
+        {selectedExercisesSection}
+      </div>
+    </div>
+  ) : (
+    <div className="space-y-6">
+      {basicInfoSection}
+      {addExerciseSection}
+      {selectedExercisesSection}
+    </div>
+  );
+
+  const footer = prime ? (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="gp-mono text-xs gp-text-dim">
+        {selectedExercises.length > 0
+          ? `${selectedExercises.length} ejercicio${selectedExercises.length === 1 ? '' : 's'} · ${duration} min`
+          : 'Nombre + al menos 1 ejercicio requeridos'}
+      </p>
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="outline" onClick={onClose} className="gp-btn-ghost gp-mono text-xs uppercase">
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!name.trim() || selectedExercises.length === 0}
+          className="gp-btn-phosphor gp-mono text-xs uppercase"
+        >
+          {mode === 'edit' ? 'Guardar rutina' : 'Crear rutina'}
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <div className="flex justify-end gap-3">
+      <Button variant="outline" onClick={onClose}>
+        Cancelar
+      </Button>
+      <Button onClick={handleSave} className="bg-gradient-to-r from-primary to-secondary">
+        {mode === 'edit' ? 'Guardar rutina' : 'Crear rutina'}
+      </Button>
+    </div>
+  );
+
+  if (prime) {
+    return (
+      <>
+        <PrimeScrollableModal
+          title={mode === 'edit' ? 'Editar rutina' : 'Crear rutina'}
+          modId="32"
+          onClose={onClose}
+          footer={footer}
+          size="full"
+          maxWidth="max-w-[min(72rem,calc(100vw-2rem))]"
+        >
+          {body}
+        </PrimeScrollableModal>
+        <ExerciseFormModal
+          open={isExerciseFormOpen}
+          onClose={() => setIsExerciseFormOpen(false)}
+          prime
+          onSaved={async (exercise) => {
+            await onExercisesChanged?.();
+            setSelectedExerciseId(exercise.id);
+            setIsExerciseFormOpen(false);
+          }}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="w-full max-w-4xl rounded-2xl border border-secondary/20 bg-card shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between border-b border-secondary/20 sticky top-0 bg-card px-8 py-6">
+            <h2 className="text-2xl font-bold">
+              {mode === 'edit' ? 'Editar Rutina' : 'Crear Nueva Rutina'}
+            </h2>
+            <Button variant="outline" size="sm" onClick={onClose} className="h-8 w-8 p-0 border-secondary/30">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="px-8 py-8">{body}</div>
+
+          <div className="border-t border-secondary/20 sticky bottom-0 bg-card px-8 py-4">{footer}</div>
+        </div>
+      </div>
+      <ExerciseFormModal
+        open={isExerciseFormOpen}
+        onClose={() => setIsExerciseFormOpen(false)}
+        onSaved={async (exercise) => {
+          await onExercisesChanged?.();
+          setSelectedExerciseId(exercise.id);
+          setIsExerciseFormOpen(false);
+        }}
+      />
+    </>
   );
 }

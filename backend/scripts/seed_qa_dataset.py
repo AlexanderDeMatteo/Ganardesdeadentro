@@ -34,6 +34,7 @@ SPECIALIZATIONS = (
 PLANS = (
     {
         'name': 'Básica',
+        'functionalTier': 'basic',
         'description': 'Plan básico QA',
         'price': 0,
         'color': 'gray',
@@ -41,6 +42,7 @@ PLANS = (
     },
     {
         'name': 'Premium',
+        'functionalTier': 'premium',
         'description': 'Plan premium QA',
         'price': 19.99,
         'color': 'blue',
@@ -48,6 +50,7 @@ PLANS = (
     },
     {
         'name': 'Pro',
+        'functionalTier': 'pro',
         'description': 'Plan pro QA',
         'price': 29.99,
         'color': 'purple',
@@ -102,19 +105,46 @@ def set_trainer_specialization(trainer_id: int, specialization: str) -> None:
         session.close()
 
 
-def ensure_membership_plans() -> list[str]:
+def ensure_membership_plans() -> tuple[list[str], list[str]]:
+    """Crea planes QA faltantes y corrige functional_tier en planes ya existentes."""
     session = SessionLocal()
     try:
         by_name = {plan.name: plan for plan in session.query(Membership).filter_by(is_active=True).all()}
         created: list[str] = []
+        updated: list[str] = []
         for spec in PLANS:
-            if spec['name'] in by_name:
+            existing = by_name.get(spec['name'])
+            if existing is None:
+                plan, err = MembershipService.create_plan(spec, session=session)
+                if err:
+                    raise RuntimeError(err)
+                created.append(plan['name'])
                 continue
-            plan, err = MembershipService.create_plan(spec, session=session)
-            if err:
-                raise RuntimeError(err)
-            created.append(plan['name'])
-        return created
+
+            expected_tier = spec['functionalTier'].lower()
+            current_tier = (existing.functional_tier or 'basic').lower()
+            if current_tier != expected_tier:
+                _, err = MembershipService.update_plan(
+                    existing.id,
+                    {'functionalTier': expected_tier},
+                    session=session,
+                )
+                if err:
+                    raise RuntimeError(err)
+                updated.append(spec['name'])
+        return created, updated
+    finally:
+        session.close()
+
+
+def ensure_qa_trainers_active(trainer_ids: list[int]) -> None:
+    session = SessionLocal()
+    try:
+        for trainer_id in trainer_ids:
+            trainer = session.query(User).filter_by(id=trainer_id, role=RoleEnum.TRAINER).first()
+            if trainer and not trainer.is_active:
+                trainer.is_active = True
+        session.commit()
     finally:
         session.close()
 
@@ -176,6 +206,8 @@ def main() -> None:
             if created:
                 trainers_new += 1
 
+        ensure_qa_trainers_active([trainer.id for trainer in trainers])
+
         athletes_new = 0
         for i in range(1, 51):
             trainer = trainers[(i - 1) // 5]
@@ -189,7 +221,7 @@ def main() -> None:
             if created:
                 athletes_new += 1
 
-        new_plans = ensure_membership_plans()
+        new_plans, updated_plans = ensure_membership_plans()
 
         for i in range(1, 51):
             session = SessionLocal()
@@ -215,6 +247,8 @@ def main() -> None:
         print(f'Athletes: athlete1..50@{DOMAIN} / {PASSWORD} (nuevos: {athletes_new})')
         if new_plans:
             print(f'Planes creados: {", ".join(new_plans)}')
+        if updated_plans:
+            print(f'Planes actualizados (functional_tier): {", ".join(updated_plans)}')
         print_summary()
 
 

@@ -213,6 +213,72 @@
     line-height: 0.92;
   }
 
+  /* Landing page — scoped palette from PDF (verde pastel, verde, verde oscuro, ink) */
+  .landing-root {
+    --landing-bg: #121a16;
+    --landing-green: #68ca62;
+    --landing-green-dark: #255831;
+    --landing-green-pastel: #cedeb9;
+    --landing-surface: color-mix(in srgb, #255831 18%, #121a16);
+    --landing-glow: 0 0 32px rgb(104 202 98 / 0.22);
+    --landing-glow-strong: 0 0 48px rgb(104 202 98 / 0.45), 0 0 96px rgb(37 88 49 / 0.25);
+    --landing-glow-button: 0 0 20px rgb(104 202 98 / 0.55);
+    background-color: var(--landing-bg);
+    color: var(--foreground);
+  }
+
+  .landing-root .landing-text-glow {
+    text-shadow:
+      0 0 24px rgb(104 202 98 / 0.45),
+      0 2px 20px rgb(0 0 0 / 0.6);
+  }
+
+  .landing-root .brand-kicker {
+    color: var(--landing-green-pastel);
+  }
+
+  .landing-root .landing-heading {
+    /* inherits display font */
+  }
+
+  .landing-v4 {
+    --landing-v4-section-glow: radial-gradient(ellipse 80% 50% at 50% 0%, rgb(104 202 98 / 0.14), transparent 70%);
+    --landing-v4-pillar-echo: radial-gradient(ellipse 45% 80% at 50% 50%, rgb(104 202 98 / 0.12), transparent 65%);
+  }
+
+  .landing-v4 .landing-v4-divider {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(104 202 98 / 0.35) 50%,
+      transparent
+    );
+    box-shadow: 0 0 24px rgb(104 202 98 / 0.15);
+  }
+
+  .landing-v4 .landing-v4-card {
+    border: 1px solid rgb(255 255 255 / 0.1);
+    background: color-mix(in srgb, var(--landing-surface) 85%, transparent);
+    backdrop-filter: blur(12px);
+    transition:
+      border-color 0.25s ease,
+      box-shadow 0.25s ease,
+      transform 0.25s ease;
+  }
+
+  .landing-v4 .landing-v4-card:hover {
+    border-color: rgb(104 202 98 / 0.45);
+    box-shadow: var(--landing-glow);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-root [data-landing-animate] {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+
   /* Dashboard-2 (mock / brutalist) — variables from app/dashboard-2/layout.tsx */
   .dashboard-mock-root {
     font-family: var(--font-dashboard-lexend), ui-sans-serif, system-ui, sans-serif;

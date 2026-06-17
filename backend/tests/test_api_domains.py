@@ -245,6 +245,51 @@ class TestRoutinesHierarchy:
         assert get_routine.status_code == 200
         assert get_routine.get_json()['routine']['name'] == 'Athlete Visible Routine'
 
+    def test_list_active_weekly_plans_for_trainer(
+        self, client, trainer_user, athlete_user, trainer_headers
+    ):
+        from tests.conftest import create_user
+
+        athlete_two = create_user('athlete2@example.com', trainer_id=trainer_user.id)
+        routine_a = client.post(
+            '/api/routines/',
+            headers=trainer_headers,
+            json={'name': 'Plan A', 'exercises': []},
+        ).get_json()['routine']
+        routine_b = client.post(
+            '/api/routines/',
+            headers=trainer_headers,
+            json={'name': 'Plan B', 'exercises': []},
+        ).get_json()['routine']
+        client.put(
+            '/api/routines/weekly-plan',
+            headers=trainer_headers,
+            json={
+                'athleteId': athlete_user.id,
+                'weekStartDate': '2026-06-02',
+                'days': [{'dayIndex': 0, 'label': 'Lun', 'routineId': routine_a['id'], 'focus': 'Push'}],
+            },
+        )
+        client.put(
+            '/api/routines/weekly-plan',
+            headers=trainer_headers,
+            json={
+                'athleteId': athlete_two.id,
+                'weekStartDate': '2026-06-02',
+                'days': [{'dayIndex': 1, 'label': 'Mar', 'routineId': routine_b['id'], 'focus': 'Pull'}],
+            },
+        )
+        response = client.get(
+            f'/api/routines/weekly-plans/active?trainerId={trainer_user.id}',
+            headers=trainer_headers,
+        )
+        assert response.status_code == 200
+        plans = response.get_json()['plans']
+        athlete_ids = {plan['athleteId'] for plan in plans}
+        assert str(athlete_user.id) in athlete_ids
+        assert str(athlete_two.id) in athlete_ids
+        assert len(plans) == 2
+
 
 class TestMetricsRoutes:
     def test_athlete_creates_metric(self, client, athlete_user, athlete_headers):
@@ -478,6 +523,40 @@ class TestMembershipsRoutes:
         )
         assert response.status_code == 404
 
+    def test_custom_plan_name_with_functional_tier(self, client, admin_headers, athlete_user):
+        create_response = client.post(
+            '/api/memberships/plans',
+            headers=admin_headers,
+            json={
+                'name': 'Plan Verano 2026',
+                'functionalTier': 'premium',
+                'price': 29.99,
+                'description': 'Promoción verano',
+                'features': ['Acceso Titan'],
+                'durationDays': 30,
+                'color': 'purple',
+            },
+        )
+        assert create_response.status_code == 201
+        created = create_response.get_json()['plan']
+        assert created['name'] == 'Plan Verano 2026'
+        assert created['functionalTier'] == 'premium'
+        plan_id = created['id']
+
+        assign_response = client.put(
+            f'/api/memberships/users/{athlete_user.id}',
+            headers=admin_headers,
+            json={'planId': plan_id},
+        )
+        assert assign_response.status_code == 200
+        assert assign_response.get_json()['membership']['level'] == 'premium'
+
+        athletes_response = client.get('/api/admin/athletes', headers=admin_headers)
+        assert athletes_response.status_code == 200
+        athletes = athletes_response.get_json()['athletes']
+        athlete = next(item for item in athletes if item['id'] == str(athlete_user.id))
+        assert athlete['membershipLevel'] == 'premium'
+
 
 class TestSessionsRoutes:
     def _complete_session_fixture(self, client, trainer_user, athlete_user, trainer_headers, athlete_headers):
@@ -523,6 +602,82 @@ class TestSessionsRoutes:
             client, trainer_user, athlete_user, trainer_headers, athlete_headers
         )
 
+    def test_complete_session_via_direct_assignment_regression(
+        self, client, trainer_user, athlete_user, trainer_headers, athlete_headers
+    ):
+        """Sin plan semanal: la asignación directa activa sigue permitiendo guardar sesión."""
+        scheduled = date.today().isoformat()
+        routine = client.post(
+            '/api/routines/',
+            headers=trainer_headers,
+            json={'name': 'Direct Only', 'exercises': []},
+        ).get_json()['routine']
+        client.post(
+            '/api/routines/assignments',
+            headers=trainer_headers,
+            json={'athleteId': athlete_user.id, 'routineId': routine['id']},
+        )
+        response = client.post(
+            '/api/sessions/complete',
+            headers=athlete_headers,
+            json={
+                'athleteId': athlete_user.id,
+                'routineId': routine['id'],
+                'scheduledDate': scheduled,
+                'setLogs': [],
+                'completedSets': 0,
+                'totalSets': 0,
+                'completed': True,
+                'sessionOutcome': 'completed',
+            },
+        )
+        assert response.status_code == 201
+
+    def test_complete_session_via_weekly_plan_without_direct_assignment(
+        self, client, trainer_user, athlete_user, trainer_headers, athlete_headers
+    ):
+        scheduled = date.today().isoformat()
+        routine = client.post(
+            '/api/routines/',
+            headers=trainer_headers,
+            json={'name': 'Weekly Only', 'exercises': []},
+        ).get_json()['routine']
+        client.put(
+            '/api/routines/weekly-plan',
+            headers=trainer_headers,
+            json={
+                'athleteId': athlete_user.id,
+                'weekStartDate': scheduled,
+                'days': [
+                    {'dayIndex': 0, 'label': 'Lun', 'routineId': routine['id'], 'focus': 'Legs'},
+                ],
+            },
+        )
+        response = client.post(
+            '/api/sessions/complete',
+            headers=athlete_headers,
+            json={
+                'athleteId': athlete_user.id,
+                'routineId': routine['id'],
+                'scheduledDate': scheduled,
+                'setLogs': [
+                    {
+                        'exerciseId': 'squat',
+                        'exerciseName': 'Squat',
+                        'setNumber': 1,
+                        'weightKg': 60,
+                        'repsLogged': '8',
+                        'result': 'completed',
+                    }
+                ],
+                'completedSets': 1,
+                'totalSets': 1,
+                'completed': True,
+                'sessionOutcome': 'completed',
+            },
+        )
+        assert response.status_code == 201
+
     def test_list_sessions_after_complete(
         self, client, trainer_user, athlete_user, trainer_headers, athlete_headers
     ):
@@ -564,6 +719,82 @@ class TestSessionsRoutes:
         progress = response.get_json()['progress']
         assert len(progress) >= 1
         assert progress[0]['maxWeightKg'] == 100
+
+    def test_complete_session_partial_with_failed_set(
+        self, client, trainer_user, athlete_user, trainer_headers, athlete_headers
+    ):
+        scheduled = date.today().isoformat()
+        routine = client.post(
+            '/api/routines/',
+            headers=trainer_headers,
+            json={'name': 'Legs', 'exercises': []},
+        ).get_json()['routine']
+        client.post(
+            '/api/routines/assignments',
+            headers=trainer_headers,
+            json={'athleteId': athlete_user.id, 'routineId': routine['id']},
+        )
+        response = client.post(
+            '/api/sessions/complete',
+            headers=athlete_headers,
+            json={
+                'athleteId': athlete_user.id,
+                'routineId': routine['id'],
+                'scheduledDate': scheduled,
+                'setLogs': [
+                    {
+                        'exerciseId': 'squat',
+                        'exerciseName': 'Sentadilla',
+                        'setNumber': 1,
+                        'repsTarget': '10',
+                        'repsLogged': '6',
+                        'weightKg': 80,
+                        'result': 'failed',
+                    }
+                ],
+                'completedSets': 0,
+                'failedSets': 1,
+                'totalSets': 6,
+                'completed': False,
+                'sessionOutcome': 'partial',
+            },
+        )
+        assert response.status_code == 201
+        session = response.get_json()['session']
+        assert session['sessionOutcome'] == 'partial'
+        assert session['failedSets'] == 1
+        set_log = session['setLogs'][0]
+        assert set_log['repsLogged'] == '6'
+        assert set_log['exerciseName'] == 'Sentadilla'
+        assert set_log['result'] == 'failed'
+
+    def test_complete_session_rejects_abandoned_outcome(
+        self, client, trainer_user, athlete_user, trainer_headers, athlete_headers
+    ):
+        scheduled = date.today().isoformat()
+        routine = client.post(
+            '/api/routines/',
+            headers=trainer_headers,
+            json={'name': 'Legs', 'exercises': []},
+        ).get_json()['routine']
+        client.post(
+            '/api/routines/assignments',
+            headers=trainer_headers,
+            json={'athleteId': athlete_user.id, 'routineId': routine['id']},
+        )
+        response = client.post(
+            '/api/sessions/complete',
+            headers=athlete_headers,
+            json={
+                'athleteId': athlete_user.id,
+                'routineId': routine['id'],
+                'scheduledDate': scheduled,
+                'setLogs': [],
+                'sessionOutcome': 'abandoned',
+            },
+        )
+        assert response.status_code == 400
+        assert 'sessionOutcome' in response.get_json()['error']
 
     def test_athlete_cannot_list_foreign_sessions(self, client, athlete_user, athlete_headers):
         other = create_user('other-athlete-sessions@example.com', role='user')
@@ -662,6 +893,23 @@ class TestAdminRoutes:
         assert response.status_code == 200
         data = response.get_json()
         assert 'trainerCount' in data
+
+    def test_admin_dashboard_metrics(self, client, admin_headers, trainer_headers):
+        response = client.get('/api/admin/dashboard/metrics', headers=admin_headers)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert 'memberships' in data
+        assert 'capacity' in data
+        assert 'retention' in data
+        assert 'telemetry' in data
+        assert 'operations' in data
+        assert 'activeCount' in data['memberships']
+        assert 'loadPercent' in data['capacity']
+        assert isinstance(data['retention']['atRisk'], list)
+        assert isinstance(data['operations']['unassigned'], list)
+
+        denied = client.get('/api/admin/dashboard/metrics', headers=trainer_headers)
+        assert denied.status_code == 403
 
     def test_trainer_denied_admin_overview(self, client, trainer_headers):
         response = client.get('/api/admin/overview', headers=trainer_headers)

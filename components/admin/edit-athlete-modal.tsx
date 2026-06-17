@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { AthleteProfile } from '@/hooks/use-admin';
 import { useMemberships } from '@/hooks/use-memberships';
+import { PrimeScrollableModal } from '@/components/admin-v2/prime-scrollable-modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X } from 'lucide-react';
+import { ScrollableModal } from '@/components/ui/scrollable-modal';
 
 interface EditAthleteModalProps {
   athlete: AthleteProfile | null;
@@ -17,6 +18,7 @@ interface EditAthleteModalProps {
     email: string;
     planId?: string;
   }) => Promise<void>;
+  prime?: boolean;
 }
 
 function splitName(name: string): { firstName: string; lastName: string } {
@@ -26,7 +28,7 @@ function splitName(name: string): { firstName: string; lastName: string } {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 }
 
-export function EditAthleteModal({ athlete, onClose, onSave }: EditAthleteModalProps) {
+export function EditAthleteModal({ athlete, onClose, onSave, prime = false }: EditAthleteModalProps) {
   const { plans } = useMemberships();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -62,60 +64,119 @@ export function EditAthleteModal({ athlete, onClose, onSave }: EditAthleteModalP
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-secondary/20 bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-secondary/20 px-6 py-4">
-          <h2 className="text-xl font-bold">Editar atleta</h2>
-          <Button variant="outline" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-            <X className="h-4 w-4" />
-          </Button>
+  const labelClass = prime
+    ? 'gp-mono mb-1.5 block text-xs uppercase gp-text-dim'
+    : 'mb-2 block text-sm font-medium';
+  const inputClass = prime ? 'gp-field gp-mono h-9 rounded-lg px-3 text-sm' : undefined;
+  const selectClass = prime
+    ? 'gp-field gp-mono h-9 w-full rounded-lg px-3 text-sm'
+    : 'h-11 w-full rounded-md border border-input bg-background px-3 text-sm';
+
+  const formBody = (
+    <form id="edit-athlete-form" onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className={labelClass} htmlFor="edit-athlete-first-name">
+            Nombre
+          </label>
+          <Input
+            id="edit-athlete-first-name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            className={inputClass}
+          />
         </div>
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 px-6 py-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-medium">Nombre</label>
-              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium">Apellido</label>
-              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </div>
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">Email</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="mb-2 block text-sm font-medium">Plan de membresía</label>
-            <select
-              value={planId}
-              onChange={(e) => setPlanId(e.target.value)}
-              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="">Sin cambio</option>
-              {plans.map((plan) => (
-                <option key={plan.id} value={plan.id}>
-                  {plan.name} — ${plan.price}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSaving}>
-              {isSaving ? 'Guardando…' : 'Guardar cambios'}
-            </Button>
-          </div>
-        </form>
+        <div>
+          <label className={labelClass} htmlFor="edit-athlete-last-name">
+            Apellido
+          </label>
+          <Input
+            id="edit-athlete-last-name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className={inputClass}
+          />
+        </div>
       </div>
+      <div>
+        <label className={labelClass} htmlFor="edit-athlete-email">
+          Email
+        </label>
+        <Input
+          id="edit-athlete-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className={inputClass}
+        />
+      </div>
+      <div>
+        <label className={labelClass} htmlFor="edit-athlete-plan">
+          Plan de membresía
+        </label>
+        <select
+          id="edit-athlete-plan"
+          value={planId}
+          onChange={(e) => setPlanId(e.target.value)}
+          className={selectClass}
+        >
+          <option value="">Sin cambio</option>
+          {plans.map((plan) => (
+            <option key={plan.id} value={plan.id}>
+              {plan.name} — ${plan.price}
+            </option>
+          ))}
+        </select>
+      </div>
+    </form>
+  );
+
+  const footer = (
+    <div className="flex justify-end gap-3">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onClose}
+        disabled={isSaving}
+        className={prime ? 'gp-btn-ghost gp-mono text-xs uppercase' : undefined}
+      >
+        Cancelar
+      </Button>
+      <Button
+        type="submit"
+        form="edit-athlete-form"
+        disabled={isSaving}
+        className={
+          prime
+            ? 'gp-btn-phosphor gp-mono text-xs uppercase'
+            : undefined
+        }
+      >
+        {isSaving ? 'Guardando…' : 'Guardar cambios'}
+      </Button>
     </div>
+  );
+
+  if (prime) {
+    return (
+      <PrimeScrollableModal
+        title="Editar atleta"
+        modId="14"
+        onClose={onClose}
+        footer={footer}
+        size="wide"
+        fitContent
+      >
+        {formBody}
+      </PrimeScrollableModal>
+    );
+  }
+
+  return (
+    <ScrollableModal title="Editar atleta" onClose={onClose} footer={footer} size="md">
+      {formBody}
+    </ScrollableModal>
   );
 }

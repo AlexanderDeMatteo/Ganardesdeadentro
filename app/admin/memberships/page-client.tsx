@@ -3,18 +3,26 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useMemberships, type MembershipPlan } from '@/hooks/use-memberships';
+import { ApiError } from '@/lib/api/errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CreditCard, Trash2, Plus, X, Pencil } from 'lucide-react';
 
 const DEFAULT_FORM: Omit<MembershipPlan, 'id' | 'createdAt'> = {
-  name: 'Básica',
+  name: '',
+  functionalTier: 'basic',
   price: 0,
   description: '',
   features: [''],
   durationDays: 30,
   color: 'blue',
+};
+
+const TIER_LABELS: Record<MembershipPlan['functionalTier'], string> = {
+  basic: 'Básico',
+  premium: 'Premium',
+  pro: 'Pro',
 };
 
 export default function MembershipsPage() {
@@ -35,6 +43,7 @@ export default function MembershipsPage() {
     setEditingPlan(plan);
     setFormData({
       name: plan.name,
+      functionalTier: plan.functionalTier,
       price: plan.price,
       description: plan.description,
       features: plan.features.length > 0 ? plan.features : [''],
@@ -73,10 +82,19 @@ export default function MembershipsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.price || !formData.description) return;
+    const trimmedName = formData.name.trim();
+    if (!trimmedName || !formData.price || !formData.description) {
+      toast.error('Completa nombre, precio y descripción');
+      return;
+    }
+    if (trimmedName.length > 120) {
+      toast.error('El nombre no puede superar 120 caracteres');
+      return;
+    }
 
     const payload = {
-      name: formData.name,
+      name: trimmedName,
+      functionalTier: formData.functionalTier,
       price: formData.price,
       description: formData.description,
       features: formData.features.filter(f => f.trim()),
@@ -94,8 +112,12 @@ export default function MembershipsPage() {
         toast.success('Plan creado');
       }
       closeForm();
-    } catch {
-      toast.error(editingPlan ? 'No se pudo actualizar el plan' : 'No se pudo crear el plan');
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        toast.error(err.message || 'Ya existe un plan con ese nombre');
+      } else {
+        toast.error(editingPlan ? 'No se pudo actualizar el plan' : 'No se pudo crear el plan');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -134,7 +156,10 @@ export default function MembershipsPage() {
                 <CreditCard className="h-6 w-6" />
               </div>
 
-              <h3 className="text-2xl font-bold text-foreground mb-2">{plan.name}</h3>
+              <h3 className="text-2xl font-bold text-foreground mb-1">{plan.name}</h3>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                Nivel {TIER_LABELS[plan.functionalTier]}
+              </p>
               <div className="mb-4">
                 <span className="text-4xl font-bold text-foreground">${plan.price}</span>
                 <span className="text-muted-foreground ml-2">/{plan.durationDays} días</span>
@@ -192,15 +217,31 @@ export default function MembershipsPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold">Nombre</label>
-                  <select
+                  <label className="text-sm font-semibold">Nombre comercial</label>
+                  <Input
                     value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value as typeof formData.name }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Plan Verano 2026"
+                    maxLength={120}
+                    className="h-10 bg-card border-border"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Nivel funcional</label>
+                  <select
+                    value={formData.functionalTier}
+                    onChange={(e) =>
+                      setFormData(prev => ({
+                        ...prev,
+                        functionalTier: e.target.value as MembershipPlan['functionalTier'],
+                      }))
+                    }
                     className="w-full px-4 py-2 rounded-lg border border-border bg-card text-foreground focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <option>Básica</option>
-                    <option>Premium</option>
-                    <option>Pro</option>
+                    <option value="basic">Básico</option>
+                    <option value="premium">Premium</option>
+                    <option value="pro">Pro</option>
                   </select>
                 </div>
 

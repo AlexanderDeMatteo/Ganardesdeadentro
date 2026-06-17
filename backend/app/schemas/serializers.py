@@ -19,6 +19,15 @@ def _json_loads(value, default=None):
         return default if default is not None else {}
 
 
+VALID_FUNCTIONAL_TIERS = frozenset({'basic', 'premium', 'pro'})
+
+
+def _normalize_functional_tier(value: str | None) -> str:
+    if value and str(value).lower() in VALID_FUNCTIONAL_TIERS:
+        return str(value).lower()
+    return 'basic'
+
+
 def _membership_level_from_name(name: str | None) -> str:
     if not name:
         return 'basic'
@@ -30,12 +39,21 @@ def _membership_level_from_name(name: str | None) -> str:
     return 'basic'
 
 
+def _membership_level_from_plan(membership) -> str:
+    if membership is None:
+        return 'basic'
+    tier = getattr(membership, 'functional_tier', None)
+    if tier and str(tier).lower() in VALID_FUNCTIONAL_TIERS:
+        return str(tier).lower()
+    return _membership_level_from_name(getattr(membership, 'name', None))
+
+
 def serialize_athlete(user, profile=None, active_membership=None, latest_metric=None):
     profile = profile or user.profile
     level = 'basic'
     membership_id = None
     if active_membership and active_membership.membership:
-        level = _membership_level_from_name(active_membership.membership.name)
+        level = _membership_level_from_plan(active_membership.membership)
         membership_id = str(active_membership.membership_id)
 
     payload = {
@@ -159,6 +177,7 @@ def serialize_membership_plan(membership):
         'features': features if isinstance(features, list) else [],
         'durationDays': membership.duration_days or 30,
         'color': membership.color or 'blue',
+        'functionalTier': _normalize_functional_tier(getattr(membership, 'functional_tier', None)),
         'createdAt': _dt_iso(membership.created_at),
     }
 
@@ -172,7 +191,7 @@ def serialize_active_membership(user_membership):
     if end_date:
         days_remaining = max(0, (end_date.date() - datetime.now(timezone.utc).date()).days)
     return {
-        'level': _membership_level_from_name(membership.name),
+        'level': _membership_level_from_plan(membership),
         'planId': str(membership.id),
         'daysRemaining': days_remaining,
     }

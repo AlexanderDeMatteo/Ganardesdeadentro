@@ -7,6 +7,7 @@ import { FoodDiary } from '@/components/nutrition/food-diary';
 import { NutritionSummary } from '@/components/nutrition/nutrition-summary';
 import { NutritionUnassignedAlert } from '@/components/nutrition/nutrition-unassigned-alert';
 import { WaterTracker } from '@/components/nutrition/water-tracker';
+import { PrimeModule } from '@/components/admin-v2/prime-module';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNutrition } from '@/hooks/use-nutrition';
 import { clampDateKeyToLast7Days, isDateKeyOnOrBeforeToday, toLocalDateKey } from '@/lib/nutrition/dates';
@@ -51,36 +52,54 @@ export function NutritionPageContent() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <NutritionUnassignedAlert />
 
-      <NutritionSummary {...summaryProps} onGoToDiary={() => goToDiary({ focusForm: true })} />
+      <PrimeModule modId="N00" title="RESUMEN_DIARIO">
+        <div className="p-4">
+          <NutritionSummary {...summaryProps} onGoToDiary={() => goToDiary({ focusForm: true })} />
+        </div>
+      </PrimeModule>
 
-      <p className="text-xs text-muted-foreground italic">
+      <p className="gp-mono text-xs italic gp-text-dim">
         Plan asignado por tu entrenador. El diario es orientativo y no sustituye asesoría profesional.
       </p>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1">
-          <TabsTrigger value="macros">Macros</TabsTrigger>
-          <TabsTrigger value="plan">Plan</TabsTrigger>
-          <TabsTrigger value="diary">Diario</TabsTrigger>
+        <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 gp-bg-surface-variant">
+          <TabsTrigger value="macros" className="gp-mono text-xs">Macros</TabsTrigger>
+          <TabsTrigger value="plan" className="gp-mono text-xs">Plan</TabsTrigger>
+          <TabsTrigger value="diary" className="gp-mono text-xs">Diario</TabsTrigger>
         </TabsList>
 
         <TabsContent value="macros" className="space-y-6">
-          <AssignedMacrosView />
+          <PrimeModule modId="N01" title="MACROS_OBJETIVO">
+            <div className="p-4">
+              <AssignedMacrosView />
+            </div>
+          </PrimeModule>
         </TabsContent>
 
         <TabsContent value="plan" className="space-y-6">
-          <AssignedMealPlanView />
+          <PrimeModule modId="N02" title="PLAN_COMIDAS">
+            <div className="p-4">
+              <AssignedMealPlanView />
+            </div>
+          </PrimeModule>
         </TabsContent>
 
         <TabsContent value="diary" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <FoodDiary date={selectedDiaryDate} onDateChange={selectDiaryDate} formRef={diaryFormRef} />
-            <WaterTracker />
-          </div>
-          <AdherenceChart selectedDate={selectedDiaryDate} onSelectDate={selectDiaryDate} />
+          <PrimeModule modId="N03" title="DIARIO_ALIMENTOS">
+            <div className="grid gap-6 p-4 lg:grid-cols-2">
+              <FoodDiary date={selectedDiaryDate} onDateChange={selectDiaryDate} formRef={diaryFormRef} />
+              <WaterTracker />
+            </div>
+          </PrimeModule>
+          <PrimeModule modId="N04" title="ADHERENCIA">
+            <div className="p-4">
+              <AdherenceChart selectedDate={selectedDiaryDate} onSelectDate={selectDiaryDate} />
+            </div>
+          </PrimeModule>
         </TabsContent>
       </Tabs>
     </div>

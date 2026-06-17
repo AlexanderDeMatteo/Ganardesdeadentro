@@ -1,7 +1,8 @@
+import { normalizeActivityLevel } from './activity-level';
 import { createDefaultSlotTimes } from './meal-schedule';
 import type { AssignedNutritionPlan, CoachNutritionDraft, MealSlotTimes } from './types';
 import { GOAL_ADJUSTMENTS } from './metabolism';
-import type { ActivityLevel, NutritionGoal } from './types';
+import type { NutritionGoal } from './types';
 
 export function assignedStorageKey(athleteId: string): string {
   return `fittrack_nutrition_assigned_${athleteId}`;
@@ -34,7 +35,7 @@ export function parseAssignedPlan(raw: string | null): AssignedNutritionPlan | n
       macroTargets: o.macroTargets,
       mealPlan: o.mealPlan,
       slotTimes: o.slotTimes ?? createDefaultSlotTimes(),
-      activityLevel: (o.activityLevel ?? 'moderate') as ActivityLevel,
+      activityLevel: normalizeActivityLevel(o.activityLevel),
       goal: (o.goal ?? 'maintain') as NutritionGoal,
       calorieAdjustment: o.calorieAdjustment ?? 0,
       publishedAt: o.publishedAt ?? new Date().toISOString(),
@@ -53,6 +54,7 @@ export function parseCoachDraft(raw: string | null): CoachNutritionDraft {
     return {
       ...defaults,
       ...o,
+      activityLevel: normalizeActivityLevel(o.activityLevel, defaults.activityLevel),
       mealPlans: Array.isArray(o.mealPlans) ? o.mealPlans : defaults.mealPlans,
       slotTimes: o.slotTimes ?? defaults.slotTimes,
       macroTargets: o.macroTargets ?? defaults.macroTargets,

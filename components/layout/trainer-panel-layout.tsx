@@ -7,6 +7,7 @@ import {
   Link as LinkIcon,
   TrendingUp,
   User,
+  Sparkles,
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/protected-route';
 import { RolePanelShell } from '@/components/layout/role-panel-shell';
@@ -16,6 +17,7 @@ const TRAINER_ICON_MAP = {
   '/trainer': LayoutDashboard,
   '/trainer/athletes': Users,
   '/trainer/routines': Dumbbell,
+  '/trainer/exercises': Sparkles,
   '/trainer/assignments': LinkIcon,
   '/trainer/progress': TrendingUp,
   '/trainer/profile': User,

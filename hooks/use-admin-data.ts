@@ -3,13 +3,14 @@
 import { isApiRoutinesSource, isApiUsersSource } from '@/lib/api/config';
 import {
   getAdminOverview,
+  getAdminDashboardMetrics,
   listAdminAthletes,
   listAdminTrainers,
   listAssignments,
   listExercises,
   listRoutines,
 } from '@/lib/data/client';
-import { SEED_EXERCISES } from '@/lib/data/seeds';
+import type { AdminDashboardMetricsResponse } from '@/lib/api/contracts/admin';
 import type { Athlete, Exercise, Routine, RoutineAssignment, Trainer } from '@/lib/data/types';
 import { useDataStore } from '@/lib/data/store';
 import { useCallback, useEffect, useState } from 'react';
@@ -17,9 +18,11 @@ import { useCallback, useEffect, useState } from 'react';
 export function useAdminData() {
   const { state, isHydrated, setState } = useDataStore();
   const [overview, setOverview] = useState<Awaited<ReturnType<typeof getAdminOverview>> | null>(null);
+  const [dashboardMetrics, setDashboardMetrics] = useState<AdminDashboardMetricsResponse | null>(null);
   const [apiAthletes, setApiAthletes] = useState<Athlete[] | null>(null);
   const [apiTrainers, setApiTrainers] = useState<Trainer[] | null>(null);
   const [apiExercises, setApiExercises] = useState<Exercise[] | null>(null);
+  const [exercisesError, setExercisesError] = useState<string | null>(null);
   const [apiRoutines, setApiRoutines] = useState<Routine[] | null>(null);
   const [apiAssignments, setApiAssignments] = useState<RoutineAssignment[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +34,16 @@ export function useAdminData() {
     const data = await getAdminOverview();
     setOverview(data);
     setIsLoading(false);
+  }, []);
+
+  const refreshDashboardMetrics = useCallback(async () => {
+    try {
+      const data = await getAdminDashboardMetrics();
+      setDashboardMetrics(data);
+    } catch (error) {
+      console.error('Failed to load admin dashboard metrics', error);
+      setDashboardMetrics(null);
+    }
   }, []);
 
   const refreshUserLists = useCallback(async () => {
@@ -48,9 +61,13 @@ export function useAdminData() {
     if (!useApiRoutines) return;
     try {
       const remote = await listExercises({ perPage: 100 });
-      setApiExercises(remote.length > 0 ? remote : SEED_EXERCISES);
-    } catch {
-      setApiExercises(SEED_EXERCISES);
+      setApiExercises(remote);
+      setExercisesError(null);
+    } catch (error) {
+      setApiExercises([]);
+      setExercisesError(
+        error instanceof Error ? error.message : 'No se pudo cargar el catálogo de ejercicios',
+      );
     }
   }, [useApiRoutines]);
 
@@ -67,6 +84,7 @@ export function useAdminData() {
   useEffect(() => {
     if (!isHydrated) return;
     void refreshOverview();
+    void refreshDashboardMetrics();
     if (useApiUsers) {
       void refreshUserLists();
     }
@@ -76,7 +94,7 @@ export function useAdminData() {
     if (useApiRoutines) {
       void refreshExercises();
     }
-  }, [isHydrated, refreshOverview, refreshUserLists, refreshExercises, refreshRoutines, useApiUsers, useApiRoutines, state]);
+  }, [isHydrated, refreshOverview, refreshDashboardMetrics, refreshUserLists, refreshExercises, refreshRoutines, useApiUsers, useApiRoutines, state]);
 
   const athletes = useApiUsers && apiAthletes !== null ? apiAthletes : state.athletes;
   const trainers = useApiUsers && apiTrainers !== null ? apiTrainers : state.trainers;
@@ -99,12 +117,15 @@ export function useAdminData() {
     metrics: state.metrics,
     sessionLogs: state.sessionLogs,
     overview,
+    dashboardMetrics,
     isHydrated,
     isLoading: !isHydrated || isLoading || listsLoading,
     setState,
     refreshOverview,
+    refreshDashboardMetrics,
     refreshUserLists,
     refreshExercises,
     refreshRoutines,
+    exercisesError,
   };
 }

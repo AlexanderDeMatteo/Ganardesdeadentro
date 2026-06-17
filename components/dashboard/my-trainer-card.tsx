@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useAthleteData } from '@/hooks/use-athlete-data';
-import { Button } from '@/components/ui/button';
 import { Mail, UserRound } from 'lucide-react';
 
 interface MyTrainerCardProps {
@@ -14,21 +13,21 @@ export function MyTrainerCard({ compact = false }: MyTrainerCardProps) {
 
   if (isLoading) {
     return (
-      <div className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-6 animate-pulse">
-        <div className="h-4 w-32 rounded bg-muted" />
-        <div className="mt-4 h-6 w-48 rounded bg-muted" />
+      <div className="gp-module gp-module-corner animate-pulse p-6">
+        <div className="h-4 w-32 rounded gp-bg-surface-variant" />
+        <div className="mt-4 h-6 w-48 rounded gp-bg-surface-variant" />
       </div>
     );
   }
 
   if (!trainer) {
     return (
-      <div className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-6">
-        <h3 className="text-xs uppercase tracking-widest text-[#9ca3af]">Mi entrenador</h3>
-        <p className="mt-3 text-sm text-[#9ca3af]">
+      <div className="gp-module gp-module-corner p-6">
+        <h3 className="gp-label gp-text-muted">Mi entrenador</h3>
+        <p className="mt-3 text-sm gp-text-muted">
           Aún no tienes un entrenador asignado. Contacta con soporte o elige un plan Premium/Pro.
         </p>
-        <Link href="/memberships" className="mt-4 inline-block text-sm text-cyan-400 hover:underline">
+        <Link href="/memberships" className="mt-4 inline-block text-sm gp-text-phosphor hover:underline">
           Ver membresías
         </Link>
       </div>
@@ -37,35 +36,35 @@ export function MyTrainerCard({ compact = false }: MyTrainerCardProps) {
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-[#2a2e32] bg-[#23272A] p-4">
-        <div className="flex size-10 items-center justify-center rounded-full bg-cyan-400/15 text-cyan-400">
+      <div className="flex items-center gap-3 rounded-lg border gp-border-outline gp-bg-surface-variant p-4">
+        <div className="flex size-10 items-center justify-center rounded-full gp-bg-surface gp-text-phosphor">
           <UserRound className="size-5" aria-hidden />
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-[#9ca3af]">Tu entrenador</p>
-          <p className="truncate font-bold text-white">{trainer.name}</p>
-          <p className="truncate text-xs text-[#9ca3af]">{trainer.specialization}</p>
+          <p className="text-xs gp-text-muted">Tu entrenador</p>
+          <p className="truncate font-bold gp-text-primary">{trainer.name}</p>
+          <p className="truncate text-xs gp-text-muted">{trainer.specialization}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="dashboard-v3-panel rounded-2xl border border-[#2a2e32] p-6">
-      <h3 className="mb-1 text-xs uppercase tracking-widest text-[#9ca3af]">Mi entrenador</h3>
+    <div className="gp-module gp-module-corner p-6">
+      <h3 className="gp-label gp-text-muted">Mi entrenador</h3>
       <div className="mt-4 flex items-start gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-cyan-400/15 text-cyan-400">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-full gp-bg-surface-variant gp-text-phosphor">
           <UserRound className="size-6" aria-hidden />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-bold text-white">{trainer.name}</h2>
-          <p className="mt-1 text-sm text-lime-400">{trainer.specialization}</p>
+          <h2 className="gp-display text-xl gp-text-primary">{trainer.name}</h2>
+          <p className="mt-1 text-sm gp-text-phosphor">{trainer.specialization}</p>
           {trainer.bio && (
-            <p className="mt-2 text-sm leading-relaxed text-[#9ca3af]">{trainer.bio}</p>
+            <p className="mt-2 text-sm leading-relaxed gp-text-muted">{trainer.bio}</p>
           )}
           <a
             href={`mailto:${trainer.email}`}
-            className="mt-3 inline-flex items-center gap-2 text-sm text-cyan-400 hover:underline"
+            className="mt-3 inline-flex items-center gap-2 text-sm gp-text-phosphor hover:underline"
           >
             <Mail className="size-4" aria-hidden />
             {trainer.email}
@@ -73,7 +72,7 @@ export function MyTrainerCard({ compact = false }: MyTrainerCardProps) {
         </div>
       </div>
       {athleteId && (
-        <p className="mt-4 text-xs text-[#6b7280]">
+        <p className="mt-4 text-xs gp-text-dim">
           Rating: {trainer.rating.toFixed(1)} · {trainer.athletes} atletas activos
         </p>
       )}
