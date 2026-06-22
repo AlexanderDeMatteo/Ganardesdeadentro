@@ -46,10 +46,20 @@ class Config:
 
     EXERCISE_MEDIA_UPLOAD_DIR = os.getenv('EXERCISE_MEDIA_UPLOAD_DIR', '/data/exercise_media')
     EXERCISE_MEDIA_MAX_BYTES = int(os.getenv('EXERCISE_MEDIA_MAX_BYTES', '10485760'))
+    EXERCISE_MEDIA_RAW_MAX_BYTES = int(os.getenv('EXERCISE_MEDIA_RAW_MAX_BYTES', '52428800'))
     EXERCISE_MEDIA_ALLOWED_MIME = os.getenv(
         'EXERCISE_MEDIA_ALLOWED_MIME',
         'image/gif,video/mp4,image/webp',
     )
+    EXERCISE_MEDIA_TRANSCODE_ENABLED = os.getenv(
+        'EXERCISE_MEDIA_TRANSCODE_ENABLED',
+        'true',
+    ).lower() == 'true'
+    EXERCISE_MEDIA_MAX_DURATION_SECONDS = int(
+        os.getenv('EXERCISE_MEDIA_MAX_DURATION_SECONDS', '60'),
+    )
+    EXERCISE_MEDIA_VIDEO_MAX_WIDTH = int(os.getenv('EXERCISE_MEDIA_VIDEO_MAX_WIDTH', '1280'))
+    EXERCISE_MEDIA_VIDEO_CRF = int(os.getenv('EXERCISE_MEDIA_VIDEO_CRF', '26'))
 
     PAYMENT_RECEIPT_UPLOAD_DIR = os.getenv('PAYMENT_RECEIPT_UPLOAD_DIR', '/data/payment_receipts')
     PAYMENT_RECEIPT_MAX_BYTES = int(os.getenv('PAYMENT_RECEIPT_MAX_BYTES', '5242880'))

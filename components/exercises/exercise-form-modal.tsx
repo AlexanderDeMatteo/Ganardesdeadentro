@@ -276,8 +276,13 @@ export function ExerciseFormModal({
           {pendingFile ? (
             <p className="gp-mono text-xs gp-text-dim">
               {pendingFile.name} · {formatMediaFileSize(pendingFile.size)}
+              {pendingFile.type.startsWith('video/') ? ' · se optimizará al publicar' : ''}
             </p>
-          ) : null}
+          ) : (
+            <p className="gp-mono text-xs gp-text-dim">
+              MP4: se optimiza automáticamente (720p, sin audio). GIF/WebP se publican tal cual.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <PrimeChamferButton
               type="button"

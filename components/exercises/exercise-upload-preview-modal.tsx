@@ -81,7 +81,13 @@ export function ExerciseUploadPreviewModal({
         />
         <p className="gp-mono text-xs gp-text-dim">
           {pendingFile.name} · {formatMediaFileSize(pendingFile.size)} · {pendingFile.type || 'archivo'}
+          {pendingFile.type.startsWith('video/') ? ' · se optimizará al publicar' : ''}
         </p>
+        {pendingFile.type.startsWith('video/') ? (
+          <p className="gp-mono text-xs gp-text-dim">
+            Los MP4 se comprimen en el servidor (máx. 60 s, 720p, sin audio).
+          </p>
+        ) : null}
       </div>
     </PrimeScrollableModal>
   );

@@ -1,6 +1,7 @@
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
+from app.services.video_processor import ProcessResult
 from tests.conftest import seed_cached_exercise
 
 
@@ -251,6 +252,45 @@ class TestCustomExercises:
         assert exercise['animation_source'] == 'upload'
         assert exercise['animation_type'] == 'gif'
         assert exercise['animation_url'].startswith('/api/exercises/media/')
+
+    def test_upload_transcodes_mp4(self, client, admin_headers, tmp_path):
+        with patch('app.services.custom_exercise_service.ExerciseAPIService.search_exercises') as mock_search:
+            mock_search.return_value = ([], '')
+            create = client.post(
+                '/api/exercises',
+                headers=admin_headers,
+                json=self._create_payload('MP4 upload'),
+            )
+        exercise_id = create.get_json()['exercise']['exercise_db_id']
+
+        def fake_process(input_path, output_path):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b'optimized-mp4')
+            return ProcessResult(
+                output_path=output_path,
+                duration_seconds=12.0,
+                width=1280,
+                height=720,
+                size_bytes=len(b'optimized-mp4'),
+                was_transcoded=True,
+            )
+
+        with patch(
+            'app.services.custom_exercise_service.VideoProcessor.process',
+            side_effect=fake_process,
+        ):
+            response = client.post(
+                f'/api/exercises/{exercise_id}/media',
+                headers={k: v for k, v in admin_headers.items() if k.lower() != 'content-type'},
+                data={'file': (BytesIO(b'\x00\x00\x00\x20ftypmp4'), 'demo.mp4')},
+            )
+
+        assert response.status_code == 200
+        exercise = response.get_json()['exercise']
+        assert exercise['animation_source'] == 'upload'
+        assert exercise['animation_type'] == 'video'
+        assert exercise['animation_url'].startswith('/api/exercises/media/')
+        assert exercise['animation_url'].endswith('.mp4')
 
     def test_get_exercise_returns_animation_fields(self, client, admin_headers):
         with patch('app.services.custom_exercise_service.ExerciseAPIService.search_exercises') as mock_search:

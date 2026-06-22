@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import re
+import shutil
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -12,6 +14,7 @@ from app.config import get_config
 from app.database import SessionLocal
 from app.models import DifficultyEnum, Exercise, RoutineExercise
 from app.services.exercise_api_service import ExerciseAPIService
+from app.services.video_processor import VideoProcessor, VideoProcessorError
 from app.utils.exercise_serializer import serialize_exercise
 
 logger = logging.getLogger(__name__)
@@ -244,6 +247,135 @@ class CustomExerciseService:
         finally:
             session.close()
 
+    @staticmethod
+    def _resolve_upload_ext(content_type: str, filename: str) -> tuple[str | None, str]:
+        ext = MIME_TO_EXT.get(content_type)
+        if not ext and '.' in filename:
+            guessed_ext = filename.rsplit('.', 1)[-1].lower()
+            ext = guessed_ext if guessed_ext in EXT_TO_ANIMATION_TYPE else None
+            if ext == 'gif':
+                content_type = 'image/gif'
+            elif ext == 'mp4':
+                content_type = 'video/mp4'
+            elif ext == 'webp':
+                content_type = 'image/webp'
+        return ext, content_type
+
+    @staticmethod
+    def _apply_media_to_exercise(exercise: Exercise, filename: str, ext: str) -> None:
+        media_path = f'/api/exercises/media/{filename}'
+        animation_type = EXT_TO_ANIMATION_TYPE.get(ext, 'none')
+        exercise.animation_url = media_path
+        exercise.animation_type = animation_type
+        exercise.animation_source = 'upload'
+        if animation_type == 'gif':
+            exercise.gif_url = media_path
+        else:
+            exercise.gif_url = None
+
+    @classmethod
+    def _prepare_media_file(
+        cls,
+        source_path: Path,
+        destination: Path,
+        ext: str,
+    ) -> tuple[Path | None, str, int]:
+        try:
+            if ext == 'mp4' and VideoProcessor.is_video_path(source_path):
+                VideoProcessor.process(source_path, destination)
+                return destination, '', 200
+
+            if source_path.stat().st_size > config.EXERCISE_MEDIA_MAX_BYTES:
+                return None, 'Archivo demasiado grande', 400
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, destination)
+            return destination, '', 200
+        except VideoProcessorError as exc:
+            return None, exc.message, 400
+
+    @classmethod
+    def persist_exercise_media(
+        cls,
+        exercise: Exercise,
+        source_path: Path,
+        ext: str,
+        *,
+        session=None,
+        commit: bool = True,
+    ) -> tuple[dict | None, str, int]:
+        upload_dir = cls._ensure_upload_dir()
+        filename = secure_filename(f'{exercise.exercise_db_id}.{ext}')
+        destination = upload_dir / filename
+
+        prepared, error, status = cls._prepare_media_file(source_path, destination, ext)
+        if error:
+            return None, error, status
+
+        cls._apply_media_to_exercise(exercise, filename, ext)
+
+        if session is not None and commit:
+            session.commit()
+            session.refresh(exercise)
+
+        return serialize_exercise(exercise), '', 200
+
+    @classmethod
+    def ingest_media_from_path(
+        cls,
+        exercise_id: str,
+        source_path: Path,
+        *,
+        dry_run: bool = False,
+    ) -> tuple[dict | None, str, int]:
+        if not source_path.is_file():
+            return None, 'Archivo no encontrado', 400
+
+        ext = source_path.suffix.lstrip('.').lower()
+        if ext not in EXT_TO_ANIMATION_TYPE:
+            return None, 'Tipo de archivo no permitido', 400
+
+        session = SessionLocal()
+        try:
+            exercise = cls._get_by_external_id(session, exercise_id)
+            if exercise is None or not exercise.is_active:
+                return None, 'Ejercicio no encontrado', 404
+            if not exercise.is_custom:
+                return None, 'Solo ejercicios custom admiten subida de media', 400
+
+            if dry_run:
+                if ext == 'mp4':
+                    metadata = VideoProcessor.probe(source_path)
+                    max_duration = config.EXERCISE_MEDIA_MAX_DURATION_SECONDS
+                    if metadata.duration_seconds > max_duration:
+                        return None, f'El video no puede superar {max_duration} segundos', 400
+                return {
+                    'exercise_db_id': exercise.exercise_db_id,
+                    'name': exercise.name,
+                    'source': str(source_path),
+                    'dry_run': True,
+                }, '', 200
+
+            result, error, status = cls.persist_exercise_media(
+                exercise,
+                source_path,
+                ext,
+                session=session,
+            )
+            if error:
+                session.rollback()
+                return None, error, status
+            return result, '', status
+        except VideoProcessorError as exc:
+            session.rollback()
+            return None, exc.message, 400
+        except Exception:
+            session.rollback()
+            logger.exception('Error ingesting media for exercise %s', exercise_id)
+            return None, GENERIC_ERROR, 500
+        finally:
+            session.close()
+
     @classmethod
     def delete_exercise(cls, exercise_id: str) -> tuple[dict | None, str, int]:
         session = SessionLocal()
@@ -286,28 +418,26 @@ class CustomExerciseService:
         }
         content_type = (file.content_type or '').lower()
         filename = file.filename or ''
-        ext = MIME_TO_EXT.get(content_type)
-        if not ext and '.' in filename:
-            guessed_ext = filename.rsplit('.', 1)[-1].lower()
-            ext = guessed_ext if guessed_ext in EXT_TO_ANIMATION_TYPE else None
-            if ext == 'gif':
-                content_type = 'image/gif'
-            elif ext == 'mp4':
-                content_type = 'video/mp4'
-            elif ext == 'webp':
-                content_type = 'image/webp'
+        ext, content_type = cls._resolve_upload_ext(content_type, filename)
+
         if content_type not in allowed_mimes and ext not in {'gif', 'mp4', 'webp'}:
+            return None, 'Tipo de archivo no permitido', 400
+        if not ext:
             return None, 'Tipo de archivo no permitido', 400
 
         file.seek(0, os.SEEK_END)
         size = file.tell()
         file.seek(0)
-        if size > config.EXERCISE_MEDIA_MAX_BYTES:
+        max_upload = (
+            config.EXERCISE_MEDIA_RAW_MAX_BYTES
+            if ext == 'mp4'
+            else config.EXERCISE_MEDIA_MAX_BYTES
+        )
+        if size > max_upload:
             return None, 'Archivo demasiado grande', 400
-        if not ext:
-            return None, 'Tipo de archivo no permitido', 400
 
         session = SessionLocal()
+        temp_path: Path | None = None
         try:
             exercise = cls._get_by_external_id(session, exercise_id)
             if exercise is None or not exercise.is_active:
@@ -315,27 +445,28 @@ class CustomExerciseService:
             if not exercise.is_custom:
                 return None, 'Solo ejercicios custom admiten subida de media', 400
 
-            upload_dir = cls._ensure_upload_dir()
-            filename = secure_filename(f'{exercise.exercise_db_id}.{ext}')
-            destination = upload_dir / filename
-            file.save(destination)
+            suffix = f'.{ext}'
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                file.save(temp_file.name)
+                temp_path = Path(temp_file.name)
 
-            media_path = f'/api/exercises/media/{filename}'
-            animation_type = EXT_TO_ANIMATION_TYPE.get(ext, 'none')
-            exercise.animation_url = media_path
-            exercise.animation_type = animation_type
-            exercise.animation_source = 'upload'
-            if animation_type == 'gif':
-                exercise.gif_url = media_path
-
-            session.commit()
-            session.refresh(exercise)
-            return serialize_exercise(exercise), '', 200
+            result, error, status = cls.persist_exercise_media(
+                exercise,
+                temp_path,
+                ext,
+                session=session,
+            )
+            if error:
+                session.rollback()
+                return None, error, status
+            return result, '', status
         except Exception:
             session.rollback()
             logger.exception('Error uploading media for exercise %s', exercise_id)
             return None, GENERIC_ERROR, 500
         finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
             session.close()
 
     @staticmethod
