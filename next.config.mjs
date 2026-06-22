@@ -33,6 +33,9 @@ const nextConfig = {
         destination: '/trainer-v2/athletes/:athleteId/nutrition',
         permanent: true,
       },
+      { source: '/landing-v2', destination: '/', permanent: true },
+      { source: '/landing-v3', destination: '/', permanent: true },
+      { source: '/landing-v4', destination: '/', permanent: true },
     ];
   },
 };

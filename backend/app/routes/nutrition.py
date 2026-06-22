@@ -6,6 +6,7 @@ from app.services.nutrition_diary_service import NutritionDiaryService
 from app.services.nutrition_service import GENERIC_ERROR, NutritionService
 from app.utils.authorization import (
     require_athlete_access,
+    require_active_membership,
     require_manage_athlete,
     require_modify_athlete_diary,
     role_required,
@@ -30,6 +31,9 @@ def get_plan():
     session = SessionLocal()
     try:
         denied = require_athlete_access(athlete_id, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_id, session=session)
         if denied:
             return denied
         plan, error = NutritionService.get_plan(athlete_id, session=session)
@@ -127,6 +131,9 @@ def get_diary():
         denied = require_athlete_access(athlete_id, session=session)
         if denied:
             return denied
+        denied = require_active_membership(athlete_id, session=session)
+        if denied:
+            return denied
         diary, error = NutritionDiaryService.get_diary(athlete_id, date=date, session=session)
     finally:
         session.close()
@@ -148,6 +155,9 @@ def put_diary():
     session = SessionLocal()
     try:
         denied = require_modify_athlete_diary(athlete_parsed, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_parsed, session=session)
         if denied:
             return denied
         diary, error = NutritionDiaryService.upsert_diary(data, session=session)
@@ -174,6 +184,9 @@ def add_diary_entry():
         denied = require_modify_athlete_diary(athlete_parsed, session=session)
         if denied:
             return denied
+        denied = require_active_membership(athlete_parsed, session=session)
+        if denied:
+            return denied
         diary, error = NutritionDiaryService.add_entry(data, session=session)
     finally:
         session.close()
@@ -195,6 +208,9 @@ def delete_diary_entry(entry_id):
     session = SessionLocal()
     try:
         denied = require_modify_athlete_diary(athlete_id, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_id, session=session)
         if denied:
             return denied
         diary, error = NutritionDiaryService.delete_entry(
@@ -224,6 +240,9 @@ def patch_diary_water():
     session = SessionLocal()
     try:
         denied = require_modify_athlete_diary(athlete_parsed, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_parsed, session=session)
         if denied:
             return denied
         diary, error = NutritionDiaryService.patch_water(data, session=session)

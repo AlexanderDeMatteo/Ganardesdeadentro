@@ -6,6 +6,7 @@ import { PrimeActivityLogPanel } from '@/components/admin-v2/prime-activity-log-
 import { PrimeAlertsPanel } from '@/components/admin-v2/prime-alerts-panel';
 import { PrimeCommandPalette } from '@/components/admin-v2/prime-command-palette';
 import { PrimeCommandTrigger } from '@/components/admin-v2/prime-command-trigger';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +36,7 @@ export function PrimeTopBar() {
         </div>
 
         <div className="flex items-center gap-4 md:gap-6">
+        <NotificationBell />
         <DropdownMenu onOpenChange={(open) => open && markAlertsRead()}>
           <DropdownMenuTrigger asChild>
             <button

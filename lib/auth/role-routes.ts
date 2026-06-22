@@ -15,6 +15,7 @@ export const ATHLETE_NAV_ITEMS: RoleNavItem[] = [
   { href: '/metrics', label: 'Métricas' },
   { href: '/nutrition', label: 'Nutrición' },
   { href: '/memberships', label: 'Membresías' },
+  { href: '/support', label: 'Soporte' },
   { href: '/profile', label: 'Perfil' },
 ];
 
@@ -35,6 +36,10 @@ export const ADMIN_V2_NAV_ITEMS: RoleNavItem[] = [
   { href: '/admin-v2/exercises', label: 'Ejercicios' },
   { href: '/admin-v2/assignments', label: 'Asignaciones' },
   { href: '/admin-v2/memberships', label: 'Membresías' },
+  { href: '/admin-v2/payment-methods', label: 'Métodos de pago' },
+  { href: '/admin-v2/exchange-rates', label: 'Tasas de cambio' },
+  { href: '/admin-v2/payments', label: 'Pagos' },
+  { href: '/admin-v2/support', label: 'Soporte' },
 ];
 
 export const ADMIN_V3_NAV_ITEMS: RoleNavItem[] = [
@@ -71,6 +76,7 @@ const ATHLETE_ROUTE_PREFIXES = [
   '/metrics',
   '/nutrition',
   '/memberships',
+  '/support',
   '/profile',
 ] as const;
 
@@ -147,6 +153,11 @@ export function isAdminPanelPath(pathname: string): boolean {
 
 export function isAdminPreviewPath(pathname: string): boolean {
   return isAdminV2Path(pathname) || isAdminV3Path(pathname);
+}
+
+export function isPublicAuthPath(pathname: string): boolean {
+  const normalized = pathname.split('?')[0] ?? pathname;
+  return normalized === '/login' || normalized === '/register' || normalized === '/activate';
 }
 
 export function isTrainerV2Path(pathname: string): boolean {

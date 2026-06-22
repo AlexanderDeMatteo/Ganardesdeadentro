@@ -3,16 +3,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, type Variants } from 'framer-motion';
-import { useEffect, useState } from 'react';
 import { GridBackground } from '@/components/landing/aceternity/grid-background';
 import { LuminousButton } from '@/components/landing/aceternity/luminous-button';
-import { Spotlight } from '@/components/landing/aceternity/spotlight';
-import { Vortex } from '@/components/ui/vortex';
 import { CoachParallaxCard } from '@/components/landing/coach-parallax-card';
 import { LightPillarBackground } from '@/components/landing/light-pillar-background';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
-import { LANDING_MASCOT_V1, type LandingMascotConfig } from '@/lib/landing/mascot-config';
-import type { LandingHeroBackground } from '@/lib/landing/landing-variant';
+import { LANDING_MASCOT_V2, type LandingMascotConfig } from '@/lib/landing/mascot-config';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -30,7 +26,6 @@ const itemVariants: Variants = {
 type HeroSectionProps = {
   isAuthenticated: boolean;
   mascot?: LandingMascotConfig;
-  heroBackground?: LandingHeroBackground;
 };
 
 function HeroInner({
@@ -100,9 +95,9 @@ function HeroInner({
                   Únete a la élite
                 </LuminousButton>
               </Link>
-              <Link href="#rutinas" className="w-full sm:min-w-[220px]">
+              <Link href="#membresias" className="w-full sm:min-w-[220px]">
                 <LuminousButton luminousVariant="ghost" size="lg" className="w-full">
-                  Ver programas
+                  Ver membresías
                 </LuminousButton>
               </Link>
             </>
@@ -113,9 +108,9 @@ function HeroInner({
                   Ir al panel
                 </LuminousButton>
               </Link>
-              <Link href="#rutinas" className="w-full sm:min-w-[220px]">
+              <Link href="#membresias" className="w-full sm:min-w-[220px]">
                 <LuminousButton luminousVariant="ghost" size="lg" className="w-full">
-                  Ver programas
+                  Ver membresías
                 </LuminousButton>
               </Link>
             </>
@@ -135,66 +130,19 @@ function HeroInner({
   );
 }
 
-export function HeroSection({
-  isAuthenticated,
-  mascot = LANDING_MASCOT_V1,
-  heroBackground = 'spotlight',
-}: HeroSectionProps) {
+export function HeroSection({ isAuthenticated, mascot = LANDING_MASCOT_V2 }: HeroSectionProps) {
   const reducedMotion = useReducedMotion();
-  const [particleCount, setParticleCount] = useState(200);
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)');
-    const update = () => setParticleCount(media.matches ? 100 : 200);
-    update();
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-
-  if (heroBackground === 'vortex') {
-    return (
-      <section className="relative min-h-screen overflow-hidden" aria-labelledby="hero-heading">
-        <Vortex
-          backgroundColor="#black"
-          rangeY={800}
-          particleCount={particleCount}
-          baseHue={120}
-          baseSpeed={0.02}
-          rangeSpeed={1.2}
-          containerClassName="min-h-screen"
-          className="relative flex min-h-screen w-full flex-col"
-        >
-          <HeroInner isAuthenticated={isAuthenticated} mascot={mascot} reducedMotion={reducedMotion} />
-        </Vortex>
-      </section>
-    );
-  }
-
-  if (heroBackground === 'lightPillar') {
-    return (
-      <section
-        className="relative min-h-screen overflow-hidden bg-[var(--landing-bg)]"
-        aria-labelledby="hero-heading"
-      >
-        <GridBackground className="z-0 opacity-35" />
-        <LightPillarBackground reducedMotion={reducedMotion} />
-        <div className="relative z-10 min-h-screen">
-          <HeroInner isAuthenticated={isAuthenticated} mascot={mascot} reducedMotion={reducedMotion} />
-        </div>
-      </section>
-    );
-  }
 
   return (
     <section
       className="relative min-h-screen overflow-hidden bg-[var(--landing-bg)]"
       aria-labelledby="hero-heading"
     >
-      <GridBackground />
-
-      <Spotlight className="relative min-h-screen">
+      <GridBackground className="z-0 opacity-35" />
+      <LightPillarBackground reducedMotion={reducedMotion} />
+      <div className="relative z-10 min-h-screen">
         <HeroInner isAuthenticated={isAuthenticated} mascot={mascot} reducedMotion={reducedMotion} />
-      </Spotlight>
+      </div>
     </section>
   );
 }

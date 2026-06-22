@@ -8,11 +8,17 @@ import { usePathname } from 'next/navigation';
 import { AthletePowerRail } from '@/components/athlete-prime/athlete-power-rail';
 import { ATHLETE_PRIME_NAV_ICON_MAP } from '@/lib/athlete-prime/athlete-prime-nav-icons';
 import { ATHLETE_NAV_ITEMS } from '@/lib/auth/role-routes';
+import { filterAthleteNavForMembership, getMembershipDaysRemaining, hasActiveAthleteMembership } from '@/lib/membership/access';
 import { cn } from '@/lib/utils';
 
 export function AthletePrimeSidebar() {
   const pathname = usePathname() ?? '';
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const navItems = filterAthleteNavForMembership(
+    ATHLETE_NAV_ITEMS,
+    getMembershipDaysRemaining(user?.membership),
+  );
+  const hasActive = hasActiveAthleteMembership(user?.membership);
 
   return (
     <nav
@@ -31,19 +37,28 @@ export function AthletePrimeSidebar() {
       </div>
 
       <div className="mb-4 shrink-0 px-6">
-        <Link
-          href="/routines"
-          className="gp-chamfer gp-mono gp-btn-phosphor flex w-full items-center justify-center gap-2 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#68ca62]"
-        >
-          <Dumbbell className="h-4 w-4" aria-hidden />
-          ENTRENAR HOY
-        </Link>
+        {hasActive ? (
+          <Link
+            href="/routines"
+            className="gp-chamfer gp-mono gp-btn-phosphor flex w-full items-center justify-center gap-2 py-2.5 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#68ca62]"
+          >
+            <Dumbbell className="h-4 w-4" aria-hidden />
+            ENTRENAR HOY
+          </Link>
+        ) : (
+          <Link
+            href="/memberships"
+            className="gp-chamfer gp-mono flex w-full items-center justify-center gap-2 border border-[#d4a853]/50 bg-[#d4a853]/10 py-2.5 text-sm font-bold text-[#d4a853] transition-all"
+          >
+            ACTIVAR MEMBRESÍA
+          </Link>
+        )}
       </div>
 
       <div className="gp-power-rail-track relative min-h-0 flex-1 overflow-y-auto px-4">
-        <AthletePowerRail activeHref={pathname} />
+        <AthletePowerRail activeHref={pathname} items={navItems} />
         <ul className="space-y-1">
-          {ATHLETE_NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = ATHLETE_PRIME_NAV_ICON_MAP[item.href];
             const isActive = item.exact
               ? pathname === item.href

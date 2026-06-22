@@ -4,6 +4,7 @@ import {
   Dumbbell,
   LayoutDashboard,
   Link2,
+  MessageCircle,
   Sparkles,
   Users,
   type LucideIcon,
@@ -17,4 +18,5 @@ export const ADMIN_V2_NAV_ICON_MAP: Record<string, LucideIcon> = {
   '/admin-v2/exercises': Sparkles,
   '/admin-v2/assignments': Link2,
   '/admin-v2/memberships': CreditCard,
+  '/admin-v2/support': MessageCircle,
 };

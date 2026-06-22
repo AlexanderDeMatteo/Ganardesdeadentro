@@ -23,6 +23,18 @@ INVALID_NAME_ERROR = 'El nombre no puede superar 120 caracteres'
 INVALID_TIER_ERROR = 'functionalTier inválido; use basic, premium o pro'
 
 
+def _is_membership_valid(user_membership: UserMembership | None, now: datetime | None = None) -> bool:
+    if user_membership is None or not user_membership.is_active:
+        return False
+    if user_membership.end_date is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    end = user_membership.end_date
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    return end > now
+
+
 class MembershipService:
     @staticmethod
     def _validate_plan_name(name: str | None) -> tuple[str | None, str]:
@@ -54,7 +66,7 @@ class MembershipService:
                 .order_by(UserMembership.start_date.desc())
                 .first()
             )
-            if not active:
+            if not active or not _is_membership_valid(active):
                 return None, ''
             return serialize_active_membership(active), ''
         except Exception:
@@ -77,7 +89,7 @@ class MembershipService:
                 .order_by(UserMembership.start_date.desc())
                 .first()
             )
-            if not active:
+            if not active or not _is_membership_valid(active):
                 return None, ''
             return serialize_me_membership(active), ''
         except Exception:
@@ -217,6 +229,80 @@ class MembershipService:
             if _membership_level_from_plan(plan) == normalized:
                 return plan
         return None
+
+    @staticmethod
+    def has_active_membership(user_id: int, session=None) -> bool:
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            active = (
+                session.query(UserMembership)
+                .filter_by(user_id=user_id, is_active=True)
+                .order_by(UserMembership.start_date.desc())
+                .first()
+            )
+            return _is_membership_valid(active)
+        finally:
+            if close_session:
+                session.close()
+
+    @staticmethod
+    def assign_membership_on_payment(user_id: int, plan_id: int, session=None):
+        close_session = False
+        if session is None:
+            session = SessionLocal()
+            close_session = True
+        try:
+            user = session.query(User).filter_by(id=user_id, role=RoleEnum.USER).first()
+            if not user:
+                return None, 'Atleta no encontrado'
+
+            plan = session.query(Membership).filter_by(id=plan_id, is_active=True).first()
+            if not plan:
+                return None, 'Plan no encontrado'
+
+            now = datetime.now(timezone.utc)
+            duration = timedelta(days=plan.duration_days or 30)
+            active = (
+                session.query(UserMembership)
+                .filter_by(user_id=user_id, is_active=True)
+                .order_by(UserMembership.start_date.desc())
+                .first()
+            )
+
+            if active and _is_membership_valid(active):
+                end = active.end_date
+                if end.tzinfo is None:
+                    end = end.replace(tzinfo=timezone.utc)
+                base = end if end > now else now
+                active.end_date = base + duration
+                active.membership_id = plan.id
+                session.commit()
+                session.refresh(active)
+                return serialize_active_membership(active), ''
+
+            session.query(UserMembership).filter_by(user_id=user_id, is_active=True).update({'is_active': False})
+            membership = UserMembership(
+                user_id=user_id,
+                membership_id=plan.id,
+                start_date=now,
+                end_date=now + duration,
+                is_active=True,
+                auto_renew=False,
+            )
+            session.add(membership)
+            session.commit()
+            session.refresh(membership)
+            return serialize_active_membership(membership), ''
+        except Exception:
+            session.rollback()
+            logger.exception('Error assigning membership on payment approval')
+            return None, GENERIC_ERROR
+        finally:
+            if close_session:
+                session.close()
 
     @staticmethod
     def assign_membership(user_id: int, plan_id: int, session=None):

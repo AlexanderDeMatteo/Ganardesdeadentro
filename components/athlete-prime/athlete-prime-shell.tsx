@@ -5,8 +5,10 @@ import { usePathname } from 'next/navigation';
 import { AthletePrimeSidebar } from '@/components/athlete-prime/athlete-prime-sidebar';
 import { AthletePrimeTopBar } from '@/components/athlete-prime/athlete-prime-top-bar';
 import { ExpirationAlert } from '@/components/membership/expiration-alert';
+import { useAuth } from '@/app/context/auth-context';
 import { ATHLETE_PRIME_NAV_ICON_MAP } from '@/lib/athlete-prime/athlete-prime-nav-icons';
 import { ATHLETE_NAV_ITEMS, isNavItemActive } from '@/lib/auth/role-routes';
+import { filterAthleteNavForMembership, getMembershipDaysRemaining } from '@/lib/membership/access';
 import { cn } from '@/lib/utils';
 
 type AthletePrimeShellProps = {
@@ -15,6 +17,11 @@ type AthletePrimeShellProps = {
 
 export function AthletePrimeShell({ children }: AthletePrimeShellProps) {
   const pathname = usePathname() ?? '';
+  const { user } = useAuth();
+  const navItems = filterAthleteNavForMembership(
+    ATHLETE_NAV_ITEMS,
+    getMembershipDaysRemaining(user?.membership),
+  );
 
   return (
     <div className="gainer-prime-root flex min-h-screen">
@@ -36,7 +43,7 @@ export function AthletePrimeShell({ children }: AthletePrimeShellProps) {
         className="fixed bottom-0 left-0 z-40 flex w-full items-center justify-around overflow-x-auto border-t gp-border-outline bg-[#0d1511]/95 py-2 px-1 backdrop-blur-sm md:hidden"
         aria-label="Navegación principal"
       >
-        {ATHLETE_NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = ATHLETE_PRIME_NAV_ICON_MAP[item.href];
           if (!Icon) return null;
           const isActive = isNavItemActive(pathname, item);

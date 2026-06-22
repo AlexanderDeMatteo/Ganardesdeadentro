@@ -3,7 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from app.config import get_config, validate_critical_config
 from app.database import SessionLocal, init_db
-from app.extensions import limiter
+from app.extensions import limiter, socketio
 from app.models import User
 
 
@@ -22,6 +22,7 @@ def create_app(config=None):
     CORS(app, origins=app.config['CORS_ORIGINS'], supports_credentials=True)
     jwt = JWTManager(app)
     limiter.init_app(app)
+    socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'])
 
     @jwt.user_lookup_loader
     def load_user(_jwt_header, jwt_data):
@@ -44,24 +45,35 @@ def create_app(config=None):
     from app.routes import (
         admin_bp,
         auth_bp,
+        exchange_rates_bp,
         exercises_bp,
         memberships_bp,
         metrics_bp,
+        notifications_bp,
         nutrition_bp,
+        payments_bp,
         routines_bp,
         sessions_bp,
+        support_bp,
         users_bp,
     )
+    from app.realtime.events import register_socket_events
+
+    register_socket_events()
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(users_bp, url_prefix='/api/users')
+    app.register_blueprint(exchange_rates_bp, url_prefix='/api/exchange-rates')
     app.register_blueprint(exercises_bp, url_prefix='/api/exercises')
     app.register_blueprint(routines_bp, url_prefix='/api/routines')
     app.register_blueprint(memberships_bp, url_prefix='/api/memberships')
+    app.register_blueprint(payments_bp, url_prefix='/api/payments')
     app.register_blueprint(metrics_bp, url_prefix='/api/metrics')
     app.register_blueprint(sessions_bp, url_prefix='/api/sessions')
     app.register_blueprint(nutrition_bp, url_prefix='/api/nutrition')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(notifications_bp, url_prefix='/api/notifications')
+    app.register_blueprint(support_bp, url_prefix='/api/support')
 
     @app.route('/api/health', methods=['GET'])
     def health():

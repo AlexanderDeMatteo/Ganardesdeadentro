@@ -8,7 +8,7 @@ import { CoachAvatar } from '@/components/coach/coach-avatar';
 import { Button } from '@/components/ui/button';
 import { CoachTitanMessage } from '@/components/coach/coach-titan-message';
 import { useCoach } from '@/app/context/coach-context';
-import { isAdminPreviewPath } from '@/lib/auth/role-routes';
+import { isAdminPreviewPath, isPublicAuthPath } from '@/lib/auth/role-routes';
 import { cn } from '@/lib/utils';
 
 export function CoachMascot() {
@@ -35,7 +35,7 @@ export function CoachMascot() {
   } = useCoach();
   const [nutritionInput, setNutritionInput] = useState('');
 
-  if (isAdminPreviewPath(pathname)) {
+  if (isAdminPreviewPath(pathname) || isPublicAuthPath(pathname)) {
     return null;
   }
 

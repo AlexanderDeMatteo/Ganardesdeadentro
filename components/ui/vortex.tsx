@@ -2,7 +2,6 @@
 
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 import { createNoise3D } from 'simplex-noise';
 import { useEffect, useRef, type ReactNode } from 'react';
 
@@ -230,16 +229,15 @@ export function Vortex({
 
   return (
     <div className={cn('relative h-full w-full', containerClassName)}>
-      <motion.div
-        initial={reducedMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
+      <div
         ref={containerRef}
-        className="absolute inset-0 z-0 flex h-full w-full items-center justify-center bg-transparent"
+        className="absolute inset-0 z-0"
+        style={{ background: backgroundColor }}
       >
         <canvas ref={canvasRef} className="h-full w-full" aria-hidden />
-      </motion.div>
+      </div>
 
-      <div className={cn('relative z-10', className)}>{children}</div>
+      {children ? <div className={cn('relative z-10', className)}>{children}</div> : null}
     </div>
   );
 }

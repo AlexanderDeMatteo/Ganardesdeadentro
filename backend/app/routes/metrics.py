@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required
 from app.database import SessionLocal
 from app.models import RoleEnum, User
 from app.services.metrics_service import VALIDATION_ERRORS, MetricsService
-from app.utils.authorization import require_athlete_access
+from app.utils.authorization import require_athlete_access, require_active_membership
 
 metrics_bp = Blueprint('metrics', __name__)
 
@@ -35,6 +35,9 @@ def list_metrics():
         denied = require_athlete_access(athlete_id, session=session)
         if denied:
             return denied
+        denied = require_active_membership(athlete_id, session=session)
+        if denied:
+            return denied
         metrics, error = MetricsService.list_metrics(athlete_id, session=session)
     finally:
         session.close()
@@ -56,6 +59,9 @@ def create_metric():
     session = SessionLocal()
     try:
         denied = require_athlete_access(athlete_parsed, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_parsed, session=session)
         if denied:
             return denied
         athlete = session.query(User).filter_by(id=athlete_parsed).first()
@@ -85,6 +91,9 @@ def update_metric(metric_id):
         denied = require_athlete_access(existing.user_id, session=session)
         if denied:
             return denied
+        denied = require_active_membership(existing.user_id, session=session)
+        if denied:
+            return denied
         metric, error = MetricsService.update_metric(parsed, request.get_json() or {}, session=session)
     finally:
         session.close()
@@ -105,6 +114,9 @@ def delete_metric(metric_id):
         if not existing:
             return {'error': 'Métrica no encontrada'}, 404
         denied = require_athlete_access(existing.user_id, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(existing.user_id, session=session)
         if denied:
             return denied
         success, error = MetricsService.delete_metric(parsed, session=session)

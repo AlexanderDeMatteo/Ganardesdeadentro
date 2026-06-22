@@ -51,6 +51,13 @@ class Config:
         'image/gif,video/mp4,image/webp',
     )
 
+    PAYMENT_RECEIPT_UPLOAD_DIR = os.getenv('PAYMENT_RECEIPT_UPLOAD_DIR', '/data/payment_receipts')
+    PAYMENT_RECEIPT_MAX_BYTES = int(os.getenv('PAYMENT_RECEIPT_MAX_BYTES', '5242880'))
+    PAYMENT_RECEIPT_ALLOWED_MIME = os.getenv(
+        'PAYMENT_RECEIPT_ALLOWED_MIME',
+        'image/jpeg,image/png,image/gif,application/pdf',
+    )
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
@@ -74,6 +81,7 @@ class TestingConfig(Config):
     RATELIMIT_ENABLED = False
     AUTH_RATE_LIMIT = '1000 per minute'
     EXERCISE_MEDIA_UPLOAD_DIR = os.getenv('EXERCISE_MEDIA_UPLOAD_DIR', 'exercise_media_test')
+    PAYMENT_RECEIPT_UPLOAD_DIR = os.getenv('PAYMENT_RECEIPT_UPLOAD_DIR', 'payment_receipts_test')
 
 
 config = {

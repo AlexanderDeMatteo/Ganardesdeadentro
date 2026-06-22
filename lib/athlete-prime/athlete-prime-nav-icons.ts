@@ -4,6 +4,7 @@ import {
   CreditCard,
   Dumbbell,
   LayoutDashboard,
+  MessageCircle,
   User,
   type LucideIcon,
 } from 'lucide-react';
@@ -14,5 +15,6 @@ export const ATHLETE_PRIME_NAV_ICON_MAP: Record<string, LucideIcon> = {
   '/metrics': BarChart3,
   '/nutrition': Apple,
   '/memberships': CreditCard,
+  '/support': MessageCircle,
   '/profile': User,
 };

@@ -9,6 +9,7 @@ from app.utils.authorization import (
     get_current_user_id,
     get_current_role,
     require_athlete_access,
+    require_active_membership,
     require_assignment_manage,
     require_manage_athlete,
     require_routine_manage,
@@ -40,6 +41,9 @@ def my_routine():
     session = SessionLocal()
     try:
         denied = require_athlete_access(athlete_id, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_id, session=session)
         if denied:
             return denied
         result, error = RoutineService.get_my_routine(athlete_id, session=session)
@@ -164,6 +168,9 @@ def get_weekly_plan():
         denied = require_athlete_access(athlete_id, session=session)
         if denied:
             return denied
+        denied = require_active_membership(athlete_id, session=session)
+        if denied:
+            return denied
         plan, error = RoutineService.get_weekly_plan(athlete_id, session=session)
     finally:
         session.close()
@@ -247,6 +254,9 @@ def get_routine(routine_id):
     session = SessionLocal()
     try:
         denied = require_routine_read(parsed, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(session=session)
         if denied:
             return denied
         routine, error = RoutineService.get_routine_by_id(parsed, session=session)

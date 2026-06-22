@@ -7,52 +7,54 @@ import { useReducedMotion } from '@/hooks/use-reduced-motion';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 
-const LASER_REVEAL = { duration: 1.1, ease: 'easeOut' as const };
-const CONTENT_REVEAL = { duration: 0.7, delay: 0.9, ease: 'easeOut' as const };
+const LASER_REVEAL = { duration: 1.4, ease: [0.16, 1, 0.3, 1] as const };
+const CONTENT_REVEAL = { duration: 0.8, delay: 0.85, ease: 'easeOut' as const };
 
 export function LandingCtaV4() {
   const reducedMotion = useReducedMotion();
   const isMobile = useIsMobile();
 
   return (
-    <section className="relative min-h-[640px] w-full scroll-mt-24 overflow-hidden bg-black">
+    <section className="relative min-h-[760px] w-full scroll-mt-24 overflow-hidden bg-black">
       {!reducedMotion && (
-        /* Height fija en CSS — Three.js necesita dimensiones estables al montar */
         <motion.div
-          className="pointer-events-none absolute top-0 left-0 right-0 z-0 h-[500px] overflow-hidden"
+          className="pointer-events-none absolute top-0 left-0 right-0 z-0 h-[760px] overflow-hidden"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
-          viewport={{ once: true, amount: 0.15 }}
+          viewport={{ once: true, amount: 0.1 }}
           transition={LASER_REVEAL}
         >
           <LaserFlow
-            color="#255831"
-            flowSpeed={0.45}
-            wispIntensity={isMobile ? 10 : 28}
-            wispDensity={isMobile ? 0.7 : 1.1}
-            fogIntensity={isMobile ? 0.35 : 0.55}
-            fogScale={0.28}
-            verticalSizing={isMobile ? 2.8 : 3.5}
+            color="#3a8c4a"
+            flowSpeed={0.35}
+            wispIntensity={isMobile ? 6 : 12}
+            wispDensity={isMobile ? 0.8 : 1.0}
+            wispSpeed={15}
+            fogIntensity={isMobile ? 0.45 : 0.6}
+            fogScale={0.3}
+            fogFallSpeed={0.6}
+            verticalSizing={isMobile ? 2.5 : 4.5}
             horizontalBeamOffset={0}
-            verticalBeamOffset={0.38}
-            horizontalSizing={0.28}
-            flowStrength={0.3}
-            decay={1.2}
+            verticalBeamOffset={0}
+            horizontalSizing={0.3}
+            flowStrength={0.25}
+            decay={1.1}
+            falloffStart={1.2}
             className="h-full w-full mix-blend-screen"
           />
         </motion.div>
       )}
 
-      {/* Glow radial en el punto de impacto del láser */}
+      {/* Glow de impacto — halo verde difuso bajo el punto de aterrizaje */}
       <div
-        className="pointer-events-none absolute left-1/2 top-[390px] z-[1] h-32 w-[min(100%,36rem)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(37,88,49,0.4)_0%,transparent_70%)]"
+        className="pointer-events-none absolute left-1/2 top-[360px] z-[1] h-44 w-[min(100%,46rem)] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(58,140,74,0.34)_0%,rgba(37,88,49,0.18)_45%,transparent_72%)]"
         aria-hidden
       />
 
       <motion.div
-        initial={reducedMotion ? false : { opacity: 0 }}
-        whileInView={reducedMotion ? undefined : { opacity: 1 }}
-        viewport={{ once: true, amount: 0.3 }}
+        initial={reducedMotion ? false : { opacity: 0, y: 12 }}
+        whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.25 }}
         transition={reducedMotion ? undefined : CONTENT_REVEAL}
         className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-4 pb-24 pt-[400px] text-center sm:px-6 lg:px-8 lg:pb-32"
       >
@@ -67,7 +69,7 @@ export function LandingCtaV4() {
             <LuminousButton
               luminousVariant="primary"
               size="lg"
-              className="h-auto w-full px-8 py-4 text-sm shadow-[0_0_20px_rgba(104,202,98,0.3)] sm:text-base"
+              className="h-auto w-full px-8 py-4 text-sm shadow-[0_0_28px_rgba(37,88,49,0.35)] sm:text-base"
             >
               Únete al sistema
             </LuminousButton>

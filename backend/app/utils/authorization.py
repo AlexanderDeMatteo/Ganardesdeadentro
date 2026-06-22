@@ -304,3 +304,22 @@ def require_trainer_profile_access(trainer_id: int, session=None):
     if not can_edit_trainer_profile(trainer_id, session=session):
         return {'error': 'No tienes permisos para editar este perfil'}, 403
     return None
+
+
+def has_active_membership(user_id: int, session=None) -> bool:
+    from app.services.membership_service import MembershipService
+
+    return MembershipService.has_active_membership(user_id, session=session)
+
+
+def require_active_membership(user_id: int | None = None, session=None):
+    user = get_verified_user(session=session)
+    if user is None:
+        return {'error': 'La cuenta ha sido desactivada o no existe'}, 401
+    role = _role_value(user.role)
+    if role != RoleEnum.USER.value:
+        return None
+    target_id = user_id if user_id is not None else user.id
+    if not has_active_membership(target_id, session=session):
+        return {'error': 'Membresía activa requerida', 'code': 'membership_required'}, 403
+    return None

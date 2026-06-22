@@ -14,6 +14,8 @@ import { NutritionDashboardCta } from '@/components/nutrition/nutrition-dashboar
 import { useAthleteData } from '@/hooks/use-athlete-data';
 import { useMetrics } from '@/hooks/use-metrics';
 import { useNutrition } from '@/hooks/use-nutrition';
+import { usePaymentCheckout } from '@/hooks/use-payment-checkout';
+import { hasActiveAthleteMembership } from '@/lib/membership/access';
 import {
   Award,
   BarChart3,
@@ -74,11 +76,13 @@ export function AthletePrimeDashboard() {
   const { getLatestEntry, getProgressChange, isLoading: metricsLoading } = useMetrics();
   const latestMetric = getLatestEntry();
   const { getWeeklyAdherence, isLoading: nutritionLoading } = useNutrition();
+  const { pendingRequest } = usePaymentCheckout(user?.id);
 
   const displayName = user?.first_name ?? 'Atleta';
   const isDataLoading = athleteLoading || metricsLoading || nutritionLoading;
   const isAdmin = user?.role === 'admin';
   const membership = user?.membership;
+  const hasActiveMembership = isAdmin || hasActiveAthleteMembership(membership);
 
   const weeklyAdherence = getWeeklyAdherence();
   const adherencePct = weeklyAdherence.adherencePercent;
@@ -142,6 +146,33 @@ export function AthletePrimeDashboard() {
           {initial}
         </div>
       </div>
+
+      {!isAdmin && !hasActiveMembership && (
+        <div className="rounded-xl border border-[#d4a853]/40 bg-[#faf6ee]/10 p-5">
+          {pendingRequest ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="gp-mono text-sm font-bold gp-text-phosphor">Pago en revisión</p>
+                <p className="mt-1 text-sm gp-text-muted">
+                  Tu solicitud para {pendingRequest.planName} está siendo validada por un administrador.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="gp-mono text-sm font-bold gp-text-phosphor">Activa tu membresía</p>
+                <p className="mt-1 text-sm gp-text-muted">
+                  Elige un plan, realiza el pago y sube tu comprobante para desbloquear rutinas, métricas y nutrición.
+                </p>
+              </div>
+              <Link href="/memberships">
+                <PrimeChamferButton type="button">Ver planes</PrimeChamferButton>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       <PrimeKpiStrip
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"

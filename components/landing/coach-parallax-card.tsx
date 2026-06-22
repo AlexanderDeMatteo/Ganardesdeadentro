@@ -10,6 +10,7 @@ import {
 } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { cn } from '@/lib/utils';
 import { LANDING_MASCOT_V1, type LandingMascotConfig } from '@/lib/landing/mascot-config';
 
 const GREETINGS = ['¡Hola, futuro ganador!', 'Comienza tu entrenamiento hoy'];
@@ -40,7 +41,15 @@ function ParallaxLayer({
   );
 }
 
-export function CoachParallaxCard({ mascot = LANDING_MASCOT_V1 }: { mascot?: LandingMascotConfig }) {
+export function CoachParallaxCard({
+  mascot = LANDING_MASCOT_V1,
+  showGreeting = true,
+  className,
+}: {
+  mascot?: LandingMascotConfig;
+  showGreeting?: boolean;
+  className?: string;
+}) {
   const reducedMotion = useReducedMotion();
   const [greetingIndex, setGreetingIndex] = useState(0);
 
@@ -56,12 +65,12 @@ export function CoachParallaxCard({ mascot = LANDING_MASCOT_V1 }: { mascot?: Lan
   const springFloatY = useSpring(floatY, FLOAT_SPRING);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || !showGreeting) return;
     const id = window.setInterval(() => {
       setGreetingIndex((i) => (i + 1) % GREETINGS.length);
     }, 4000);
     return () => window.clearInterval(id);
-  }, [reducedMotion]);
+  }, [reducedMotion, showGreeting]);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -90,9 +99,9 @@ export function CoachParallaxCard({ mascot = LANDING_MASCOT_V1 }: { mascot?: Lan
   };
 
   return (
-    <div className="relative flex w-full max-w-sm flex-col items-center lg:max-w-md lg:flex-shrink-0">
+    <div className={cn('relative flex w-full max-w-sm flex-col items-center lg:max-w-md lg:flex-shrink-0', className)}>
       <motion.div
-        className="relative w-full [perspective:1200px]"
+        className="relative w-full overflow-visible px-2 pb-3 [perspective:1200px]"
         style={reducedMotion ? undefined : { y: springFloatY }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
@@ -128,23 +137,25 @@ export function CoachParallaxCard({ mascot = LANDING_MASCOT_V1 }: { mascot?: Lan
           </ParallaxLayer>
 
           <ParallaxLayer depth={8} pointerX={springX} pointerY={springY} className="relative z-10">
-            <motion.div
-              key={greetingIndex}
-              initial={reducedMotion ? false : { opacity: 0, scale: 0.92 }}
-              animate={reducedMotion ? undefined : { opacity: 1, scale: 1 }}
-              transition={{ duration: 0.35 }}
-              className="absolute -right-2 -top-2 z-20 max-w-[180px] rounded-lg border border-[var(--landing-green-dark)] bg-[var(--landing-surface)] px-3 py-2 text-center shadow-[var(--landing-glow)] sm:-right-6 sm:-top-4 sm:max-w-[200px]"
-              role="status"
-              aria-live="polite"
-            >
-              <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--landing-green)] sm:text-sm">
-                {GREETINGS[greetingIndex]}
-              </p>
-              <span
-                className="absolute -bottom-2 left-1/2 h-0 w-0 -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-[var(--landing-green-dark)]"
-                aria-hidden
-              />
-            </motion.div>
+            {showGreeting && (
+              <motion.div
+                key={greetingIndex}
+                initial={reducedMotion ? false : { opacity: 0, scale: 0.92 }}
+                animate={reducedMotion ? undefined : { opacity: 1, scale: 1 }}
+                transition={{ duration: 0.35 }}
+                className="absolute -right-2 -top-2 z-20 max-w-[180px] rounded-lg border border-[var(--landing-green-dark)] bg-[var(--landing-surface)] px-3 py-2 text-center shadow-[var(--landing-glow)] sm:-right-6 sm:-top-4 sm:max-w-[200px]"
+                role="status"
+                aria-live="polite"
+              >
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--landing-green)] sm:text-sm">
+                  {GREETINGS[greetingIndex]}
+                </p>
+                <span
+                  className="absolute -bottom-2 left-1/2 h-0 w-0 -translate-x-1/2 border-x-8 border-t-8 border-x-transparent border-t-[var(--landing-green-dark)]"
+                  aria-hidden
+                />
+              </motion.div>
+            )}
 
             <Image
               src={mascot.src}

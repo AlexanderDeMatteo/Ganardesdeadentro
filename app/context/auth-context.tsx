@@ -14,7 +14,7 @@ interface AuthContextType {
   error: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
-  register: (email: string, password: string, first_name: string, last_name: string) => Promise<void>;
+  register: (email: string, password: string, first_name: string, last_name: string) => Promise<User>;
   logout: () => void;
   clearError: () => void;
   refreshSession: () => Promise<void>;
@@ -81,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           last_name,
         });
         setUser(session.user);
+        return session.user;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'An error occurred';
         setError(message);

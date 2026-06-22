@@ -1,9 +1,10 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, send_file
 from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
-from app.models import RoleEnum
+from app.models import MembershipPaymentRequest, RoleEnum
 from app.services.membership_service import MembershipService
+from app.services.payment_service import PaymentService
 from app.utils.authorization import get_verified_user, require_athlete_access, role_required
 
 memberships_bp = Blueprint('memberships', __name__)
@@ -48,6 +49,14 @@ def active_membership():
     if error:
         return {'error': error}, 500
     return {'membership': membership}, 200
+
+
+@memberships_bp.route('/plans/public', methods=['GET'])
+def list_plans_public():
+    plans, error = MembershipService.list_plans()
+    if error:
+        return {'error': error}, 500
+    return {'plans': plans}, 200
 
 
 @memberships_bp.route('/plans', methods=['GET'])
@@ -114,11 +123,162 @@ def subscribe():
     if err:
         return err
 
-    membership, error = MembershipService.assign_membership(user.id, plan_parsed)
+    return {
+        'error': 'La suscripción directa está deshabilitada. Envía una solicitud de pago con comprobante.',
+        'code': 'payment_required',
+    }, 403
+
+
+@memberships_bp.route('/payment-requests', methods=['POST'])
+@jwt_required()
+def create_payment_request():
+    user = get_verified_user()
+    if user is None:
+        return {'error': 'La cuenta ha sido desactivada o no existe'}, 401
+    if user.role != RoleEnum.USER:
+        return {'error': 'Solo los atletas pueden enviar solicitudes de pago'}, 403
+
+    form = request.form
+    receipt = request.files.get('receipt')
+    data = {
+        'planId': form.get('planId'),
+        'paymentMethodId': form.get('paymentMethodId'),
+        'fullName': form.get('fullName'),
+        'phone': form.get('phone'),
+        'country': form.get('country'),
+        'sellerCode': form.get('sellerCode'),
+        'email': form.get('email'),
+        'amountUsd': form.get('amountUsd'),
+        'amountConverted': form.get('amountConverted'),
+        'convertedCurrency': form.get('convertedCurrency'),
+        'exchangeRateSnapshot': form.get('exchangeRateSnapshot'),
+    }
+    payment_request, error = PaymentService.create_payment_request(user.id, data, receipt)
     if error:
-        status = 404 if error in ('Atleta no encontrado', 'Plan no encontrado') else 500
+        status = 400 if error in (
+            'planId y paymentMethodId requeridos',
+            'fullName, phone, country y email son requeridos',
+            'Comprobante requerido',
+            'Formato de archivo no permitido',
+            'El archivo supera el tamaño máximo permitido',
+            'Ya tienes una solicitud de pago pendiente',
+            'Plan no encontrado',
+            'Método de pago no encontrado',
+            'amountUsd inválido',
+            'amountConverted inválido',
+            'exchangeRateSnapshot inválido',
+        ) else 500
         return {'error': error}, status
-    return {'membership': membership}, 200
+    return {'paymentRequest': payment_request}, 201
+
+
+@memberships_bp.route('/payment-requests/mine', methods=['GET'])
+@jwt_required()
+def list_my_payment_requests():
+    user = get_verified_user()
+    if user is None:
+        return {'error': 'La cuenta ha sido desactivada o no existe'}, 401
+    requests, error = PaymentService.list_my_requests(user.id)
+    if error:
+        return {'error': error}, 500
+    return {'paymentRequests': requests}, 200
+
+
+@memberships_bp.route('/payment-requests', methods=['GET'])
+@jwt_required()
+@role_required('admin')
+def list_payment_requests():
+    status = request.args.get('status')
+    requests, error = PaymentService.list_requests(status=status)
+    if error:
+        return {'error': error}, 500
+    return {'paymentRequests': requests}, 200
+
+
+@memberships_bp.route('/payment-requests/<request_id>', methods=['GET'])
+@jwt_required()
+def get_payment_request(request_id):
+    user = get_verified_user()
+    if user is None:
+        return {'error': 'La cuenta ha sido desactivada o no existe'}, 401
+    parsed, err = _parse_int(request_id, 'requestId')
+    if err:
+        return err
+
+    session = SessionLocal()
+    try:
+        req = session.query(MembershipPaymentRequest).filter_by(id=parsed).first()
+        if not req:
+            return {'error': 'Solicitud no encontrada'}, 404
+        role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        if role != RoleEnum.ADMIN.value and req.user_id != user.id:
+            return {'error': 'No tienes permisos para ver esta solicitud'}, 403
+    finally:
+        session.close()
+
+    payment_request, error = PaymentService.get_request(parsed)
+    if error:
+        return {'error': error}, 404 if error == 'Solicitud no encontrada' else 500
+    return {'paymentRequest': payment_request}, 200
+
+
+@memberships_bp.route('/payment-requests/<request_id>/approve', methods=['POST'])
+@jwt_required()
+@role_required('admin')
+def approve_payment_request(request_id):
+    user = get_verified_user()
+    parsed, err = _parse_int(request_id, 'requestId')
+    if err:
+        return err
+    result, error = PaymentService.approve_request(parsed, user.id)
+    if error:
+        status = 404 if error == 'Solicitud no encontrada' else 400 if error == 'La solicitud ya fue procesada' else 500
+        return {'error': error}, status
+    return {'paymentRequest': result}, 200
+
+
+@memberships_bp.route('/payment-requests/<request_id>/reject', methods=['POST'])
+@jwt_required()
+@role_required('admin')
+def reject_payment_request(request_id):
+    user = get_verified_user()
+    parsed, err = _parse_int(request_id, 'requestId')
+    if err:
+        return err
+    data = request.get_json() or {}
+    result, error = PaymentService.reject_request(parsed, user.id, data.get('reason'))
+    if error:
+        status = 404 if error == 'Solicitud no encontrada' else 400 if error == 'La solicitud ya fue procesada' else 500
+        return {'error': error}, status
+    return {'paymentRequest': result}, 200
+
+
+@memberships_bp.route('/payment-requests/<request_id>/receipt', methods=['GET'])
+@jwt_required()
+def serve_payment_receipt(request_id):
+    user = get_verified_user()
+    if user is None:
+        return {'error': 'La cuenta ha sido desactivada o no existe'}, 401
+    parsed, err = _parse_int(request_id, 'requestId')
+    if err:
+        return err
+
+    session = SessionLocal()
+    try:
+        req = session.query(MembershipPaymentRequest).filter_by(id=parsed).first()
+        if not req:
+            return {'error': 'Solicitud no encontrada'}, 404
+        role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        if role != RoleEnum.ADMIN.value and req.user_id != user.id:
+            return {'error': 'No tienes permisos para ver este comprobante'}, 403
+    finally:
+        session.close()
+
+    path, mime, filename, error = PaymentService.get_receipt_path(parsed)
+    if error:
+        status = 404 if error in ('Solicitud no encontrada', 'Comprobante no encontrado') else 500
+        return {'error': error}, status
+    return send_file(path, mimetype=mime, as_attachment=False, download_name=filename)
 
 
 @memberships_bp.route('/users/<user_id>', methods=['PUT'])

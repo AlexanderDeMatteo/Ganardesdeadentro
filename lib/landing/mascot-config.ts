@@ -17,7 +17,9 @@ export type LandingMascotConfig = {
   glowRingClassName: string;
 };
 
-const KICKER_LOGO = '/WhatsApp_Image_2026-06-03_at_7.42.29_PM__1_-removebg-preview.png';
+import { OFFICIAL_BRAND_LOGO } from '@/lib/landing/brand-logo';
+
+const KICKER_LOGO = OFFICIAL_BRAND_LOGO;
 
 export const LANDING_MASCOT_V1: LandingMascotConfig = {
   id: 'v1',
@@ -61,4 +63,16 @@ export const LANDING_MASCOT_V2: LandingMascotConfig = {
     'h-[300px] w-[300px] rounded-full bg-[radial-gradient(circle,rgb(104_202_98_/_0.35)_0%,rgb(37_88_49_/_0.15)_45%,transparent_70%)] blur-2xl sm:h-[340px] sm:w-[340px] lg:h-[400px] lg:w-[400px]',
   glowRingClassName:
     'h-[240px] w-[240px] rounded-full border border-[var(--landing-green)]/25 shadow-[var(--landing-glow-strong)] sm:h-[280px] sm:w-[280px] lg:h-[340px] lg:w-[340px]',
+};
+
+/** Mascot oficial para auth — escala dentro del contenedor sin recortes. */
+export const LANDING_MASCOT_AUTH: LandingMascotConfig = {
+  ...LANDING_MASCOT_V2,
+  imageClassName:
+    'relative mx-auto h-auto w-full max-w-[180px] object-contain object-center sm:max-w-[200px] lg:max-w-[200px] drop-shadow-[0_24px_48px_rgb(0_0_0_/_0.55)]',
+  sizes: '(max-width: 1024px) 45vw, 200px',
+  glowBlurClassName:
+    'h-[170px] w-[170px] rounded-full bg-[radial-gradient(circle,rgb(104_202_98_/_0.35)_0%,rgb(37_88_49_/_0.15)_45%,transparent_70%)] blur-2xl sm:h-[190px] sm:w-[190px] lg:h-[210px] lg:w-[210px]',
+  glowRingClassName:
+    'h-[145px] w-[145px] rounded-full border border-[var(--landing-green)]/25 shadow-[var(--landing-glow-strong)] sm:h-[165px] sm:w-[165px] lg:h-[185px] lg:w-[185px]',
 };

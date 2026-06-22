@@ -92,6 +92,9 @@ class UserProfile(Base):
     initial_body_fat_percentage = Column(Float)
     profile_picture_url = Column(String(255))
     bio = Column(Text)
+    phone = Column(String(40))
+    country = Column(String(80))
+    seller_code = Column(String(80))
     specialization = Column(String(160))
     rating = Column(Float, default=0.0)
     max_athletes = Column(Integer, default=10)
@@ -131,6 +134,107 @@ class Membership(Base):
     )
 
     user_memberships = relationship('UserMembership', back_populates='membership', cascade='all, delete-orphan')
+    payment_requests = relationship('MembershipPaymentRequest', back_populates='membership', cascade='all, delete-orphan')
+
+
+class ExchangeRate(Base):
+    __tablename__ = 'exchange_rates'
+
+    id = Column(Integer, primary_key=True)
+    from_currency = Column(String(3), nullable=False, default='USD')
+    to_currency = Column(String(3), nullable=False, default='VES')
+    rate = Column(Float, nullable=False, default=1)
+    label = Column(String(80))
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    payment_methods = relationship('PaymentMethod', back_populates='exchange_rate')
+
+    __table_args__ = (
+        Index('idx_exchange_rate_pair_active', 'from_currency', 'to_currency', 'is_active'),
+    )
+
+
+class PaymentMethod(Base):
+    __tablename__ = 'payment_methods'
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(120), nullable=False)
+    slug = Column(String(120), unique=True, nullable=False, index=True)
+    category = Column(String(120), nullable=False, default='')
+    method_type = Column(String(20), nullable=False, default='digital')
+    exchange_rate_id = Column(Integer, ForeignKey('exchange_rates.id'), nullable=True, index=True)
+    details = Column(Text, nullable=False, default='[]')
+    instructions = Column(Text, nullable=False, default='')
+    sort_order = Column(Integer, default=0, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    payment_requests = relationship('MembershipPaymentRequest', back_populates='payment_method')
+    exchange_rate = relationship('ExchangeRate', back_populates='payment_methods')
+
+
+class MembershipPaymentRequest(Base):
+    __tablename__ = 'membership_payment_requests'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    membership_id = Column(Integer, ForeignKey('memberships.id'), nullable=False, index=True)
+    payment_method_id = Column(Integer, ForeignKey('payment_methods.id'), nullable=False, index=True)
+    full_name = Column(String(200), nullable=False)
+    phone = Column(String(40), nullable=False)
+    country = Column(String(80), nullable=False)
+    seller_code = Column(String(80))
+    email = Column(String(120), nullable=False)
+    amount = Column(Float, nullable=False, default=0)
+    amount_usd = Column(Float, nullable=False, default=0)
+    amount_converted = Column(Float)
+    converted_currency = Column(String(3))
+    exchange_rate_snapshot = Column(Float)
+    receipt_path = Column(String(512), nullable=False)
+    receipt_mime = Column(String(80), nullable=False)
+    receipt_size = Column(Integer, nullable=False, default=0)
+    status = Column(String(20), nullable=False, default='pending', index=True)
+    reviewed_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    rejection_reason = Column(Text)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    user = relationship('User', back_populates='payment_requests', foreign_keys=[user_id])
+    membership = relationship('Membership', back_populates='payment_requests')
+    payment_method = relationship('PaymentMethod', back_populates='payment_requests')
+    reviewer = relationship('User', foreign_keys=[reviewed_by])
+
+    __table_args__ = (
+        Index('idx_payment_request_status_created', 'status', 'created_at'),
+        Index('idx_payment_request_user_status', 'user_id', 'status'),
+    )
+
+
+User.payment_requests = relationship(
+    'MembershipPaymentRequest',
+    back_populates='user',
+    foreign_keys=[MembershipPaymentRequest.user_id],
+    cascade='all, delete-orphan',
+)
 
 
 class UserMembership(Base):
@@ -411,4 +515,57 @@ class InvitationToken(Base):
 
     __table_args__ = (
         Index('idx_invitation_user_purpose', 'user_id', 'purpose'),
+    )
+
+
+class Notification(Base):
+    __tablename__ = 'notifications'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    type = Column(String(64), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    body = Column(Text, nullable=False, default='')
+    data = Column(Text, nullable=False, default='{}')
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    user = relationship('User', backref='notifications')
+
+    __table_args__ = (
+        Index('idx_notification_user_read', 'user_id', 'read_at'),
+        Index('idx_notification_user_created', 'user_id', 'created_at'),
+    )
+
+
+class SupportThread(Base):
+    __tablename__ = 'support_threads'
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, ForeignKey('users.id'), unique=True, nullable=False, index=True)
+    last_message_at = Column(DateTime, nullable=True)
+    last_message_preview = Column(String(200), nullable=False, default='')
+    unread_for_admin = Column(Integer, nullable=False, default=0)
+    unread_for_athlete = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    athlete = relationship('User', foreign_keys=[athlete_id], backref='support_thread')
+
+
+class SupportMessage(Base):
+    __tablename__ = 'support_messages'
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    sender_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    sender_role = Column(String(20), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    read_at = Column(DateTime, nullable=True)
+
+    athlete = relationship('User', foreign_keys=[athlete_id])
+    sender = relationship('User', foreign_keys=[sender_id])
+
+    __table_args__ = (
+        Index('idx_support_message_athlete_created', 'athlete_id', 'created_at'),
     )

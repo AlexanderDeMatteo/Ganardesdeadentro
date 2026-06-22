@@ -1,15 +1,79 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/auth-context';
-import { Button } from '@/components/ui/button';
+import { LuminousButton } from '@/components/landing/aceternity/luminous-button';
+import { CoachParallaxCard } from '@/components/landing/coach-parallax-card';
 import { Input } from '@/components/ui/input';
+import { useReducedMotion } from '@/hooks/use-reduced-motion';
+import { getHomeRouteForRole } from '@/lib/auth/role-routes';
+import { LANDING_MASCOT_V2 } from '@/lib/landing/mascot-config';
+import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { type ReactNode, useState } from 'react';
+
+const STAGGER = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.08, delayChildren: 0.05 },
+  },
+};
+
+const ITEM = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring' as const, stiffness: 260, damping: 26 },
+  },
+};
+
+const inputClassName = cn(
+  'h-12 border-white/10 bg-[rgb(18_26_22_/_0.7)] text-white placeholder:text-white/30',
+  'focus-visible:border-[var(--landing-green)]/60 focus-visible:ring-[3px] focus-visible:ring-[rgb(104_202_98_/_0.12)]',
+);
+
+type RevealProps = {
+  animate: boolean;
+  as?: 'div' | 'form';
+  className?: string;
+  children: ReactNode;
+  onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void;
+};
+
+function Reveal({ animate, as = 'div', className, children, onSubmit }: RevealProps) {
+  if (!animate) {
+    if (as === 'form') {
+      return (
+        <form onSubmit={onSubmit} className={className}>
+          {children}
+        </form>
+      );
+    }
+    return <div className={className}>{children}</div>;
+  }
+
+  if (as === 'form') {
+    return (
+      <motion.form variants={ITEM} className={className} onSubmit={onSubmit}>
+        {children}
+      </motion.form>
+    );
+  }
+
+  return (
+    <motion.div variants={ITEM} className={className}>
+      {children}
+    </motion.div>
+  );
+}
 
 export function RegisterForm() {
   const router = useRouter();
+  const reducedMotion = useReducedMotion();
+  const animate = !reducedMotion;
   const { register, isLoading, error, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,8 +92,8 @@ export function RegisterForm() {
     }
 
     try {
-      await register(email, password, firstName, lastName);
-      router.push('/dashboard');
+      const user = await register(email, password, firstName, lastName);
+      router.push(getHomeRouteForRole(user.role));
     } catch (err) {
       console.error('Register error:', err);
     }
@@ -37,147 +101,151 @@ export function RegisterForm() {
 
   const displayError = error || localError;
 
-  return (
-    <div className="brand-card w-full max-w-md rounded-2xl p-6 sm:p-8">
-      <div className="space-y-8">
-        <div className="space-y-3 text-center">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-accent to-secondary brand-glow-primary">
-            <span className="text-2xl font-black text-primary-foreground">FT</span>
-          </div>
-          <p className="brand-kicker">Nuevo retador</p>
-          <h1 className="brand-title text-5xl font-black brand-text-gradient">Únete a FitTrack</h1>
-          <p className="text-base text-muted-foreground">
-            Comienza tu transformación hoy mismo
-          </p>
+  const body = (
+    <>
+      <Reveal
+        animate={animate}
+        className="mb-6 flex flex-col items-center text-center lg:mb-8 lg:items-start lg:text-left"
+      >
+        <div className="mb-5 scale-90 lg:hidden">
+          <CoachParallaxCard mascot={LANDING_MASCOT_V2} showGreeting={false} className="mx-auto" />
         </div>
+        <h2 className="landing-heading text-3xl text-[var(--landing-green)] sm:text-4xl">Crear cuenta</h2>
+        <p className="mt-2 text-sm text-white/55">Únete y empieza a entrenar con propósito.</p>
+      </Reveal>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {displayError && (
-            <div
-              className="flex items-start gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/20"
-              role="alert"
-              aria-live="assertive"
+      <Reveal animate={animate} as="form" onSubmit={handleSubmit} className="space-y-4">
+        {displayError && (
+          <div
+            className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4"
+            role="alert"
+            aria-live="assertive"
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+            <p className="text-sm font-medium text-red-300">{displayError}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <label
+              htmlFor="firstName"
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--landing-green-pastel)]"
             >
-              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-              <p className="text-sm font-medium text-destructive">{displayError}</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="firstName" className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">
-                Nombre
-              </label>
-              <Input
-                id="firstName"
-                type="text"
-                placeholder="Juan"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                disabled={isLoading}
-                required
-                className="h-11 text-base"
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="lastName" className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">
-                Apellido
-              </label>
-              <Input
-                id="lastName"
-                type="text"
-                placeholder="Pérez"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                disabled={isLoading}
-                required
-                className="h-11 text-base"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="email" className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">
-              Correo electrónico
+              Nombre
             </label>
             <Input
-              id="email"
-              type="email"
-              placeholder="tu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              id="firstName"
+              type="text"
+              autoComplete="given-name"
+              placeholder="Juan"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               disabled={isLoading}
               required
-              className="h-11 text-base"
+              className={inputClassName}
             />
           </div>
-
           <div className="space-y-2">
-            <label htmlFor="password" className="text-xs font-extrabold uppercase tracking-[0.14em] text-foreground">
-              Contraseña
+            <label
+              htmlFor="lastName"
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--landing-green-pastel)]"
+            >
+              Apellido
             </label>
             <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              id="lastName"
+              type="text"
+              autoComplete="family-name"
+              placeholder="Pérez"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               disabled={isLoading}
               required
-              className="h-11 text-base"
+              className={inputClassName}
             />
-            <p className="text-xs text-muted-foreground mt-1">Mínimo 8 caracteres</p>
           </div>
+        </div>
 
-          <Button
-            type="submit"
+        <div className="space-y-2">
+          <label
+            htmlFor="email"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--landing-green-pastel)]"
+          >
+            Correo electrónico
+          </label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="tu@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            className="h-12 w-full text-base"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Creando cuenta...
-              </>
-            ) : (
-              'Crear cuenta'
-            )}
-          </Button>
-        </form>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="bg-card px-2 text-muted-foreground">¿Ya tienes cuenta?</span>
-          </div>
+            required
+            className={inputClassName}
+          />
         </div>
 
-        <Link href="/login">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-12 w-full border-2 border-secondary text-base text-secondary hover:bg-secondary/5"
+        <div className="space-y-2">
+          <label
+            htmlFor="password"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--landing-green-pastel)]"
           >
-            Inicia sesión aquí
-          </Button>
+            Contraseña
+          </label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+            required
+            className={inputClassName}
+          />
+          <p className="text-xs text-white/40">Mínimo 8 caracteres</p>
+        </div>
+
+        <LuminousButton type="submit" disabled={isLoading} className="w-full">
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+              Creando cuenta...
+            </>
+          ) : (
+            'Crear cuenta'
+          )}
+        </LuminousButton>
+      </Reveal>
+
+      <Reveal animate={animate} className="relative my-6">
+        <div className="landing-v4-divider absolute inset-x-0 top-1/2" aria-hidden />
+        <p className="relative mx-auto w-fit bg-[color-mix(in_srgb,var(--landing-surface)_85%,transparent)] px-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+          ¿Ya tienes cuenta?
+        </p>
+      </Reveal>
+
+      <Reveal animate={animate}>
+        <Link href="/login" className="block w-full">
+          <LuminousButton type="button" luminousVariant="ghost" className="w-full">
+            Iniciar sesión
+          </LuminousButton>
         </Link>
+      </Reveal>
+    </>
+  );
 
-        <div className="space-y-3 rounded-xl border border-accent/20 bg-accent/10 p-4 backdrop-blur-sm">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
-            <div className="text-xs text-foreground">
-              <p className="font-semibold mb-1">Qué incluye tu cuenta:</p>
-              <ul className="space-y-1 text-muted-foreground">
-                <li>✓ Planes de entrenamiento personalizados</li>
-                <li>✓ Seguimiento de métricas</li>
-                <li>✓ Historial de progreso</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
+  return (
+    <div className="w-full rounded-2xl border border-white/[0.08] bg-[color-mix(in_srgb,var(--landing-surface)_85%,transparent)] p-6 backdrop-blur-xl sm:p-8">
+      {animate ? (
+        <motion.div variants={STAGGER} initial="hidden" animate="visible">
+          {body}
+        </motion.div>
+      ) : (
+        body
+      )}
     </div>
   );
 }

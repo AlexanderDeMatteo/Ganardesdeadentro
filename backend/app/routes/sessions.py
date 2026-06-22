@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
 from app.services.session_service import GENERIC_ERROR, SessionService
-from app.utils.authorization import get_current_user_id, require_athlete_access
+from app.utils.authorization import get_current_user_id, require_athlete_access, require_active_membership
 
 sessions_bp = Blueprint('sessions', __name__)
 
@@ -30,6 +30,9 @@ def complete_session():
         denied = require_athlete_access(athlete_parsed, session=session)
         if denied:
             return denied
+        denied = require_active_membership(athlete_parsed, session=session)
+        if denied:
+            return denied
         log, error = SessionService.mark_complete(athlete_parsed, data, session=session)
     finally:
         session.close()
@@ -52,6 +55,9 @@ def list_sessions():
         denied = require_athlete_access(athlete_id, session=session)
         if denied:
             return denied
+        denied = require_active_membership(athlete_id, session=session)
+        if denied:
+            return denied
         logs, error = SessionService.list_sessions(athlete_id, session=session)
     finally:
         session.close()
@@ -72,6 +78,9 @@ def week_sessions():
         denied = require_athlete_access(athlete_id, session=session)
         if denied:
             return denied
+        denied = require_active_membership(athlete_id, session=session)
+        if denied:
+            return denied
         logs, error = SessionService.list_sessions_for_week(athlete_id, week_start, session=session)
     finally:
         session.close()
@@ -90,6 +99,9 @@ def exercise_progress():
     session = SessionLocal()
     try:
         denied = require_athlete_access(athlete_id, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_id, session=session)
         if denied:
             return denied
         points, error = SessionService.get_exercise_progress(athlete_id, exercise_id, session=session)

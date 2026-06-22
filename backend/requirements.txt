@@ -13,3 +13,5 @@ pytest==8.3.4
 alembic==1.14.0
 pydantic>=2.10.3
 resend>=2.0.0
+Flask-SocketIO==5.3.6
+python-socketio==5.11.0

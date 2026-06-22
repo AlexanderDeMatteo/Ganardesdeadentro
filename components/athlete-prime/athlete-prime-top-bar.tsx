@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Shield, UserCircle } from 'lucide-react';
 import { useAuth } from '@/app/context/auth-context';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 
 export function AthletePrimeTopBar() {
   const { user } = useAuth();
@@ -25,16 +26,19 @@ export function AthletePrimeTopBar() {
         )}
       </div>
 
-      <Link
-        href="/profile"
-        className="flex items-center gap-3 border-l gp-border-outline pl-4 transition-opacity hover:opacity-90"
-      >
+      <div className="flex items-center gap-4">
+        <NotificationBell athleteMode />
+        <Link
+          href="/profile"
+          className="flex items-center gap-3 border-l gp-border-outline pl-4 transition-opacity hover:opacity-90"
+        >
         <div className="hidden text-right sm:block">
           <p className="gp-label gp-text-phosphor">{user?.first_name ?? 'Atleta'}</p>
           <p className="gp-mono text-[10px] uppercase gp-text-muted">Mi cuenta</p>
         </div>
         <UserCircle className="h-8 w-8 gp-text-muted" aria-hidden />
-      </Link>
+        </Link>
+      </div>
     </header>
   );
 }

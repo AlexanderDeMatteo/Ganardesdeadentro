@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Bebas_Neue, Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { AuthProvider } from '@/app/context/auth-context'
+import { RealtimeProvider } from '@/app/context/realtime-context'
 import { CoachProvider } from '@/app/context/coach-context'
 import { DataProvider } from '@/lib/data/store'
 import { MetricsProvider } from '@/hooks/use-metrics'
@@ -87,6 +88,7 @@ export default function RootLayout({
         </a>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <AuthProvider>
+            <RealtimeProvider>
             <DataProvider>
               <MetricsProvider>
                 <NutritionProvider>
@@ -98,6 +100,7 @@ export default function RootLayout({
                 </NutritionProvider>
               </MetricsProvider>
             </DataProvider>
+            </RealtimeProvider>
           </AuthProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

@@ -6,6 +6,7 @@ import {
   getHomeRouteForRole,
   getRedirectForWrongRole,
 } from '@/lib/auth/role-routes';
+import { canAthleteAccessPath, getMembershipDaysRemaining } from '@/lib/membership/access';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -42,6 +43,18 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
       !canRoleAccessPath(user.role, pathname)
     ) {
       router.push(getHomeRouteForRole(user.role));
+      return;
+    }
+
+    if (
+      !isLoading &&
+      isAuthenticated &&
+      user &&
+      user.role === 'user' &&
+      !requiredRole &&
+      !canAthleteAccessPath(pathname, getMembershipDaysRemaining(user.membership))
+    ) {
+      router.push('/dashboard');
     }
   }, [isLoading, isAuthenticated, requiredRole, user, router, pathname]);
 
@@ -69,6 +82,14 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   if (!requiredRole && !canRoleAccessPath(user.role, pathname)) {
+    return null;
+  }
+
+  if (
+    user.role === 'user' &&
+    !requiredRole &&
+    !canAthleteAccessPath(pathname, getMembershipDaysRemaining(user.membership))
+  ) {
     return null;
   }
 
