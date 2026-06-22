@@ -1,4 +1,7 @@
+import io
 from datetime import date
+
+import pytest
 
 from tests.conftest import auth_headers, create_user
 
@@ -52,6 +55,10 @@ class TestUsersRoutes:
 
 
 class TestRoutinesHierarchy:
+    @pytest.fixture(autouse=True)
+    def _athlete_has_membership(self, athlete_membership):
+        return athlete_membership
+
     def test_trainer_assigns_routine_visible_to_athlete(self, client, trainer_user, athlete_user, trainer_headers, athlete_headers):
         create = client.post(
             '/api/routines/',
@@ -292,6 +299,10 @@ class TestRoutinesHierarchy:
 
 
 class TestMetricsRoutes:
+    @pytest.fixture(autouse=True)
+    def _athlete_has_membership(self, athlete_membership):
+        return athlete_membership
+
     def test_athlete_creates_metric(self, client, athlete_user, athlete_headers):
         response = client.post(
             '/api/metrics/',
@@ -470,7 +481,7 @@ class TestMembershipsRoutes:
         )
         assert response.status_code == 403
 
-    def test_athlete_subscribe_plan(self, client, admin_headers, athlete_headers):
+    def test_athlete_subscribe_plan_blocked(self, client, admin_headers, athlete_headers):
         create_response = client.post(
             '/api/memberships/plans',
             headers=admin_headers,
@@ -489,10 +500,8 @@ class TestMembershipsRoutes:
             headers=athlete_headers,
             json={'planId': plan_id},
         )
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['membership']['planId'] == plan_id
-        assert data['membership']['level'] == 'premium'
+        assert response.status_code == 403
+        assert response.get_json()['code'] == 'payment_required'
 
     def test_trainer_cannot_subscribe(self, client, admin_headers, trainer_headers):
         create_response = client.post(
@@ -521,7 +530,7 @@ class TestMembershipsRoutes:
             headers=athlete_headers,
             json={'planId': 99999},
         )
-        assert response.status_code == 404
+        assert response.status_code == 403
 
     def test_custom_plan_name_with_functional_tier(self, client, admin_headers, athlete_user):
         create_response = client.post(
@@ -558,7 +567,201 @@ class TestMembershipsRoutes:
         assert athlete['membershipLevel'] == 'premium'
 
 
+class TestPaymentFlow:
+    def _create_rate(self, client, admin_headers):
+        return client.post(
+            '/api/exchange-rates/',
+            headers=admin_headers,
+            json={
+                'fromCurrency': 'USD',
+                'toCurrency': 'VES',
+                'rate': 36.5,
+                'label': 'USD → VES',
+                'isActive': True,
+            },
+        )
+
+    def _create_plan(self, client, admin_headers, name='Premium Pay'):
+        return client.post(
+            '/api/memberships/plans',
+            headers=admin_headers,
+            json={
+                'name': name,
+                'price': 5.0,
+                'description': 'Plan pago',
+                'features': ['Rutinas'],
+                'durationDays': 30,
+                'color': 'gold',
+            },
+        )
+
+    def _create_method(self, client, admin_headers):
+        return client.post(
+            '/api/payments/methods',
+            headers=admin_headers,
+            json={
+                'name': 'BINANCE',
+                'category': 'Criptomonedas',
+                'methodType': 'crypto',
+                'exchangeRateId': None,
+                'details': [{'key': 'wallet', 'value': 'test123'}],
+                'instructions': 'Wallet USDT: test123',
+                'sortOrder': 0,
+                'isActive': True,
+            },
+        )
+
+    def _create_local_method(self, client, admin_headers, exchange_rate_id: str):
+        return client.post(
+            '/api/payments/methods',
+            headers=admin_headers,
+            json={
+                'name': 'Pago Móvil',
+                'category': 'Transferencia local',
+                'methodType': 'bank',
+                'exchangeRateId': exchange_rate_id,
+                'details': [{'key': 'telefono', 'value': '0414-0000000'}],
+                'instructions': 'Transferir al teléfono',
+                'sortOrder': 1,
+                'isActive': True,
+            },
+        )
+
+    def test_payment_flow_approve_assigns_membership(
+        self, client, admin_headers, athlete_headers, athlete_user
+    ):
+        plan_id = self._create_plan(client, admin_headers).get_json()['plan']['id']
+        method_id = self._create_method(client, admin_headers).get_json()['method']['id']
+
+        data = {
+            'planId': plan_id,
+            'paymentMethodId': method_id,
+            'fullName': 'Test Athlete',
+            'phone': '+58 414 1234567',
+            'country': 'VE',
+            'email': 'athlete@example.com',
+        }
+        response = client.post(
+            '/api/memberships/payment-requests',
+            headers=athlete_headers,
+            data={**data, 'receipt': (io.BytesIO(b'fake-image'), 'receipt.jpg')},
+            content_type='multipart/form-data',
+        )
+        assert response.status_code == 201
+        request_id = response.get_json()['paymentRequest']['id']
+
+        approve = client.post(
+            f'/api/memberships/payment-requests/{request_id}/approve',
+            headers=admin_headers,
+        )
+        assert approve.status_code == 200
+
+        active = client.get(
+            f'/api/memberships/active?athleteId={athlete_user.id}',
+            headers=athlete_headers,
+        )
+        assert active.status_code == 200
+        membership = active.get_json()['membership']
+        assert membership is not None
+        assert membership['planId'] == plan_id
+        assert membership['daysRemaining'] >= 29
+
+    def test_athlete_without_membership_blocked_on_routines(
+        self, client, trainer_user, athlete_user, trainer_headers, athlete_headers
+    ):
+        create = client.post(
+            '/api/routines/',
+            headers=trainer_headers,
+            json={'name': 'Gated Day', 'exercises': []},
+        )
+        routine_id = create.get_json()['routine']['id']
+        client.post(
+            '/api/routines/assignments',
+            headers=trainer_headers,
+            json={'athleteId': athlete_user.id, 'routineId': routine_id},
+        )
+        response = client.get(
+            f'/api/routines/my?athleteId={athlete_user.id}',
+            headers=athlete_headers,
+        )
+        assert response.status_code == 403
+        assert response.get_json()['code'] == 'membership_required'
+
+    def test_admin_crud_payment_methods(self, client, admin_headers, athlete_headers):
+        create = self._create_method(client, admin_headers)
+        assert create.status_code == 201
+        method_id = create.get_json()['method']['id']
+
+        public = client.get('/api/payments/methods')
+        assert public.status_code == 200
+        assert len(public.get_json()['methods']) >= 1
+
+        denied = client.post(
+            '/api/payments/methods',
+            headers=athlete_headers,
+            json={'name': 'Hack'},
+        )
+        assert denied.status_code == 403
+
+        patch = client.patch(
+            f'/api/payments/methods/{method_id}',
+            headers=admin_headers,
+            json={'instructions': 'Updated wallet'},
+        )
+        assert patch.status_code == 200
+
+    def test_exchange_rates_crud(self, client, admin_headers):
+        created = self._create_rate(client, admin_headers)
+        assert created.status_code == 201
+        rate_id = created.get_json()['exchangeRate']['id']
+
+        listed = client.get('/api/exchange-rates/', headers=admin_headers)
+        assert listed.status_code == 200
+        assert any(item['id'] == rate_id for item in listed.get_json()['exchangeRates'])
+
+        patched = client.patch(
+            f'/api/exchange-rates/{rate_id}',
+            headers=admin_headers,
+            json={'rate': 37.2},
+        )
+        assert patched.status_code == 200
+        assert patched.get_json()['exchangeRate']['rate'] == 37.2
+
+    def test_payment_request_stores_conversion_snapshot(self, client, admin_headers, athlete_headers):
+        plan_id = self._create_plan(client, admin_headers).get_json()['plan']['id']
+        rate_id = self._create_rate(client, admin_headers).get_json()['exchangeRate']['id']
+        method_id = self._create_local_method(client, admin_headers, rate_id).get_json()['method']['id']
+        response = client.post(
+            '/api/memberships/payment-requests',
+            headers=athlete_headers,
+            data={
+                'planId': plan_id,
+                'paymentMethodId': method_id,
+                'fullName': 'Test Athlete',
+                'phone': '+58 414 1234567',
+                'country': 'VE',
+                'email': 'athlete@example.com',
+                'amountUsd': '5.00',
+                'amountConverted': '182.50',
+                'convertedCurrency': 'VES',
+                'exchangeRateSnapshot': '36.50',
+                'receipt': (io.BytesIO(b'fake-image'), 'receipt.jpg'),
+            },
+            content_type='multipart/form-data',
+        )
+        assert response.status_code == 201
+        payload = response.get_json()['paymentRequest']
+        assert payload['amountUsd'] == 5.0
+        assert payload['amountConverted'] == 182.5
+        assert payload['convertedCurrency'] == 'VES'
+        assert payload['exchangeRateSnapshot'] == 36.5
+
+
 class TestSessionsRoutes:
+    @pytest.fixture(autouse=True)
+    def _athlete_has_membership(self, athlete_membership):
+        return athlete_membership
+
     def _complete_session_fixture(self, client, trainer_user, athlete_user, trainer_headers, athlete_headers):
         scheduled = date.today().isoformat()
         routine = client.post(
@@ -806,6 +1009,10 @@ class TestSessionsRoutes:
 
 
 class TestNutritionRoutes:
+    @pytest.fixture(autouse=True)
+    def _athlete_has_membership(self, athlete_membership):
+        return athlete_membership
+
     def _nutrition_plan_payload(self, athlete_id, published_by='trainer-1'):
         return {
             'athleteId': athlete_id,

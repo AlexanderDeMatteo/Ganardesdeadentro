@@ -13,20 +13,21 @@ export type TitanMembershipName = 'Básica' | 'Premium' | 'Pro';
 
 export type TitanUser = {
   role?: string;
-  membership?: { name?: string };
+  membership?: { functionalTier?: string; displayName?: string; name?: string };
 } | null;
 
 export function hasTitanNutritionAccess(user: TitanUser): boolean {
   if (!user) return false;
   if (user.role === 'admin') return true;
-  const tier = user.membership?.name;
-  return tier === 'Premium' || tier === 'Pro';
+  const tier = user.membership?.functionalTier ?? user.membership?.displayName ?? user.membership?.name;
+  return tier === 'premium' || tier === 'Premium' || tier === 'pro' || tier === 'Pro';
 }
 
 export function isProMember(user: TitanUser): boolean {
   if (!user) return false;
   if (user.role === 'admin') return true;
-  return user.membership?.name === 'Pro';
+  const tier = user.membership?.functionalTier ?? user.membership?.displayName ?? user.membership?.name;
+  return tier === 'pro' || tier === 'Pro';
 }
 
 export function hasTitanMotivationAccessForRole(

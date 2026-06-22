@@ -89,8 +89,9 @@ export function metricsToChartData(
   metrics: Metric[],
   field: MetricField,
   period: PerformancePeriod,
+  reference = new Date(),
 ): PerformanceChartPoint[] {
-  const scoped = filterMetricsByPeriod(metrics, period);
+  const scoped = filterMetricsByPeriod(metrics, period, reference);
   const source = period === 'year' && scoped.length > 14 ? bucketMetricsByMonth(scoped, field) : scoped;
 
   return source
@@ -106,8 +107,9 @@ export function computePeriodDelta(
   metrics: Metric[],
   field: MetricField,
   period: PerformancePeriod,
+  reference = new Date(),
 ): number | null {
-  const scoped = filterMetricsByPeriod(metrics, period);
+  const scoped = filterMetricsByPeriod(metrics, period, reference);
   if (scoped.length < 2) return null;
   const first = scoped[0][field];
   const last = scoped[scoped.length - 1][field];

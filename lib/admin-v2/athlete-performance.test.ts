@@ -27,7 +27,7 @@ describe('athlete-performance', () => {
       { id: '2', athleteId: 'a1', date: '2026-06-10', weight: 80 },
     ];
 
-    const data = metricsToChartData(metrics, 'weight', 'month');
+    const data = metricsToChartData(metrics, 'weight', 'month', reference);
     expect(data).toHaveLength(2);
     expect(data[1]?.value).toBe(80);
   });

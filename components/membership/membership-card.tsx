@@ -69,7 +69,7 @@ export function MembershipCard({ variant = 'default' }: { variant?: MembershipCa
               className={cn(
                 'bg-gradient-to-br p-3 text-white',
                 isBrutalist ? 'rounded-none' : 'rounded-xl',
-                getMembershipColor(membership.name),
+                getMembershipColor(membership.displayName),
               )}
             >
               <CreditCard className="h-6 w-6" />
@@ -89,7 +89,7 @@ export function MembershipCard({ variant = 'default' }: { variant?: MembershipCa
                   isBrutalist && 'dm-display text-2xl',
                 )}
               >
-                {membership.name}
+                {membership.displayName}
               </h3>
             </div>
           </div>

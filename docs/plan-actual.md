@@ -208,13 +208,13 @@ Validación manual: [TEST_ADMIN_TRAINERS.md](../TEST_ADMIN_TRAINERS.md). Contrat
 
 Objetivo: corregir comportamientos rotos o que pierden datos en modo `api`. **Es la fase de mayor prioridad.**
 
-- [ ] **10.1** 🔴 **Plan semanal del trainer pisa el plan existente.** `components/trainer/weekly-plan-editor.tsx` (~L18-38) nunca llama `getWeeklyPlan(athleteId)` al seleccionar atleta: arranca siempre con la plantilla `defaultDays()` y al guardar sobrescribe el plan real. Cargar `GET /api/routines/weekly-plan` y precargar el editor.
-- [ ] **10.2** 🟠 **Bug de campo en asignaciones del trainer.** `components/trainer/assignment-board.tsx` (L29, 64, 75) usa `isCompleted`, que no existe en el tipo ni en la API (`isActive` en `lib/data/types.ts` L87-89). El toggle "Completar/Reactivar" nunca refleja el estado real. Unificar a `isActive` y alinear semántica local vs API.
-- [ ] **10.3** 🟠 **Rutinas creadas por admin invisibles en modo API.** `hooks/use-admin-data.ts` lista rutinas con `listRoutines(trainer.id)` por cada trainer; el backend filtra por `trainer_id` y las rutinas con `admin_id` nunca aparecen. Opciones: query `?adminId=` / listado global para admin en `backend/app/routes/routines.py` + consumo en el hook.
-- [ ] **10.4** 🟠 **`resolveAthleteId` ignora `ROUTINES=api`.** `lib/nutrition/resolve-athlete-id.ts` (~L40-42) solo considera `AUTH`/`METRICS`/`NUTRITION`; con solo rutinas en API el `athleteId` puede no coincidir con el backend. Añadir `ROUTINES` a la condición + test en `resolve-athlete-id.test.ts`.
-- [ ] **10.5** 🟠 **Guard de trainer consulta store local en modo API.** `canTrainerAccessAthlete` en `lib/auth/guards.ts` lee `getDataState().athletes` (localStorage) aunque los datos vengan de Flask → UX rota para trainers en API. Resolver contra datos remotos (o delegar al 403 del backend).
-- [ ] **10.6** 🟠 **Errores de guardado del diario silenciados.** `hooks/use-nutrition.ts` (~L169-171, `persistDiaryChange`) revierte en silencio si la API falla: el atleta cree que guardó. Mostrar toast/estado de error.
-- [ ] **10.7** 🟡 **Dashboard admin mezcla tipos de asignación.** La tarjeta "Asignaciones Activas" (`app/admin/page-client.tsx`) usa `overview.assignmentCount` (rutina↔atleta) pero enlaza a `/admin/assignments` (trainer↔atleta). Separar métricas o corregir etiqueta/enlace.
+- [x] **10.1** 🔴 **Plan semanal del trainer pisa el plan existente.** Resuelto: `weekly-plan-editor.tsx` y `prime-trainer-weekly-plan.tsx` cargan `GET /api/routines/weekly-plan` al cambiar atleta.
+- [x] **10.2** 🟠 **Bug de campo en asignaciones del trainer.** Resuelto: `assignment-board.tsx` usa `isActive` alineado con la API.
+- [x] **10.3** 🟠 **Rutinas creadas por admin invisibles en modo API.** Resuelto: backend admin sin `trainerId` lista todas (`test_authz.py`); `use-admin-data.ts` usa `listRoutines()` global.
+- [x] **10.4** 🟠 **`resolveAthleteId` ignora `ROUTINES=api`.** Resuelto: `resolve-athlete-id.ts` incluye `isApiRoutinesSource()`.
+- [x] **10.5** 🟠 **Guard de trainer consulta store local en modo API.** Resuelto: `useAthleteForCoach` + `isApiRoutinesSource`; `findAthleteInStore` documentado como local-only.
+- [x] **10.6** 🟠 **Errores de guardado del diario silenciados.** Resuelto: `use-nutrition.ts` muestra toast y revierte estado optimista.
+- [x] **10.7** 🟡 **Dashboard admin mezcla tipos de asignación.** Resuelto: enlace a `/admin-v2/assignments` con etiqueta de rutina.
 
 **Validación:** Vitest para 10.4; prueba manual trainer en modo API (plan semanal: editar sin perder días previos; asignaciones: completar/reactivar refleja estado); pytest si se toca `routines.py` (10.3) con casos admin/trainer.
 
@@ -226,10 +226,10 @@ Objetivo: cablear pantallas/botones muertos a endpoints que ya existen. Sin camb
 
 - [ ] **11.1** 🟠 **Perfil atleta: editar identidad y contraseña.** Botones sin `onClick` en `app/profile/page-client.tsx` (~L244-249). Backend listo: `POST /api/auth/change-password` (sin cliente: añadir a `lib/auth/auth-client.remote.ts` + contrato ya en `lib/api/contracts/auth.ts`) y `PATCH /api/users/athletes/:id` para nombre/apellido.
 - [ ] **11.2** 🟠 **Editar rutina (trainer y admin).** Botón "Editar" sin acción en `components/admin/routines-list.tsx` (L65-72); `updateRoutine` ya existe en hook, facade, remoto y backend (`PATCH /api/routines/:id`). Abrir `RoutineBuilder` en modo edición.
-- [ ] **11.3** 🟠 **Admin: editar atleta y asignar membresía.** No hay UI aunque existen `updateAthlete` (`PATCH /api/users/athletes/:id`) y `PUT /api/memberships/users/:id` (endpoint huérfano: falta también el método en `lib/data/client.remote.ts`). Modal de edición en `/admin/athletes`.
+- [x] **11.3** 🟠 **Admin: editar atleta y asignar membresía.** Modal **Asignar plan** en `/admin-v2/athletes`; `assignUserMembership` en remoto.
 - [ ] **11.4** 🟡 **Admin: editar plan de membresía.** `updateMembershipPlan`/`updatePlan` existen en hook y backend (`PATCH /api/memberships/plans/:id`) pero `/admin/memberships` solo crea/elimina. Añadir edición + estados de carga/error (el hook ya expone `isLoading`).
 - [ ] **11.5** 🟡 **Admin: reactivar entrenador inactivo.** Hoy solo se desactiva (`DELETE /api/admin/trainers/:id`). Requiere endpoint nuevo (p. ej. `PATCH /api/admin/trainers/:id` con `isActive: true`) + botón en `components/admin/trainers-list.tsx`.
-- [ ] **11.6** 🟠 **Membresía completa en sesión API.** `mapMeMembership` en `lib/auth/auth-client.remote.ts` (~L43-57) deja `features: []` y sin fechas/precio → dashboard atleta siempre muestra fallback demo. Devolver features/fechas en `/api/auth/me` (serializer) y mapearlas; revisar `PREMIUM_FEATURES_FALLBACK` en `fitness-dashboard-view.tsx`.
+- [x] **11.6** 🟠 **Membresía completa en sesión API.** `serialize_me_membership` + `functionalTier`; `mapMeMembership` acepta nombres custom y `daysRemaining`.
 - [ ] **11.7** 🟢 **Diario: macros en registro manual.** El formulario de `components/nutrition/food-diary` solo pide nombre+kcal; añadir P/C/G opcionales (el modelo y la API ya los soportan).
 
 **Validación:** lint + typecheck + build; prueba manual por flujo (cambiar contraseña con caso negativo, editar rutina, asignar membresía); casos authz positivo/negativo en pytest para 11.5.
@@ -240,8 +240,8 @@ Objetivo: cablear pantallas/botones muertos a endpoints que ya existen. Sin camb
 
 Objetivo: que trainer y admin vean datos reales del atleta (hoy dependen de `athlete.metrics` embebido en seeds, vacío en API).
 
-- [ ] **12.1** 🟠 **Página Progreso del trainer.** `components/trainer/progress-overview.tsx` no usa ningún hook de métricas → "Sin métricas registradas" siempre en API. Consumir `GET /api/metrics/?athleteId=` (flag `METRICS`) y opcionalmente `GET /api/sessions/` + `/progress` (hoy huérfano) para historial y gráficos.
-- [ ] **12.2** 🟠 **Métricas en listados/modales de atletas (trainer y admin).** `components/trainer/athletes-list.tsx` y `components/admin/athlete-detail-modal.tsx` leen `athlete.metrics` que `serialize_athlete` (backend) no incluye. Decidir: enriquecer serializer con última métrica o fetch bajo demanda en el modal.
+- [x] **12.1** 🟠 **Página Progreso del trainer.** `progress-overview.tsx` usa `useAthleteMetrics` + carga comparativa vía API cuando `METRICS=api`.
+- [x] **12.2** 🟠 **Métricas en listados/modales de atletas.** `athlete-detail-modal` y `prime-athlete-inspector` cargan métricas bajo demanda con `useAthleteMetrics`.
 - [ ] **12.3** 🟡 **Coach/admin ven el diario nutricional del atleta.** Endpoints `/api/nutrition/diary/*` + `can_modify_athlete_diary` ya existen; añadir vista de solo lectura en `/trainer|admin/athletes/[id]/nutrition`.
 - [ ] **12.4** 🟡 **Metabolismo del coach desde body-profile real.** `metabolismInputFromAthlete` usa peso/talla/edad del listado, no `GET /api/users/me/body-profile` del atleta. Requiere endpoint para que coach lea el body-profile de su atleta (hoy solo `me`).
 - [ ] **12.5** 🟢 **Capacidad de atletas por trainer.** `capacity = 10` hardcodeado en `app/admin/assignments/page-client.tsx` (~L124). Mover a config o campo del trainer.
@@ -312,6 +312,6 @@ Fase 8 (limpieza) ── al final o intercalada en huecos
 - Backend: ownership rutinas (Fase 2), diary + subscribe + admin lists (Fase 4), body-profile en `user_profiles` (Fase 5), migración `005_invitation_tokens` + invitaciones entrenador (Fase 9); doble mecanismo migración pendiente (Fase 7.4).
 - Titan/seguridad: introspección JWT, gating server-side, rate limit por `userId` en memoria, `middleware.ts` básico, fallbacks servidor (Fase 3 ✅; Redis → 7.7).
 - Frontend: `adminClient` para overview; admin trainers/assignments con invitación y activación; sin auto-seed métricas ni `MOCK_*` en hooks; body profile API + migración localStorage; plantilla `.env.local.api.example`; docker `DATA_SOURCE=api`.
-- Tests: **114 backend**; **22 Vitest**; CI en `.github/workflows/ci.yml`.
+- Tests: **168 backend**; **83 Vitest**; CI en `.github/workflows/ci.yml`.
 - Infra: sin healthchecks, sin Ollama en compose, dev-only (`next dev`); **Resend sin configurar en prod/local Docker** → invitaciones simuladas (Fase 9.2).
 - Auditoría 9 jun 2026 (origen de Fases 10–13): revisión por pestaña de los 3 roles + cruce frontend↔backend de los ~66 endpoints. Cobertura remota ~59/66; huérfanos y UI muerta detallados en cada fase.

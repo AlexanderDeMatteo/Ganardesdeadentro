@@ -24,6 +24,23 @@ interface MockUserRecord {
   membership?: Membership;
 }
 
+function mockMembership(
+  tier: Membership['functionalTier'],
+  partial: Omit<Membership, 'displayName' | 'functionalTier' | 'name'> & { name?: string },
+): Membership {
+  const labels: Record<Membership['functionalTier'], Membership['displayName']> = {
+    basic: 'Básica',
+    premium: 'Premium',
+    pro: 'Pro',
+  };
+  return {
+    ...partial,
+    name: partial.name ?? labels[tier],
+    displayName: labels[tier],
+    functionalTier: tier,
+  };
+}
+
 const MOCK_USERS: Record<string, MockUserRecord> = {
   'test@example.com': {
     id: '1',
@@ -33,15 +50,14 @@ const MOCK_USERS: Record<string, MockUserRecord> = {
     last_name: 'Pérez',
     role: 'user',
     trainer_id: '1',
-    membership: {
+    membership: mockMembership('premium', {
       id: '2',
-      name: 'Premium',
       startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       endDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       daysRemaining: 60,
       price: 29.99,
       features: ['Rutinas personalizadas', 'Seguimiento de métricas', 'Acceso a entrenador'],
-    },
+    }),
   },
   'admin@example.com': {
     id: '2',
@@ -67,15 +83,14 @@ const MOCK_USERS: Record<string, MockUserRecord> = {
     first_name: 'Laura',
     last_name: 'Gómez',
     role: 'user',
-    membership: {
+    membership: mockMembership('pro', {
       id: '3',
-      name: 'Pro',
       startDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       daysRemaining: 90,
       price: 49.99,
       features: ['Coach Titan nutricional', 'Rutinas avanzadas', 'Seguimiento prioritario'],
-    },
+    }),
   },
   'basic@example.com': {
     id: '5',
@@ -84,15 +99,14 @@ const MOCK_USERS: Record<string, MockUserRecord> = {
     first_name: 'Mario',
     last_name: 'Ruiz',
     role: 'user',
-    membership: {
+    membership: mockMembership('basic', {
       id: '1',
-      name: 'Básica',
       startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       endDate: new Date(Date.now() + 23 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       daysRemaining: 23,
       price: 0,
       features: ['Registro manual de comidas', 'Resumen diario básico'],
-    },
+    }),
   },
 };
 

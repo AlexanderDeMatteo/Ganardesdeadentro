@@ -39,6 +39,9 @@ export function canCoachEditAthlete(
   return false;
 }
 
+/**
+ * Local-only athlete lookup from demo store. Prefer `useAthleteForCoach` in API mode.
+ */
 export function findAthleteInStore(athleteId: string): Athlete | null {
   return getDataState().athletes.find((a) => a.id === athleteId) ?? null;
 }

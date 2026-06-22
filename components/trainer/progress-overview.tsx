@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AthleteProfile } from '@/hooks/use-admin';
-import { useAthleteMetrics } from '@/hooks/use-athlete-metrics';
+import { useAthleteMetrics, type AthleteLatestMetric } from '@/hooks/use-athlete-metrics';
+import { isApiMetricsSource } from '@/lib/api/config';
+import { getAthleteMetrics } from '@/lib/data/client';
+import type { Metric } from '@/lib/data/types';
 import { AthleteMetricsChart } from '@/components/metrics/athlete-metrics-chart';
 import { LoadingState } from '@/components/ui/loading-state';
 import { BarChart3, Scale, Percent } from 'lucide-react';
@@ -11,20 +14,68 @@ interface ProgressOverviewProps {
   athletes: AthleteProfile[];
 }
 
-function displayMetric(athlete: AthleteProfile) {
-  return athlete.latestMetric ?? athlete.metrics ?? null;
+function toLatest(entries: Metric[]): AthleteLatestMetric | null {
+  if (entries.length === 0) return null;
+  const latest = entries[entries.length - 1];
+  return {
+    weight: latest.weight ?? 0,
+    bodyFat: latest.bodyFat ?? 0,
+    muscleMass: latest.muscleMass ?? 0,
+    date: latest.date,
+  };
 }
 
 export function ProgressOverview({ athletes }: ProgressOverviewProps) {
   const [selectedId, setSelectedId] = useState(athletes[0]?.id ?? '');
   const selected = athletes.find((a) => a.id === selectedId) ?? athletes[0];
   const { latest, isLoading, error, getChartData } = useAthleteMetrics(selected?.id);
+  const [teamMetrics, setTeamMetrics] = useState<Record<string, AthleteLatestMetric | null>>({});
+  const [teamMetricsLoading, setTeamMetricsLoading] = useState(false);
 
   useEffect(() => {
     if (athletes.length > 0 && !athletes.some((a) => a.id === selectedId)) {
       setSelectedId(athletes[0].id);
     }
   }, [athletes, selectedId]);
+
+  useEffect(() => {
+    if (!isApiMetricsSource() || athletes.length === 0) {
+      setTeamMetrics({});
+      setTeamMetricsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setTeamMetricsLoading(true);
+    void Promise.all(
+      athletes.map(async (athlete) => {
+        try {
+          const entries = await getAthleteMetrics(athlete.id);
+          return [athlete.id, toLatest(entries)] as const;
+        } catch {
+          return [athlete.id, null] as const;
+        }
+      }),
+    ).then((rows) => {
+      if (cancelled) return;
+      setTeamMetrics(Object.fromEntries(rows));
+      setTeamMetricsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [athletes]);
+
+  const displayMetric = useMemo(
+    () => (athlete: AthleteProfile) => {
+      if (isApiMetricsSource()) {
+        return teamMetrics[athlete.id] ?? athlete.latestMetric ?? athlete.metrics ?? null;
+      }
+      return athlete.latestMetric ?? athlete.metrics ?? null;
+    },
+    [teamMetrics],
+  );
 
   if (athletes.length === 0) {
     return (
@@ -114,6 +165,7 @@ export function ProgressOverview({ athletes }: ProgressOverviewProps) {
           <div className="rounded-xl border border-secondary/20 bg-card/50 p-6">
             <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-muted-foreground">
               Comparativa del equipo
+              {teamMetricsLoading ? ' (cargando métricas…)' : ''}
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

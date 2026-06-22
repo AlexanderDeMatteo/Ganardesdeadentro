@@ -2,8 +2,14 @@ import os
 
 os.environ.setdefault('ENVIRONMENT', 'testing')
 
+import pytest
+
 
 class TestNutritionDiaryRoutes:
+    @pytest.fixture(autouse=True)
+    def _athlete_has_membership(self, athlete_membership):
+        return athlete_membership
+
     def test_owner_add_and_get_diary(self, client, athlete_user, athlete_headers):
         response = client.post(
             '/api/nutrition/diary/entries',

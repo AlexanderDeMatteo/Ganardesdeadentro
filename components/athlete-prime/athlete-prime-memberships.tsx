@@ -1,68 +1,31 @@
 'use client';
 
+import { MembershipCheckoutForm } from '@/components/membership/checkout/membership-checkout-form';
 import { PrimeChamferButton } from '@/components/admin-v2/prime-chamfer-button';
 import { PrimeModule } from '@/components/admin-v2/prime-module';
 import { PrimePageHeader } from '@/components/admin-v2/prime-page-header';
 import { useMemberships } from '@/hooks/use-memberships';
 import { useAuth } from '@/app/context/auth-context';
-import { isApiMembershipsSource } from '@/lib/api/config';
-import { membershipNameToPlanId, subscribeMembership } from '@/lib/data/client';
+import { usePaymentCheckout } from '@/hooks/use-payment-checkout';
+import { hasActiveAthleteMembership } from '@/lib/membership/access';
+import { membershipNameToPlanId } from '@/lib/data/client';
 import { CreditCard, CheckCircle2, ArrowRight } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function AthletePrimeMemberships() {
   const { plans, isLoading } = useMemberships();
-  const { user, refreshSession } = useAuth();
-  const router = useRouter();
-  const [subscribing, setSubscribing] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { pendingRequest, refresh } = usePaymentCheckout(user?.id);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [checkoutDone, setCheckoutDone] = useState(false);
 
   const currentPlanId = user?.membership
-    ? membershipNameToPlanId(user.membership.name)
+    ? membershipNameToPlanId(user.membership.displayName)
     : undefined;
 
-  const handleSelectPlan = async (planId: string) => {
-    const plan = plans.find((p) => p.id === planId);
-    if (!plan) return;
-
-    setError(null);
-    setSubscribing(planId);
-
-    try {
-      if (isApiMembershipsSource()) {
-        await subscribeMembership(planId);
-        await refreshSession();
-        router.push('/dashboard');
-        return;
-      }
-
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + plan.durationDays);
-
-      const updatedUser = {
-        ...user,
-        membership: {
-          id: planId,
-          name: plan.name,
-          startDate: new Date().toISOString().split('T')[0],
-          endDate: endDate.toISOString().split('T')[0],
-          daysRemaining: plan.durationDays,
-          price: plan.price,
-          features: plan.features,
-        },
-      };
-
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      window.location.href = '/dashboard';
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo suscribir al plan';
-      setError(message);
-    } finally {
-      setSubscribing(null);
-    }
-  };
+  const selectedPlan = plans.find((p) => p.id === selectedPlanId);
+  const hasActive = hasActiveAthleteMembership(user?.membership);
 
   if (isLoading) {
     return (
@@ -77,28 +40,65 @@ export function AthletePrimeMemberships() {
     );
   }
 
+  if (checkoutDone) {
+    return (
+      <div className="mx-auto max-w-lg space-y-4 rounded-2xl border gp-border-outline gp-bg-surface-high p-8 text-center">
+        <CheckCircle2 className="mx-auto size-12 gp-text-phosphor" aria-hidden />
+        <h2 className="gp-mono text-xl font-bold gp-text-primary">Solicitud enviada</h2>
+        <p className="text-sm gp-text-muted">
+          Tu comprobante fue recibido. Te notificaremos cuando un administrador valide tu pago.
+        </p>
+        <PrimeChamferButton type="button" onClick={() => setCheckoutDone(false)}>
+          Ver mis planes
+        </PrimeChamferButton>
+      </div>
+    );
+  }
+
+  if (selectedPlan) {
+    return (
+      <div className="space-y-6">
+        <PrimePageHeader
+          title="Checkout"
+          subtitle={`Plan seleccionado: ${selectedPlan.name}`}
+        />
+        <MembershipCheckoutForm
+          plan={selectedPlan}
+          onBack={() => setSelectedPlanId(null)}
+          onSuccess={() => {
+            void refresh();
+            setSelectedPlanId(null);
+            setCheckoutDone(true);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PrimePageHeader
         title="Elige tu Plan"
-        subtitle="Selecciona el plan que mejor se adapte a tus objetivos de fitness"
+        subtitle="Selecciona el plan y completa el pago con comprobante para activar tu membresía"
       />
 
-      {user?.membership && (
+      {pendingRequest && (
+        <div className="rounded-xl border border-[#d4a853]/40 bg-[#faf6ee]/10 p-4 text-sm gp-text-muted">
+          Tienes un pago pendiente de validación para{' '}
+          <strong className="gp-text-phosphor">{pendingRequest.planName}</strong>.
+        </div>
+      )}
+
+      {user?.membership && hasActive && (
         <p className="gp-mono text-center text-sm gp-text-phosphor">
           Plan actual: {user.membership.name} · {user.membership.daysRemaining} días restantes
-        </p>
-      )}
-      {error && (
-        <p className="gp-mono text-center text-sm text-[var(--gp-error)]" role="alert">
-          {error}
         </p>
       )}
 
       <div className="grid gap-6 md:grid-cols-3">
         {plans.map((plan) => {
-          const isCurrentPlan = currentPlanId === plan.id;
-          const isBusy = subscribing === plan.id;
+          const isCurrentPlan = hasActive && currentPlanId === plan.id;
+          const isBlocked = Boolean(pendingRequest);
 
           return (
             <PrimeModule key={plan.id} modId={`M${plan.id.slice(0, 2).toUpperCase()}`} title={plan.name.toUpperCase()}>
@@ -134,16 +134,16 @@ export function AthletePrimeMemberships() {
                 <PrimeChamferButton
                   type="button"
                   className="w-full"
-                  disabled={isCurrentPlan || isBusy}
-                  onClick={() => void handleSelectPlan(plan.id)}
+                  disabled={isCurrentPlan || isBlocked}
+                  onClick={() => setSelectedPlanId(plan.id)}
                 >
                   {isCurrentPlan ? (
                     'Tu plan actual'
-                  ) : isBusy ? (
-                    'Procesando…'
+                  ) : isBlocked ? (
+                    'Pago en revisión'
                   ) : (
                     <>
-                      Seleccionar plan
+                      Continuar al pago
                       <ArrowRight className="size-4" aria-hidden />
                     </>
                   )}

@@ -2,7 +2,7 @@
 
 Fuente de verdad que mapea cada función del cliente frontend (`lib/data/client.ts`, `lib/auth/auth-client.ts`) al endpoint Flask futuro. Tipos TypeScript en `lib/api/contracts/`.
 
-**Estado backend (jun 2026):** blueprints implementados en `/api/auth`, `/api/users`, `/api/routines`, `/api/memberships`, `/api/metrics`, `/api/sessions`, `/api/nutrition`, `/api/admin`, `/api/exercises`. Tests: `cd backend && python -m pytest` (102 tests; ver Fase 6). CI: `.github/workflows/ci.yml`.
+**Estado backend (jun 2026):** blueprints implementados en `/api/auth`, `/api/users`, `/api/routines`, `/api/memberships`, `/api/metrics`, `/api/sessions`, `/api/nutrition`, `/api/admin`, `/api/exercises`, `/api/payments`, `/api/exchange-rates`, `/api/notifications`, `/api/support`. Tests: `cd backend && python -m pytest` (168 tests). CI: `.github/workflows/ci.yml`.
 
 **Estado adaptador remoto (Fase 1):** `lib/data/client.remote.ts` cableado a Flask para overview admin, CRUD de planes, `updateAthlete`, `assignTrainerToAthlete`, métricas, rutinas, sesiones, nutrición y usuarios (ver tablas por dominio). `membershipLevelToPlanId` / `membershipNameToPlanId` usan mapeo síncrono local (sin endpoint `plan-map`). Validación manual: [TEST_FASE1_API.md](../TEST_FASE1_API.md).
 

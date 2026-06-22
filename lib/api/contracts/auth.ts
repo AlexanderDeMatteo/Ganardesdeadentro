@@ -36,7 +36,8 @@ export interface RegisterResponse {
 
 export interface MeMembershipResponse {
   planId: string;
-  name: 'Básica' | 'Premium' | 'Pro' | string;
+  name: string;
+  functionalTier?: 'basic' | 'premium' | 'pro' | string;
   daysRemaining: number;
   features?: string[];
   startDate?: string;

@@ -211,6 +211,7 @@ def serialize_me_membership(user_membership):
     return {
         'planId': str(membership.id),
         'name': membership.name,
+        'functionalTier': _normalize_functional_tier(getattr(membership, 'functional_tier', None)),
         'daysRemaining': days_remaining,
         'features': features if isinstance(features, list) else [],
         'startDate': _dt_iso(start_date) or '',
@@ -218,6 +219,73 @@ def serialize_me_membership(user_membership):
         'price': membership.price or 0,
         'durationDays': membership.duration_days or 30,
     }
+
+
+def serialize_payment_method(method, *, include_instructions: bool = False):
+    details = _json_loads(getattr(method, 'details', None), default=[])
+    exchange_rate = getattr(method, 'exchange_rate', None)
+    payload = {
+        'id': str(method.id),
+        'name': method.name,
+        'slug': method.slug,
+        'category': method.category or '',
+        'methodType': getattr(method, 'method_type', 'digital') or 'digital',
+        'exchangeRateId': str(method.exchange_rate_id) if getattr(method, 'exchange_rate_id', None) else None,
+        'details': details if isinstance(details, list) else [],
+        'sortOrder': method.sort_order or 0,
+        'isActive': bool(method.is_active),
+        'createdAt': _dt_iso(method.created_at),
+        'updatedAt': _dt_iso(method.updated_at),
+    }
+    if exchange_rate is not None:
+        payload['exchangeRate'] = {
+            'id': str(exchange_rate.id),
+            'fromCurrency': exchange_rate.from_currency,
+            'toCurrency': exchange_rate.to_currency,
+            'rate': exchange_rate.rate,
+            'label': exchange_rate.label or '',
+            'isActive': bool(exchange_rate.is_active),
+        }
+    if include_instructions:
+        payload['instructions'] = method.instructions or ''
+    return payload
+
+
+def serialize_payment_request(req, *, include_receipt_url: bool = False):
+    plan = req.membership
+    method = req.payment_method
+    user = req.user
+    payload = {
+        'id': str(req.id),
+        'userId': str(req.user_id),
+        'athleteName': f'{user.first_name} {user.last_name}'.strip() if user else '',
+        'planId': str(req.membership_id),
+        'planName': plan.name if plan else '',
+        'paymentMethodId': str(req.payment_method_id),
+        'paymentMethodName': method.name if method else '',
+        'paymentMethodCategory': method.category if method else '',
+        'fullName': req.full_name,
+        'phone': req.phone,
+        'country': req.country,
+        'sellerCode': req.seller_code or '',
+        'email': req.email,
+        'amount': req.amount or 0,
+        'amountUsd': req.amount_usd if req.amount_usd is not None else (req.amount or 0),
+        'amountConverted': req.amount_converted,
+        'convertedCurrency': req.converted_currency,
+        'exchangeRateSnapshot': req.exchange_rate_snapshot,
+        'status': req.status,
+        'rejectionReason': req.rejection_reason or '',
+        'reviewedBy': str(req.reviewed_by) if req.reviewed_by else None,
+        'reviewedAt': _dt_iso(req.reviewed_at),
+        'createdAt': _dt_iso(req.created_at),
+        'updatedAt': _dt_iso(req.updated_at),
+        'receiptMime': req.receipt_mime,
+        'receiptSize': req.receipt_size,
+    }
+    if include_receipt_url:
+        payload['receiptUrl'] = f'/api/memberships/payment-requests/{req.id}/receipt'
+    return payload
 
 
 def serialize_session(session):
@@ -318,3 +386,48 @@ def serialize_nutrition_diary(diary_row, date: str | None = None):
         'waterGoalMl': diary_row.water_goal_ml or 2500,
         'updatedAt': _dt_iso(diary_row.updated_at),
     }
+
+
+def serialize_notification(row):
+    return {
+        'id': str(row.id),
+        'userId': str(row.user_id),
+        'type': row.type,
+        'title': row.title,
+        'body': row.body or '',
+        'data': _json_loads(row.data, default={}),
+        'readAt': _dt_iso(row.read_at),
+        'createdAt': _dt_iso(row.created_at),
+    }
+
+
+def serialize_support_message(row):
+    return {
+        'id': str(row.id),
+        'athleteId': str(row.athlete_id),
+        'senderId': str(row.sender_id),
+        'senderRole': row.sender_role,
+        'body': row.body,
+        'createdAt': _dt_iso(row.created_at),
+        'readAt': _dt_iso(row.read_at),
+    }
+
+
+def serialize_support_thread(row, include_athlete: bool = False):
+    payload = {
+        'id': str(row.id),
+        'athleteId': str(row.athlete_id),
+        'lastMessageAt': _dt_iso(row.last_message_at),
+        'lastMessagePreview': row.last_message_preview or '',
+        'unreadForAdmin': row.unread_for_admin or 0,
+        'unreadForAthlete': row.unread_for_athlete or 0,
+        'createdAt': _dt_iso(row.created_at),
+    }
+    if include_athlete and row.athlete is not None:
+        payload['athlete'] = {
+            'id': str(row.athlete.id),
+            'firstName': row.athlete.first_name,
+            'lastName': row.athlete.last_name,
+            'email': row.athlete.email,
+        }
+    return payload

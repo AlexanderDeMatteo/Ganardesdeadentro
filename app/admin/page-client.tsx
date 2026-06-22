@@ -175,6 +175,12 @@ export default function AdminDashboardPage() {
                 <div className="p-4 rounded-lg bg-muted/30 border border-border">
                   <p className="text-sm text-muted-foreground mb-1">Asignaciones de rutina activas</p>
                   <p className="text-3xl font-bold text-foreground">{overview.assignmentCount}</p>
+                  <Link
+                    href="/admin-v2/assignments"
+                    className="mt-2 inline-block text-xs font-medium text-muted-foreground hover:underline"
+                  >
+                    Ver asignaciones de rutina
+                  </Link>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/30 border border-border">
                   <p className="text-sm text-muted-foreground mb-1">Entrenadores sin atletas</p>

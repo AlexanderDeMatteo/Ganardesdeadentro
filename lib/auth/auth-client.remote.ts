@@ -2,7 +2,6 @@ import type {
   AcceptInviteResponse,
   InviteValidationResponse,
   LoginResponse,
-  MeMembershipResponse,
   MeResponse,
   RegisterResponse,
 } from '@/lib/api/contracts/auth';
@@ -16,6 +15,7 @@ import type {
   RegisterCredentials,
 } from '@/lib/auth/auth-types';
 import { AuthError } from '@/lib/auth/auth-types';
+import { mapMeMembership } from '@/lib/auth/map-me-membership';
 import {
   clearStoredSession,
   getStoredSession,
@@ -37,24 +37,6 @@ function mapApiUser(user: {
     last_name: user.last_name,
     role: user.role,
     ...(user.role === 'trainer' ? { trainer_id: id } : {}),
-  };
-}
-
-function mapMeMembership(membership: MeMembershipResponse | null | undefined): Membership | undefined {
-  if (!membership) return undefined;
-  const name = membership.name;
-  if (name !== 'Básica' && name !== 'Premium' && name !== 'Pro') {
-    return undefined;
-  }
-  return {
-    id: membership.planId,
-    name,
-    startDate: membership.startDate ?? '',
-    endDate: membership.endDate ?? '',
-    daysRemaining: membership.daysRemaining,
-    price: membership.price ?? 0,
-    features: membership.features ?? [],
-    durationDays: membership.durationDays,
   };
 }
 

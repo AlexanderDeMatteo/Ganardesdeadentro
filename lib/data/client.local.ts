@@ -72,15 +72,12 @@ export function membershipLevelToPlanId(level: Athlete['membershipLevel']): stri
 }
 
 /** Map auth membership name to catalog plan id */
-export function membershipNameToPlanId(name: Membership['name']): string {
-  switch (name) {
-    case 'Premium':
-      return '2';
-    case 'Pro':
-      return '3';
-    default:
-      return '1';
-  }
+export function membershipNameToPlanId(name: string): string {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === 'pro') return '3';
+  if (normalized === 'premium') return '2';
+  if (normalized === 'básica' || normalized === 'basica' || normalized === 'basic') return '1';
+  return '1';
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +362,209 @@ export async function getMembership(athleteId: string): Promise<{
 
 export async function subscribeMembership(_planId: string): Promise<void> {
   await delay();
-  // En modo local la suscripción se gestiona en memberships/page-client.tsx vía localStorage.
+}
+
+export async function listPaymentMethods(): Promise<import('@/lib/api/contracts/payments').PaymentMethod[]> {
+  await delay();
+  return [
+    {
+      id: '1',
+      name: 'BINANCE',
+      slug: 'binance',
+      category: 'Criptomonedas',
+      methodType: 'crypto',
+      exchangeRateId: null,
+      details: [{ key: 'wallet', value: 'USDT-TRC20-DEMO' }],
+      exchangeRate: null,
+      sortOrder: 0,
+      isActive: true,
+    },
+    {
+      id: '2',
+      name: 'ZELLE',
+      slug: 'zelle',
+      category: 'Transferencia digital',
+      methodType: 'digital',
+      exchangeRateId: null,
+      details: [{ key: 'correo', value: 'zelle@demo.com' }],
+      exchangeRate: null,
+      sortOrder: 1,
+      isActive: true,
+    },
+  ];
+}
+
+export async function listAllPaymentMethods(): Promise<import('@/lib/api/contracts/payments').PaymentMethod[]> {
+  const methods = await listPaymentMethods();
+  return methods.map((m) => ({
+    ...m,
+    instructions: m.name === 'BINANCE' ? 'Wallet USDT (demo)' : 'zelle@demo.com',
+  }));
+}
+
+export async function getPaymentMethodInstructions(methodId: string) {
+  const methods = await listAllPaymentMethods();
+  const method = methods.find((m) => m.id === methodId);
+  if (!method) throw new Error('Método no encontrado');
+  return method;
+}
+
+export async function createPaymentMethod(
+  data: Record<string, unknown>,
+): Promise<import('@/lib/api/contracts/payments').PaymentMethod> {
+  await delay();
+  return {
+    id: String(Date.now()),
+    name: String(data.name ?? ''),
+    slug: String(data.slug ?? 'method'),
+    category: String(data.category ?? ''),
+    methodType: 'digital',
+    exchangeRateId: null,
+    details: [],
+    exchangeRate: null,
+    sortOrder: Number(data.sortOrder ?? 0),
+    isActive: Boolean(data.isActive ?? true),
+    instructions: String(data.instructions ?? ''),
+  };
+}
+
+export async function updatePaymentMethod(
+  id: string,
+  data: Record<string, unknown>,
+): Promise<import('@/lib/api/contracts/payments').PaymentMethod> {
+  await delay();
+  return {
+    id,
+    name: String(data.name ?? ''),
+    slug: String(data.slug ?? 'method'),
+    category: String(data.category ?? ''),
+    methodType: 'digital',
+    exchangeRateId: null,
+    details: [],
+    exchangeRate: null,
+    sortOrder: Number(data.sortOrder ?? 0),
+    isActive: Boolean(data.isActive ?? true),
+    instructions: String(data.instructions ?? ''),
+  };
+}
+
+export async function deletePaymentMethod(_id: string): Promise<void> {
+  await delay();
+}
+
+export async function submitPaymentRequest(
+  input: import('@/lib/api/contracts/payments').SubmitPaymentRequestInput,
+) {
+  await delay();
+  const stored = localStorage.getItem('fittrack_payment_requests');
+  const all = stored ? JSON.parse(stored) : [];
+  const req = {
+    id: String(Date.now()),
+    userId: 'local',
+    athleteName: input.fullName,
+    planId: input.planId,
+    planName: 'Plan',
+    paymentMethodId: input.paymentMethodId,
+    paymentMethodName: 'Método',
+    paymentMethodCategory: '',
+    fullName: input.fullName,
+    phone: input.phone,
+    country: input.country,
+    sellerCode: input.sellerCode ?? '',
+    email: input.email,
+    amount: 0,
+    amountUsd: input.amountUsd ?? 0,
+    amountConverted: input.amountConverted ?? null,
+    convertedCurrency: input.convertedCurrency ?? null,
+    exchangeRateSnapshot: input.exchangeRateSnapshot ?? null,
+    status: 'pending' as const,
+    rejectionReason: '',
+    reviewedBy: null,
+    reviewedAt: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    receiptMime: input.receipt.type,
+    receiptSize: input.receipt.size,
+  };
+  all.unshift(req);
+  localStorage.setItem('fittrack_payment_requests', JSON.stringify(all));
+  return req;
+}
+
+export async function getMyPaymentRequests() {
+  await delay();
+  const stored = localStorage.getItem('fittrack_payment_requests');
+  return stored ? JSON.parse(stored) : [];
+}
+
+export async function listPaymentRequests(status?: string) {
+  await delay();
+  const stored = localStorage.getItem('fittrack_payment_requests');
+  const all = stored ? JSON.parse(stored) : [];
+  if (!status) return all;
+  return all.filter((r: { status: string }) => r.status === status);
+}
+
+export async function approvePaymentRequest(id: string) {
+  await delay();
+  const stored = localStorage.getItem('fittrack_payment_requests');
+  const all = stored ? JSON.parse(stored) : [];
+  const item = all.find((r: { id: string }) => r.id === id);
+  if (item) item.status = 'approved';
+  localStorage.setItem('fittrack_payment_requests', JSON.stringify(all));
+  return item;
+}
+
+export async function rejectPaymentRequest(id: string, reason?: string) {
+  await delay();
+  const stored = localStorage.getItem('fittrack_payment_requests');
+  const all = stored ? JSON.parse(stored) : [];
+  const item = all.find((r: { id: string }) => r.id === id);
+  if (item) {
+    item.status = 'rejected';
+    item.rejectionReason = reason ?? '';
+  }
+  localStorage.setItem('fittrack_payment_requests', JSON.stringify(all));
+  return item;
+}
+
+export async function listExchangeRates(_active?: boolean) {
+  await delay();
+  return [
+    { id: '1', fromCurrency: 'USD', toCurrency: 'VES', rate: 36.5, label: 'USD → VES', isActive: true },
+  ];
+}
+
+export async function listPublicExchangeRates() {
+  return listExchangeRates(true);
+}
+
+export async function createExchangeRate(data: Record<string, unknown>) {
+  await delay();
+  return {
+    id: String(Date.now()),
+    fromCurrency: String(data.fromCurrency ?? 'USD'),
+    toCurrency: String(data.toCurrency ?? 'VES'),
+    rate: Number(data.rate ?? 1),
+    label: String(data.label ?? ''),
+    isActive: Boolean(data.isActive ?? true),
+  };
+}
+
+export async function updateExchangeRate(id: string, data: Record<string, unknown>) {
+  await delay();
+  return {
+    id,
+    fromCurrency: String(data.fromCurrency ?? 'USD'),
+    toCurrency: String(data.toCurrency ?? 'VES'),
+    rate: Number(data.rate ?? 1),
+    label: String(data.label ?? ''),
+    isActive: Boolean(data.isActive ?? true),
+  };
+}
+
+export async function deleteExchangeRate(_id: string): Promise<void> {
+  await delay();
 }
 
 // ---------------------------------------------------------------------------
@@ -831,6 +1030,10 @@ export async function listMembershipPlans(): Promise<MembershipPlan[]> {
   return loadMembershipPlansFromStorage();
 }
 
+export async function listPublicMembershipPlans(): Promise<MembershipPlan[]> {
+  return listMembershipPlans();
+}
+
 /**
  * @endpoint POST /api/memberships/plans
  * @auth Bearer (admin)
@@ -1263,4 +1466,168 @@ export async function updateBodyProfile(
     }
   }
   return merged;
+}
+
+const LOCAL_NOTIFICATIONS_KEY = 'fittrack_notifications';
+const LOCAL_SUPPORT_THREADS_KEY = 'fittrack_support_threads';
+const LOCAL_SUPPORT_MESSAGES_KEY = 'fittrack_support_messages';
+
+function loadLocalNotifications(): import('@/lib/api/contracts/notifications').NotificationRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_NOTIFICATIONS_KEY);
+    return raw ? (JSON.parse(raw) as import('@/lib/api/contracts/notifications').NotificationRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalNotifications(items: import('@/lib/api/contracts/notifications').NotificationRecord[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(items));
+}
+
+function loadLocalSupportMessages(): import('@/lib/api/contracts/support').SupportMessage[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_SUPPORT_MESSAGES_KEY);
+    return raw ? (JSON.parse(raw) as import('@/lib/api/contracts/support').SupportMessage[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalSupportMessages(items: import('@/lib/api/contracts/support').SupportMessage[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LOCAL_SUPPORT_MESSAGES_KEY, JSON.stringify(items));
+}
+
+function loadLocalSupportThreads(): import('@/lib/api/contracts/support').SupportThread[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_SUPPORT_THREADS_KEY);
+    return raw ? (JSON.parse(raw) as import('@/lib/api/contracts/support').SupportThread[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalSupportThreads(items: import('@/lib/api/contracts/support').SupportThread[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LOCAL_SUPPORT_THREADS_KEY, JSON.stringify(items));
+}
+
+export async function listNotifications() {
+  await delay();
+  return loadLocalNotifications();
+}
+
+export async function getUnreadNotificationCount() {
+  await delay();
+  return loadLocalNotifications().filter((item) => !item.readAt).length;
+}
+
+export async function markNotificationRead(id: string) {
+  await delay();
+  const items = loadLocalNotifications();
+  const updated = items.map((item) =>
+    item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item,
+  );
+  saveLocalNotifications(updated);
+  const found = updated.find((item) => item.id === id);
+  if (!found) throw new Error('Notificación no encontrada');
+  return found;
+}
+
+export async function markAllNotificationsRead() {
+  await delay();
+  const now = new Date().toISOString();
+  saveLocalNotifications(loadLocalNotifications().map((item) => ({ ...item, readAt: item.readAt ?? now })));
+}
+
+export async function getMySupportThread() {
+  await delay();
+  const athleteId = '1';
+  const threads = loadLocalSupportThreads();
+  const thread = threads.find((item) => item.athleteId === athleteId) ?? null;
+  const messages = thread
+    ? loadLocalSupportMessages().filter((item) => item.athleteId === athleteId)
+    : [];
+  return { thread, messages };
+}
+
+export async function sendAthleteSupportMessage(body: string) {
+  await delay();
+  const athleteId = '1';
+  const message: import('@/lib/api/contracts/support').SupportMessage = {
+    id: `msg-${Date.now()}`,
+    athleteId,
+    senderId: athleteId,
+    senderRole: 'user',
+    body,
+    createdAt: new Date().toISOString(),
+    readAt: null,
+  };
+  const messages = [...loadLocalSupportMessages(), message];
+  saveLocalSupportMessages(messages);
+  const threads = loadLocalSupportThreads();
+  const thread = threads.find((item) => item.athleteId === athleteId) ?? {
+    id: 'thread-1',
+    athleteId,
+    lastMessageAt: null,
+    lastMessagePreview: '',
+    unreadForAdmin: 0,
+    unreadForAthlete: 0,
+    createdAt: new Date().toISOString(),
+  };
+  const updatedThread = {
+    ...thread,
+    lastMessageAt: message.createdAt,
+    lastMessagePreview: body,
+    unreadForAdmin: (thread.unreadForAdmin ?? 0) + 1,
+  };
+  saveLocalSupportThreads([
+    updatedThread,
+    ...threads.filter((item) => item.athleteId !== athleteId),
+  ]);
+  return message;
+}
+
+export async function markMySupportThreadRead() {
+  await delay();
+}
+
+export async function listSupportThreads() {
+  await delay();
+  return loadLocalSupportThreads().filter((thread) => thread.lastMessageAt);
+}
+
+export async function getSupportThread(athleteId: string) {
+  await delay();
+  const threads = loadLocalSupportThreads();
+  const thread = threads.find((item) => item.athleteId === athleteId);
+  if (!thread) {
+    throw new Error('Conversación no encontrada');
+  }
+  const messages = loadLocalSupportMessages().filter((item) => item.athleteId === athleteId);
+  return { thread, messages };
+}
+
+export async function sendAdminSupportMessage(athleteId: string, body: string) {
+  await delay();
+  const message: import('@/lib/api/contracts/support').SupportMessage = {
+    id: `msg-${Date.now()}`,
+    athleteId,
+    senderId: 'admin-1',
+    senderRole: 'admin',
+    body,
+    createdAt: new Date().toISOString(),
+    readAt: null,
+  };
+  saveLocalSupportMessages([...loadLocalSupportMessages(), message]);
+  return message;
+}
+
+export async function markSupportThreadRead(_athleteId: string) {
+  await delay();
 }

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { AthleteDetailModal } from '@/components/admin/athlete-detail-modal';
 import { TrainerAssignmentModal } from '@/components/admin/trainer-assignment-modal';
+import { PrimeAthleteAssignMembershipModal } from '@/components/admin-v2/prime-athlete-assign-membership-modal';
 import { PrimeAthleteInspector } from '@/components/admin-v2/prime-athlete-inspector';
 import { PrimeAthletePerformanceModal } from '@/components/admin-v2/prime-athlete-performance-modal';
 import { PrimeAthletesTable } from '@/components/admin-v2/prime-athletes-table';
@@ -30,6 +31,7 @@ export default function AdminV2AthletesPage() {
     athletes,
     assignableTrainers,
     assignTrainerToAthlete,
+    assignMembershipToAthlete,
     getTrainerById,
     routines,
     isLoading,
@@ -46,6 +48,7 @@ export default function AdminV2AthletesPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isPerformanceOpen, setIsPerformanceOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isMembershipOpen, setIsMembershipOpen] = useState(false);
 
   const filteredAthletes = useMemo(() => {
     return athletes.filter((a) => {
@@ -83,6 +86,22 @@ export default function AdminV2AthletesPage() {
     setModalAthlete(athlete);
     setIsAssignOpen(true);
   }, [selectAthlete]);
+
+  const handleAssignMembership = useCallback((athlete: AthleteProfile) => {
+    selectAthlete(athlete);
+    setModalAthlete(athlete);
+    setIsMembershipOpen(true);
+  }, [selectAthlete]);
+
+  const handleAssignMembershipConfirm = useCallback(
+    async (athleteId: string, planId: string) => {
+      await assignMembershipToAthlete(athleteId, planId);
+      toast.success('Membresía asignada correctamente');
+      setModalAthlete(null);
+      setIsMembershipOpen(false);
+    },
+    [assignMembershipToAthlete],
+  );
 
   const getRoutineName = useCallback(
     (routineId: string) => routines.find((r) => r.id === routineId)?.name ?? 'Rutina',
@@ -151,6 +170,7 @@ export default function AdminV2AthletesPage() {
               onViewProfile={() => handleViewDetails(selectedAthlete)}
               onViewPerformance={() => handleViewPerformance(selectedAthlete)}
               onAssignTrainer={() => handleAssignTrainer(selectedAthlete)}
+              onAssignMembership={() => handleAssignMembership(selectedAthlete)}
             />
           ) : (
             <div className="gp-module flex min-h-[200px] items-center justify-center rounded-lg p-8 lg:min-h-[360px]">
@@ -196,6 +216,15 @@ export default function AdminV2AthletesPage() {
           setModalAthlete(null);
         }}
         prime
+      />
+
+      <PrimeAthleteAssignMembershipModal
+        athlete={isMembershipOpen ? modalAthlete : null}
+        onAssign={handleAssignMembershipConfirm}
+        onClose={() => {
+          setIsMembershipOpen(false);
+          setModalAthlete(null);
+        }}
       />
     </div>
   );

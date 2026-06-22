@@ -6,13 +6,14 @@ import { PrimeInspectorCta } from '@/components/admin-v2/prime-inspector-cta';
 import { PrimeMembershipBadge } from '@/components/admin-v2/prime-membership-badge';
 import { PrimeModule } from '@/components/admin-v2/prime-module';
 import { getInitials } from '@/lib/admin-v2/get-initials';
+import { useAthleteMetrics } from '@/hooks/use-athlete-metrics';
 import {
   formatLatestMetric,
   formatPrimeAgeDetail,
   formatPrimeField,
 } from '@/lib/admin-v2/format-prime-field';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, ClipboardList, TrendingUp, UserRound, UtensilsCrossed } from 'lucide-react';
+import { AlertTriangle, ClipboardList, CreditCard, TrendingUp, UserRound, UtensilsCrossed } from 'lucide-react';
 
 const EMPTY_BIOMETRY = new Set(['Sin registrar', 'No indicada', 'No indicado', '—']);
 
@@ -25,6 +26,7 @@ type PrimeAthleteInspectorProps = {
   onViewProfile: () => void;
   onViewPerformance: () => void;
   onAssignTrainer?: () => void;
+  onAssignMembership?: () => void;
 };
 
 function formatGender(gender: string): string {
@@ -68,15 +70,17 @@ export function PrimeAthleteInspector({
   onViewProfile,
   onViewPerformance,
   onAssignTrainer,
+  onAssignMembership,
 }: PrimeAthleteInspectorProps) {
   const trainer =
     mode === 'admin' && getTrainerById && athlete.trainerId
       ? getTrainerById(athlete.trainerId)
       : undefined;
   const hasTrainer = mode === 'admin' ? Boolean(athlete.trainerId && trainer) : true;
-  const metrics = athlete.latestMetric ?? athlete.metrics;
-  const lastMetric = formatLatestMetric(metrics);
-  const lastMetricEmpty = lastMetric === '—';
+  const { latest: fetchedLatest, isLoading: metricsLoading } = useAthleteMetrics(athlete.id);
+  const metrics = fetchedLatest ?? athlete.latestMetric ?? athlete.metrics;
+  const lastMetric = metricsLoading ? '…' : formatLatestMetric(metrics);
+  const lastMetricEmpty = !metricsLoading && lastMetric === '—';
 
   const biometry = [
     { label: 'Edad', value: formatPrimeAgeDetail(athlete.age) },
@@ -213,6 +217,12 @@ export function PrimeAthleteInspector({
           <PrimeInspectorCta onClick={onAssignTrainer}>
             <ClipboardList className="h-4 w-4" aria-hidden />
             {hasTrainer ? 'Reasignar' : 'Asignar'}
+          </PrimeInspectorCta>
+        ) : null}
+        {mode === 'admin' && onAssignMembership ? (
+          <PrimeInspectorCta onClick={onAssignMembership}>
+            <CreditCard className="h-4 w-4" aria-hidden />
+            Asignar plan
           </PrimeInspectorCta>
         ) : null}
       </footer>

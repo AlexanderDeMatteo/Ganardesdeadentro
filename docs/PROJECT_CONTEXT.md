@@ -7,7 +7,8 @@ Documento de referencia para trabajo en frontend, backend, Docker y pruebas. **N
 ## 1. Resumen ejecutivo
 
 - **Frontend:** Next.js 16 (App Router), React 19, Tailwind v4, componentes en `components/ui` (shadcn/Radix). Gran parte del flujo actual es **demo/mock** (usuarios en memoria, `localStorage` para sesión y datos auxiliares).
-- **Backend:** Flask, SQLAlchemy, JWT (`Flask-JWT-Extended`), CORS, Alembic. **Implementados:** autenticación (`/api/auth/*`), ejercicios (`/api/exercises/*`), usuarios (`/api/users/*`), rutinas (`/api/routines/*`), métricas (`/api/metrics/*`), membresías (`/api/memberships/*`), sesiones (`/api/sessions/*`), nutrición (`/api/nutrition/*`), admin overview (`/api/admin/overview`). Contratos en `docs/API_CONTRACTS.md`.
+- **Backend:** Flask, SQLAlchemy, JWT (`Flask-JWT-Extended`), CORS, Alembic. **Implementados:** autenticación (`/api/auth/*`), ejercicios (`/api/exercises/*`), usuarios (`/api/users/*`), rutinas (`/api/routines/*`), métricas (`/api/metrics/*`), membresías (`/api/memberships/*`), pagos (`/api/payments/*`), tasas de cambio (`/api/exchange-rates/*`), sesiones (`/api/sessions/*`), nutrición (`/api/nutrition/*`), notificaciones (`/api/notifications/*`), soporte (`/api/support/*`), admin overview (`/api/admin/overview`). Contratos en `docs/API_CONTRACTS.md`.
+- **Membresía activa (gating atleta):** atletas con rol `user` **sin** `UserMembership` vigente solo acceden a `/dashboard`, `/memberships`, `/profile` y `/support` (UX en `lib/membership/access.ts`; barrera real en backend vía `require_active_membership`). Métricas, rutinas, sesiones y nutrición devuelven **403** con `code: membership_required`. La membresía se otorga al aprobar un pago (`POST /api/memberships/payment-requests/:id/approve`) o por asignación admin (`PUT /api/memberships/users/:id`). Entrenadores y admin **no** están sujetos a este gating.
 - **IA / Coach "Titan":** asistente conversacional servido por **Ollama** (modelo `granite4.1:3b`) mediante rutas Next en `app/api/coach/*` y `app/api/nutrition/titan`. Genera motivación contextual, reseña de sesión de entrenamiento y estimación de calorías/macros. Requiere `ollama serve` local (`OLLAMA_BASE_URL`, default `http://localhost:11434`); incluye *fallbacks* si el modelo no está disponible. Acceso al asistente nutricional gateado a membresías Premium/Pro.
 - **Nutrición:** módulo en `app/nutrition`, `components/nutrition/*`, `hooks/use-nutrition.ts` y `lib/nutrition/*`. Calcula metabolismo (Mifflin-St Jeor: BMR/TDEE), define macros objetivo, gestiona plan de comidas asignado por el entrenador, diario de alimentos (kcal y macros opcionales P/C/G), hidratación y adherencia. Con `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` el diario y plan persisten en Flask; en modo `local` usa `localStorage`.
 - **Datos:** SQLite por defecto; en Docker la URI apunta a un volumen (`/data/fitness_platform.db`).
@@ -49,7 +50,8 @@ Hoy el navegador habla principalmente con Next; el backend está disponible en `
 | Área | Ruta(s) | Notas |
 |------|---------|--------|
 | Público | `/`, `/login`, `/register` | Login/register contra usuarios mock en `AuthProvider` |
-| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile` | Protegidas por shell Phosphor Prime en `app/(athlete-prime)/*`. Layout: [`components/athlete-prime/`](components/athlete-prime/) + `gainer-prime-theme.css`. Dashboard: [`components/athlete-prime/athlete-prime-dashboard.tsx`](components/athlete-prime/athlete-prime-dashboard.tsx). |
+| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile`, `/support` | Protegidas por shell Phosphor Prime en `app/(athlete-prime)/*`. Sin membresía activa solo `/dashboard`, `/memberships`, `/profile`, `/support` (ver `lib/membership/access.ts`). Layout: [`components/athlete-prime/`](components/athlete-prime/) + `gainer-prime-theme.css`. |
+| Admin V2 (pagos) | `/admin-v2/payments`, `/admin-v2/payment-methods`, `/admin-v2/exchange-rates`, `/admin-v2/support` | Aprobación de solicitudes de pago, CRUD métodos/tasas, tickets de soporte. Rol `admin`. |
 | Trainer | `/trainer`, `/trainer/*` | Rol `trainer` (cliente). Gestiona atletas, rutinas, asignaciones, progreso y nutrición asignada (`/trainer/athletes/[athleteId]/nutrition`) |
 | Admin | `/admin-v2`, `/admin-v2/*` | Plantilla oficial Phosphor V2. Rutas `/admin/*` redirigen aquí. Rol `admin` verificado en cliente. Incluye ejercicios, atletas, entrenadores, rutinas, membresías, asignaciones y nutrición por atleta |
 | API Next (IA) | `/api/coach/titan`, `/api/coach/session-review`, `/api/nutrition/titan` | Route handlers que hablan con Ollama (coach Titan). No dependen de Flask |
@@ -60,7 +62,7 @@ Hoy el navegador habla principalmente con Next; el backend está disponible en `
 |-----------|---------|--------|
 | `auth_bp` | `/api/auth` | Implementado (register, login, JWT, etc.) |
 | `exercises_bp` | `/api/exercises` | Implementado (cache + API externa) |
-| `users_bp`, `routines_bp`, `memberships_bp`, `metrics_bp`, `sessions_bp`, `nutrition_bp`, `admin_bp` | `/api/users`, `/api/routines`, … | Implementados (servicios + autorización JWT) |
+| `users_bp`, `routines_bp`, `memberships_bp`, `metrics_bp`, `sessions_bp`, `nutrition_bp`, `payments_bp`, `exchange_rates_bp`, `notifications_bp`, `support_bp`, `admin_bp` | `/api/users`, `/api/routines`, … | Implementados (servicios + autorización JWT + gating membresía en dominios atleta) |
 
 Health: `GET /api/health` → `{ "status": "ok" }`.
 
@@ -77,6 +79,10 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 | Atleta (Phosphor Prime) — **shell usuario oficial** | `app/(athlete-prime)/*`, `components/athlete-prime/*`, mismo tema `gainer-prime-theme.css` |
 | Métricas demo | `hooks/use-metrics.ts` |
 | Membresías demo | `hooks/use-memberships.ts` |
+| Gating membresía atleta (UX) | `lib/membership/access.ts` — rutas permitidas sin plan, filtro de nav |
+| Gating membresía atleta (API) | `backend/app/utils/authorization.py` — `require_active_membership` |
+| Pagos y solicitudes membresía | `backend/app/routes/memberships.py`, `backend/app/services/payment_service.py`, `hooks/use-payment-methods.ts`, `hooks/use-payment-requests.ts` |
+| Notificaciones en tiempo real | `app/context/realtime-context.tsx`, `lib/realtime/socket.ts`, `backend/app/routes/notifications.py` |
 | Coach IA (estado/orquestación) | `app/context/coach-context.tsx`, `components/coach/coach-mascot.tsx` |
 | Cliente y prompts Ollama | `lib/ollama/client.ts`, `lib/ollama/prompts.ts`, `lib/ollama/types.ts` |
 | Rutas API Titan (Next) | `app/api/coach/titan/route.ts`, `app/api/coach/session-review/route.ts`, `app/api/nutrition/titan/route.ts` |
@@ -104,7 +110,9 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 | Protección admin | Solo en cliente (UX); backend valida rol vs BD | — | Barrera real en backend (Fase 2): `role_required` revalida rol e `is_active` contra BD |
 | API Flask auth + JWT | Sí | — | Registro público fuerza `role='user'`; revalidación JWT vs BD resuelta en Fase 2 (`user_lookup_loader` rechaza inactivo; `/api/auth/me` devuelve 401 si desactivado) |
 | Autorización por recurso (rutinas) | Sí (Fase 2) | — | `can_manage_routine`/`can_read_routine` impiden IDOR en GET/PATCH/DELETE, assign/unassign y weekly-plan |
-| Membresías de usuario | Sí (Fase 2) | — | `UserMembership` se asigna/revoca de verdad; `membershipLevel` PATCH operativo; `PUT /api/memberships/users/:id` |
+| Membresías de usuario | Sí (Fase 2 + pagos) | — | `UserMembership` se asigna/revoca de verdad; alta vía aprobación de pago o admin; gating activo en métricas/rutinas/sesiones/nutrición para `role=user` sin plan vigente |
+| Pagos y tasas de cambio | Sí | — | Solicitudes con comprobante (`multipart`), métodos de pago, tasas USD→VES; aprobación admin activa membresía |
+| Gating membresía atleta | Sí (frontend + backend) | — | UX: `lib/membership/access.ts`; API: `require_active_membership` → 403 `membership_required`. Titan sigue con gating Premium/Pro aparte |
 | Validación de entrada | Pydantic v2 (Fase 2) | — | Nutrición, weekly-plan y `setLogs` validados; errores genéricos sin `str(e)` |
 | Rate limiting | Flask-Limiter (Fase 2) | — | `login`/`register`/`change-password`; storage `memory://` dev, Redis en prod (`RATELIMIT_STORAGE_URI`) |
 | API ejercicios | Sí | — | Requiere clave RapidAPI en env; `clear-cache` con `@role_required('admin')` |
@@ -127,6 +135,8 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 7. **Rutinas/sesiones (piloto API):** con `NEXT_PUBLIC_DATA_SOURCE_ROUTINES=api`, entrenador y atleta comparten datos vía Flask: listados (`GET /api/routines/`, `GET /api/routines/assignments`), CRUD/asignaciones del entrenador y lectura/completar sesión del atleta (`/api/routines/*`, `/api/sessions/*`).
 8. **Datos auxiliares atleta (piloto API):** con `NEXT_PUBLIC_DATA_SOURCE_USERS=api` → tarjeta “Mi entrenador”; `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` → plan nutricional asignado y diario persistido en Flask; `NEXT_PUBLIC_DATA_SOURCE_MEMBERSHIPS=api` → membresía activa.
 9. **Resolución de atleta en nutrición API:** si `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api`, `resolveAthleteId` debe usar `user.id` del JWT igual que métricas/rutinas. Páginas coach/admin de nutrición deben cargar el atleta con API (`getAthleteById`) en lugar de seeds (`findAthleteById`).
+10. **Gating membresía atleta:** sin `UserMembership` vigente (`end_date` futura, `is_active=true`), el atleta con rol `user` recibe **403** en métricas, rutinas (`/my`, weekly-plan, GET por id), sesiones y nutrición (plan + diario). Frontend restringe nav y rutas a `/dashboard`, `/memberships`, `/profile`, `/support`. Flujo de alta: atleta envía solicitud de pago con comprobante → admin aprueba → `MembershipService.assign_membership_on_payment` activa el plan.
+11. **Tests backend y membresía:** el fixture `athlete_user` en `backend/tests/conftest.py` **no** incluye membresía por defecto (para cubrir el caso negativo en `TestPaymentFlow`). Los tests de dominio atleta usan `grant_active_membership` vía fixture `athlete_membership` (autouse en clases de métricas, rutinas, sesiones y nutrición).
 
 ---
 
@@ -210,7 +220,9 @@ Variables en `.env.local.example`:
 
 Validación local: `npm run lint` → `npm run typecheck` → `npm run build`. Prueba manual en modo `local`; con backend levantado, modo API: login con `AUTH_SOURCE=api` y guía [TEST_FASE1_API.md](../TEST_FASE1_API.md).
 
-**Backend (Flask):** blueprints implementados en `backend/app/routes/` con servicios en `backend/app/services/`. Migraciones: `docs/MIGRATIONS.md`. Setup: `backend/README.md`. Tests: `cd backend && python -m pytest` (Python 3.11–3.14; SQLAlchemy ≥ 2.0.49 para 3.14).
+**Backend (Flask):** blueprints implementados en `backend/app/routes/` con servicios en `backend/app/services/`. Migraciones: `docs/MIGRATIONS.md`. Setup: `backend/README.md`. Tests: `cd backend && python -m pytest` (168 tests; Python 3.11–3.14; SQLAlchemy ≥ 2.0.49 para 3.14). Frontend: `npm test` (83 tests Vitest).
+
+**Instalación de dependencias:** `socket.io-client` es dependencia de realtime; tras clonar, ejecutar `pnpm install`. En entornos con proxy/certificado corporativo puede requerirse `NODE_OPTIONS=--use-system-ca` antes de `pnpm install`.
 
 
 ## 12. Mantenimiento de este documento
@@ -222,4 +234,4 @@ Actualiza este archivo cuando:
 - cambien puertos, variables de entorno o flujo de despliegue,
 - se introduzcan tests automatizados o se deprecie el modo mock.
 
-Última orientación: el frontend expone adaptadores (`local` \| `api`) documentados en [API_CONTRACTS.md](./API_CONTRACTS.md). El modo **local** sigue siendo el default para demo; activar `api` por dominio cuando se valide el flujo (piloto Docker o `.env.local`). Fase 1 del [plan-actual.md](./plan-actual.md) conectó overview admin, CRUD de planes y operaciones admin de usuarios.
+Última orientación (jun 2026): el frontend expone adaptadores (`local` \| `api`) documentados en [API_CONTRACTS.md](./API_CONTRACTS.md). El modo **local** sigue siendo el default para demo; activar `api` por dominio cuando se valide el flujo (piloto Docker o `.env.local`). Fase 1 del [plan-actual.md](./plan-actual.md) conectó overview admin, CRUD de planes y operaciones admin de usuarios. **Gating membresía atleta** activo en frontend (`lib/membership/access.ts`) y backend (`require_active_membership`); flujo de pagos con aprobación admin documentado en `TestPaymentFlow` (`backend/tests/test_api_domains.py`).

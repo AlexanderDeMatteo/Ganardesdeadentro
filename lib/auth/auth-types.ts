@@ -1,6 +1,14 @@
+export type MembershipFunctionalTier = 'basic' | 'premium' | 'pro';
+
+export type MembershipDisplayName = 'Básica' | 'Premium' | 'Pro';
+
 export interface Membership {
   id: string;
-  name: 'Básica' | 'Premium' | 'Pro';
+  /** Nombre del plan en BD (puede ser custom, ej. "Premium Pay") */
+  name: string;
+  /** Etiqueta canónica para UI y gating Titan */
+  displayName: MembershipDisplayName;
+  functionalTier: MembershipFunctionalTier;
   startDate: string;
   endDate: string;
   daysRemaining: number;

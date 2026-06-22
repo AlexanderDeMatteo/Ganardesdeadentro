@@ -457,15 +457,12 @@ export function membershipLevelToPlanId(
   }
 }
 
-export function membershipNameToPlanId(name: Membership['name']): string {
-  switch (name) {
-    case 'Premium':
-      return '2';
-    case 'Pro':
-      return '3';
-    default:
-      return '1';
-  }
+export function membershipNameToPlanId(name: string): string {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === 'pro') return '3';
+  if (normalized === 'premium') return '2';
+  if (normalized === 'básica' || normalized === 'basica' || normalized === 'basic') return '1';
+  return '1';
 }
 
 export async function getMyRoutine(athleteId: string): Promise<{
@@ -653,6 +650,160 @@ export async function subscribeMembership(planId: string): Promise<void> {
     method: 'POST',
     body: { planId: Number(planId) },
   });
+}
+
+export async function listPaymentMethods(): Promise<import('@/lib/api/contracts/payments').PaymentMethod[]> {
+  const response = await httpRequest<{ methods: import('@/lib/api/contracts/payments').PaymentMethod[] }>(
+    '/api/payments/methods',
+    { auth: false },
+  );
+  return response.methods;
+}
+
+export async function listAllPaymentMethods(): Promise<import('@/lib/api/contracts/payments').PaymentMethod[]> {
+  const response = await httpRequest<{ methods: import('@/lib/api/contracts/payments').PaymentMethod[] }>(
+    '/api/payments/methods/all',
+  );
+  return response.methods;
+}
+
+export async function getPaymentMethodInstructions(methodId: string) {
+  const response = await httpRequest<{ method: import('@/lib/api/contracts/payments').PaymentMethod }>(
+    `/api/payments/methods/${encodeURIComponent(methodId)}/instructions`,
+  );
+  return response.method;
+}
+
+export async function createPaymentMethod(
+  data: {
+    name: string;
+    category: string;
+    instructions?: string;
+    methodType: 'digital' | 'bank' | 'crypto' | 'cash';
+    exchangeRateId: string | null;
+    details: Array<{ key: string; value: string }>;
+    sortOrder: number;
+    isActive: boolean;
+    slug?: string;
+  },
+) {
+  const response = await httpRequest<{ method: import('@/lib/api/contracts/payments').PaymentMethod }>(
+    '/api/payments/methods',
+    { method: 'POST', body: data },
+  );
+  return response.method;
+}
+
+export async function updatePaymentMethod(
+  id: string,
+  data: Partial<import('@/lib/api/contracts/payments').PaymentMethod>,
+) {
+  const response = await httpRequest<{ method: import('@/lib/api/contracts/payments').PaymentMethod }>(
+    `/api/payments/methods/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: data },
+  );
+  return response.method;
+}
+
+export async function deletePaymentMethod(id: string): Promise<void> {
+  await httpRequest(`/api/payments/methods/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function submitPaymentRequest(
+  input: import('@/lib/api/contracts/payments').SubmitPaymentRequestInput,
+): Promise<import('@/lib/api/contracts/payments').PaymentRequest> {
+  const form = new FormData();
+  form.append('planId', input.planId);
+  form.append('paymentMethodId', input.paymentMethodId);
+  form.append('fullName', input.fullName);
+  form.append('phone', input.phone);
+  form.append('country', input.country);
+  if (input.sellerCode) form.append('sellerCode', input.sellerCode);
+  form.append('email', input.email);
+  if (input.amountUsd != null) form.append('amountUsd', String(input.amountUsd));
+  if (input.amountConverted != null) form.append('amountConverted', String(input.amountConverted));
+  if (input.convertedCurrency) form.append('convertedCurrency', input.convertedCurrency);
+  if (input.exchangeRateSnapshot != null) {
+    form.append('exchangeRateSnapshot', String(input.exchangeRateSnapshot));
+  }
+  form.append('receipt', input.receipt);
+  const response = await httpRequest<{ paymentRequest: import('@/lib/api/contracts/payments').PaymentRequest }>(
+    '/api/memberships/payment-requests',
+    { method: 'POST', body: form },
+  );
+  return response.paymentRequest;
+}
+
+export async function getMyPaymentRequests(): Promise<import('@/lib/api/contracts/payments').PaymentRequest[]> {
+  const response = await httpRequest<{ paymentRequests: import('@/lib/api/contracts/payments').PaymentRequest[] }>(
+    '/api/memberships/payment-requests/mine',
+  );
+  return response.paymentRequests;
+}
+
+export async function listPaymentRequests(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  const response = await httpRequest<{ paymentRequests: import('@/lib/api/contracts/payments').PaymentRequest[] }>(
+    `/api/memberships/payment-requests${qs}`,
+  );
+  return response.paymentRequests;
+}
+
+export async function approvePaymentRequest(id: string) {
+  const response = await httpRequest<{ paymentRequest: import('@/lib/api/contracts/payments').PaymentRequest }>(
+    `/api/memberships/payment-requests/${encodeURIComponent(id)}/approve`,
+    { method: 'POST' },
+  );
+  return response.paymentRequest;
+}
+
+export async function rejectPaymentRequest(id: string, reason?: string) {
+  const response = await httpRequest<{ paymentRequest: import('@/lib/api/contracts/payments').PaymentRequest }>(
+    `/api/memberships/payment-requests/${encodeURIComponent(id)}/reject`,
+    { method: 'POST', body: { reason } },
+  );
+  return response.paymentRequest;
+}
+
+export async function listExchangeRates(active?: boolean): Promise<import('@/lib/api/contracts/exchange-rates').ExchangeRate[]> {
+  const qs = active == null ? '' : `?active=${active ? 'true' : 'false'}`;
+  const response = await httpRequest<{ exchangeRates: import('@/lib/api/contracts/exchange-rates').ExchangeRate[] }>(
+    `/api/exchange-rates/${qs}`,
+  );
+  return response.exchangeRates;
+}
+
+export async function listPublicExchangeRates(): Promise<import('@/lib/api/contracts/exchange-rates').ExchangeRate[]> {
+  const response = await httpRequest<{ exchangeRates: import('@/lib/api/contracts/exchange-rates').ExchangeRate[] }>(
+    '/api/exchange-rates/public',
+    { auth: false },
+  );
+  return response.exchangeRates;
+}
+
+export async function createExchangeRate(
+  data: Omit<import('@/lib/api/contracts/exchange-rates').ExchangeRate, 'id' | 'createdAt' | 'updatedAt'>,
+) {
+  const response = await httpRequest<{ exchangeRate: import('@/lib/api/contracts/exchange-rates').ExchangeRate }>(
+    '/api/exchange-rates/',
+    { method: 'POST', body: data },
+  );
+  return response.exchangeRate;
+}
+
+export async function updateExchangeRate(
+  id: string,
+  data: Partial<Omit<import('@/lib/api/contracts/exchange-rates').ExchangeRate, 'id' | 'createdAt' | 'updatedAt'>>,
+) {
+  const response = await httpRequest<{ exchangeRate: import('@/lib/api/contracts/exchange-rates').ExchangeRate }>(
+    `/api/exchange-rates/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: data },
+  );
+  return response.exchangeRate;
+}
+
+export async function deleteExchangeRate(id: string): Promise<void> {
+  await httpRequest(`/api/exchange-rates/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export async function listRoutines(trainerId?: string): Promise<Routine[]> {
@@ -914,6 +1065,14 @@ export function getStateSnapshot(): never {
 export async function listMembershipPlans(): Promise<MembershipPlan[]> {
   const response = await httpRequest<{ plans: ApiMembershipPlanPayload[] }>(
     '/api/memberships/plans',
+  );
+  return response.plans.map(mapApiMembershipPlan);
+}
+
+export async function listPublicMembershipPlans(): Promise<MembershipPlan[]> {
+  const response = await httpRequest<{ plans: ApiMembershipPlanPayload[] }>(
+    '/api/memberships/plans/public',
+    { auth: false },
   );
   return response.plans.map(mapApiMembershipPlan);
 }
@@ -1250,4 +1409,73 @@ export async function patchDiaryWater(
     },
   });
   return response.diary;
+}
+
+export async function listNotifications() {
+  const response = await httpRequest<import('@/lib/api/contracts/notifications').NotificationsListResponse>(
+    '/api/notifications/',
+  );
+  return response.notifications;
+}
+
+export async function getUnreadNotificationCount() {
+  const response = await httpRequest<import('@/lib/api/contracts/notifications').UnreadCountResponse>(
+    '/api/notifications/unread-count',
+  );
+  return response.count;
+}
+
+export async function markNotificationRead(id: string) {
+  const response = await httpRequest<{ notification: import('@/lib/api/contracts/notifications').NotificationRecord }>(
+    `/api/notifications/${encodeURIComponent(id)}/read`,
+    { method: 'POST' },
+  );
+  return response.notification;
+}
+
+export async function markAllNotificationsRead() {
+  await httpRequest('/api/notifications/read-all', { method: 'POST' });
+}
+
+export async function getMySupportThread() {
+  return httpRequest<import('@/lib/api/contracts/support').SupportThreadResponse>('/api/support/thread');
+}
+
+export async function sendAthleteSupportMessage(body: string) {
+  const response = await httpRequest<import('@/lib/api/contracts/support').SupportMessageResponse>(
+    '/api/support/messages',
+    { method: 'POST', body: { body } },
+  );
+  return response.message;
+}
+
+export async function markMySupportThreadRead() {
+  await httpRequest('/api/support/thread/read', { method: 'POST' });
+}
+
+export async function listSupportThreads() {
+  const response = await httpRequest<import('@/lib/api/contracts/support').SupportThreadsResponse>(
+    '/api/support/threads',
+  );
+  return response.threads;
+}
+
+export async function getSupportThread(athleteId: string) {
+  return httpRequest<import('@/lib/api/contracts/support').SupportThreadResponse>(
+    `/api/support/threads/${encodeURIComponent(athleteId)}`,
+  );
+}
+
+export async function sendAdminSupportMessage(athleteId: string, body: string) {
+  const response = await httpRequest<import('@/lib/api/contracts/support').SupportMessageResponse>(
+    `/api/support/threads/${encodeURIComponent(athleteId)}/messages`,
+    { method: 'POST', body: { body } },
+  );
+  return response.message;
+}
+
+export async function markSupportThreadRead(athleteId: string) {
+  await httpRequest(`/api/support/threads/${encodeURIComponent(athleteId)}/read`, {
+    method: 'POST',
+  });
 }
