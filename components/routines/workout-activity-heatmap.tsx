@@ -73,10 +73,45 @@ export function WorkoutActivityHeatmap({
     [sessions, period],
   );
   const intensityMap = theme === 'prime' ? INTENSITY_PRIME : INTENSITY_DEFAULT;
-  const months = monthLabels(heatmap.weeks);
 
   const selectedSessions =
     selectedDate != null ? (heatmap.cellsByDate.get(selectedDate)?.sessions ?? []) : [];
+
+  const toggleDate = (date: string) => {
+    setSelectedDate((prev) => (prev === date ? null : date));
+  };
+
+  if (period === 'week') {
+    return (
+      <WeekActivityView
+        heatmap={heatmap}
+        period={period}
+        intensityMap={intensityMap}
+        theme={theme}
+        selectedDate={selectedDate}
+        onSelectDate={toggleDate}
+        selectedSessions={selectedSessions}
+        routineNames={routineNames}
+      />
+    );
+  }
+
+  if (period === 'month') {
+    return (
+      <MonthActivityView
+        heatmap={heatmap}
+        period={period}
+        intensityMap={intensityMap}
+        theme={theme}
+        selectedDate={selectedDate}
+        onSelectDate={toggleDate}
+        selectedSessions={selectedSessions}
+        routineNames={routineNames}
+      />
+    );
+  }
+
+  const months = monthLabels(heatmap.weeks);
 
   return (
     <div className="space-y-4">
@@ -153,7 +188,7 @@ export function WorkoutActivityHeatmap({
                       aria-label={cellAriaLabel(cell)}
                       title={cellAriaLabel(cell)}
                       onClick={() =>
-                        setSelectedDate((prev) => (prev === cell.date ? null : cell.date))
+                        toggleDate(cell.date)
                       }
                       className={cn(
                         'aspect-square min-h-[12px] min-w-[12px] rounded-sm border transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400',
@@ -205,6 +240,229 @@ export function WorkoutActivityHeatmap({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+type ActivityViewProps = {
+  heatmap: ReturnType<typeof buildActivityHeatmap>;
+  period: PerformancePeriod;
+  intensityMap: Record<HeatmapIntensity, string>;
+  theme: 'prime' | 'default';
+  selectedDate: string | null;
+  onSelectDate: (date: string) => void;
+  selectedSessions: SessionLog[];
+  routineNames: Record<string, string>;
+};
+
+function SessionDetailPanel({
+  selectedDate,
+  selectedSessions,
+  routineNames,
+  theme,
+}: Pick<ActivityViewProps, 'selectedDate' | 'selectedSessions' | 'routineNames' | 'theme'>) {
+  if (!selectedDate) return null;
+  return (
+    <div
+      className={cn(
+        'rounded-lg border p-4',
+        theme === 'prime' ? 'gp-form-panel gp-border-outline/40' : 'border-border bg-card/50',
+      )}
+    >
+      <AthleteSessionDayDetail
+        date={selectedDate}
+        sessions={selectedSessions}
+        routineNames={routineNames}
+        theme={theme}
+      />
+    </div>
+  );
+}
+
+function WeekActivityView({
+  heatmap,
+  period,
+  intensityMap,
+  theme,
+  selectedDate,
+  onSelectDate,
+  selectedSessions,
+  routineNames,
+}: ActivityViewProps) {
+  const days = useMemo(
+    () => Array.from(heatmap.cellsByDate.values()).sort((a, b) => a.date.localeCompare(b.date)),
+    [heatmap.cellsByDate],
+  );
+
+  return (
+    <div className="space-y-4">
+      <p
+        className={cn(
+          'text-sm font-medium',
+          theme === 'prime' ? 'gp-mono gp-text-primary' : 'text-foreground',
+        )}
+      >
+        {heatmap.workoutCount} entrenamiento{heatmap.workoutCount === 1 ? '' : 's'} ·{' '}
+        {PERFORMANCE_PERIOD_LABELS[period].toLowerCase()}
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7" role="list" aria-label="Actividad semanal">
+        {days.map((cell) => {
+          const date = new Date(`${cell.date}T12:00:00`);
+          const weekdayIndex = date.getDay() === 0 ? 6 : date.getDay() - 1;
+          const isSelected = selectedDate === cell.date;
+          return (
+            <button
+              key={cell.date}
+              type="button"
+              role="listitem"
+              aria-label={cellAriaLabel(cell)}
+              onClick={() => onSelectDate(cell.date)}
+              className={cn(
+                'flex min-h-[88px] flex-col items-center justify-center rounded-lg border p-3 transition-transform hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400',
+                intensityMap[cell.level],
+                cell.hasFailures && cell.level > 0 && 'ring-1 ring-amber-400/80',
+                isSelected && 'ring-2 ring-cyan-400',
+              )}
+            >
+              <span
+                className={cn(
+                  'text-[10px] uppercase',
+                  theme === 'prime' ? 'gp-mono gp-text-dim' : 'text-muted-foreground',
+                )}
+              >
+                {DAY_LABELS[weekdayIndex]}
+              </span>
+              <span
+                className={cn(
+                  'mt-1 text-lg font-bold',
+                  theme === 'prime' ? 'gp-mono gp-text-primary' : 'text-foreground',
+                )}
+              >
+                {date.getDate()}
+              </span>
+              <span
+                className={cn(
+                  'mt-1 text-[10px]',
+                  theme === 'prime' ? 'gp-mono gp-text-dim' : 'text-muted-foreground',
+                )}
+              >
+                {cell.level > 0 ? `${cell.sessions.length} sesión` : 'Descanso'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <SessionDetailPanel
+        selectedDate={selectedDate}
+        selectedSessions={selectedSessions}
+        routineNames={routineNames}
+        theme={theme}
+      />
+    </div>
+  );
+}
+
+function MonthActivityView({
+  heatmap,
+  period,
+  intensityMap,
+  theme,
+  selectedDate,
+  onSelectDate,
+  selectedSessions,
+  routineNames,
+}: ActivityViewProps) {
+  return (
+    <div className="space-y-4">
+      <p
+        className={cn(
+          'text-sm font-medium',
+          theme === 'prime' ? 'gp-mono gp-text-primary' : 'text-foreground',
+        )}
+      >
+        {heatmap.workoutCount} entrenamiento{heatmap.workoutCount === 1 ? '' : 's'} ·{' '}
+        {PERFORMANCE_PERIOD_LABELS[period].toLowerCase()}
+      </p>
+
+      <div className="overflow-x-auto gp-scroll-thin">
+        <div className="min-w-[280px]">
+          <div className="mb-2 grid grid-cols-7 gap-2">
+            {DAY_LABELS.map((label) => (
+              <div
+                key={label}
+                className={cn(
+                  'text-center text-[10px] uppercase',
+                  theme === 'prime' ? 'gp-mono gp-text-dim' : 'text-muted-foreground',
+                )}
+              >
+                {label}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-2" role="grid" aria-label="Calendario mensual de entrenamientos">
+            {heatmap.weeks.flatMap((week) =>
+              week.days.map((cell, index) => {
+                if (!cell) {
+                  return (
+                    <div
+                      key={`empty-${week.weekStart}-${index}`}
+                      className="min-h-[44px] min-w-[44px]"
+                      aria-hidden
+                    />
+                  );
+                }
+                const dayNum = new Date(`${cell.date}T12:00:00`).getDate();
+                const isSelected = selectedDate === cell.date;
+                return (
+                  <button
+                    key={cell.date}
+                    type="button"
+                    role="gridcell"
+                    aria-label={cellAriaLabel(cell)}
+                    onClick={() => onSelectDate(cell.date)}
+                    className={cn(
+                      'flex min-h-[44px] min-w-[44px] flex-col items-center justify-center rounded-md border text-xs transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400',
+                      intensityMap[cell.level],
+                      cell.hasFailures && cell.level > 0 && 'ring-1 ring-amber-400/80',
+                      isSelected && 'ring-2 ring-cyan-400',
+                    )}
+                  >
+                    <span className={cn('font-semibold', theme === 'prime' && 'gp-mono')}>{dayNum}</span>
+                  </button>
+                );
+              }),
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-2 text-xs',
+          theme === 'prime' ? 'gp-mono gp-text-dim' : 'text-muted-foreground',
+        )}
+      >
+        <span>Volumen</span>
+        <span className="ml-auto">Menos</span>
+        {([1, 2, 3, 4] as HeatmapIntensity[]).map((level) => (
+          <span
+            key={level}
+            className={cn('h-3 w-3 rounded-sm border', intensityMap[level])}
+            aria-hidden
+          />
+        ))}
+        <span>Más</span>
+      </div>
+
+      <SessionDetailPanel
+        selectedDate={selectedDate}
+        selectedSessions={selectedSessions}
+        routineNames={routineNames}
+        theme={theme}
+      />
     </div>
   );
 }

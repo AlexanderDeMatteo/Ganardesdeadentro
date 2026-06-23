@@ -12,6 +12,8 @@ import { PrimeAthletesTable } from '@/components/admin-v2/prime-athletes-table';
 import { PrimeFilterPills } from '@/components/admin-v2/prime-filter-pills';
 import { PrimeModule } from '@/components/admin-v2/prime-module';
 import { useAdmin, type AthleteProfile } from '@/hooks/use-admin';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type FilterKey = 'all' | 'unassigned' | 'basic' | 'premium' | 'pro';
@@ -26,6 +28,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 export default function AdminV2AthletesPage() {
   const searchParams = useSearchParams();
+  const isMobile = useIsMobile();
   const initialAthleteId = searchParams.get('athlete');
   const {
     athletes,
@@ -161,7 +164,7 @@ export default function AdminV2AthletesPage() {
           onAssignTrainer={handleAssignTrainer}
         />
 
-        <aside className="min-w-0 xl:w-full">
+        <aside className="hidden min-w-0 xl:block xl:w-full">
           {selectedAthlete ? (
             <PrimeAthleteInspector
               athlete={selectedAthlete}
@@ -181,6 +184,28 @@ export default function AdminV2AthletesPage() {
           )}
         </aside>
       </div>
+
+      <Sheet
+        open={isMobile && Boolean(selectedAthlete)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null);
+        }}
+      >
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto gp-bg-surface p-0">
+          <SheetTitle className="sr-only">Detalle del atleta</SheetTitle>
+          {selectedAthlete ? (
+            <PrimeAthleteInspector
+              athlete={selectedAthlete}
+              getTrainerById={getTrainerById}
+              nutritionBasePath="/admin-v2/athletes"
+              onViewProfile={() => handleViewDetails(selectedAthlete)}
+              onViewPerformance={() => handleViewPerformance(selectedAthlete)}
+              onAssignTrainer={() => handleAssignTrainer(selectedAthlete)}
+              onAssignMembership={() => handleAssignMembership(selectedAthlete)}
+            />
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
       <PrimeAthletePerformanceModal
         athlete={isPerformanceOpen ? modalAthlete : null}

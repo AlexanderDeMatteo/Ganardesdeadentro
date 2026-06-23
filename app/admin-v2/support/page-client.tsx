@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 
 export default function AdminSupportPage() {
   const searchParams = useSearchParams();
-  const { subscribe } = useRealtime();
+  const { subscribe, isConnected } = useRealtime();
   const [threads, setThreads] = useState<SupportThread[]>([]);
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +32,26 @@ export default function AdminSupportPage() {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const mergeThreadUpdate = useCallback((updated: SupportThread) => {
+    if (!updated?.athleteId) return;
+    setThreads((prev) => {
+      const index = prev.findIndex((thread) => thread.athleteId === updated.athleteId);
+      const next =
+        index === -1
+          ? [updated, ...prev]
+          : prev.map((thread, i) =>
+              i === index
+                ? { ...thread, ...updated, athlete: updated.athlete ?? thread.athlete }
+                : thread,
+            );
+      return [...next].sort((a, b) => {
+        const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+        const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    });
   }, []);
 
   useEffect(() => {
@@ -61,6 +81,29 @@ export default function AdminSupportPage() {
       void loadThreads();
     });
   }, [loadThreads, subscribe]);
+
+  useEffect(() => {
+    return subscribe('support:thread_updated', (payload) => {
+      mergeThreadUpdate(payload as SupportThread);
+    });
+  }, [mergeThreadUpdate, subscribe]);
+
+  useEffect(() => {
+    return subscribe('notification', (payload) => {
+      const notification = payload as { type?: string };
+      if (notification?.type === 'support.message') {
+        void loadThreads();
+      }
+    });
+  }, [loadThreads, subscribe]);
+
+  useEffect(() => {
+    if (isConnected) return;
+    const intervalId = window.setInterval(() => {
+      void loadThreads();
+    }, 15_000);
+    return () => window.clearInterval(intervalId);
+  }, [isConnected, loadThreads]);
 
   const selectedThread = useMemo(
     () => threads.find((thread) => thread.athleteId === selectedAthleteId) ?? null,

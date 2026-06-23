@@ -145,6 +145,7 @@ class RoutineService:
                 description=data.get('description', ''),
                 difficulty=DifficultyEnum(data.get('difficulty', 'beginner')),
                 duration_minutes=data.get('duration') or data.get('duration_minutes') or 0,
+                structure_type=data.get('structureType', 'standard'),
                 is_active=True,
             )
             if creator_role == 'trainer':
@@ -156,6 +157,7 @@ class RoutineService:
             for index, exercise_payload in enumerate(data.get('exercises', [])):
                 exercise = RoutineService._resolve_exercise(session, exercise_payload)
                 suggested = exercise_payload.get('suggestedWeightsKg') or []
+                block_config = exercise_payload.get('blockConfig')
                 session.add(
                     RoutineExercise(
                         routine_id=routine.id,
@@ -166,6 +168,7 @@ class RoutineService:
                         rest_seconds=int(exercise_payload.get('rest', 60)),
                         suggested_weights=json.dumps(suggested),
                         technique=exercise_payload.get('technique'),
+                        block_config=json.dumps(block_config) if block_config else None,
                     )
                 )
             session.commit()
@@ -206,11 +209,14 @@ class RoutineService:
                 routine.difficulty = DifficultyEnum(patch['difficulty'])
             if 'duration' in patch:
                 routine.duration_minutes = patch['duration']
+            if 'structureType' in patch:
+                routine.structure_type = patch['structureType']
             if 'exercises' in patch:
                 session.query(RoutineExercise).filter_by(routine_id=routine.id).delete()
                 for index, exercise_payload in enumerate(patch['exercises']):
                     exercise = RoutineService._resolve_exercise(session, exercise_payload)
                     suggested = exercise_payload.get('suggestedWeightsKg') or []
+                    block_config = exercise_payload.get('blockConfig')
                     session.add(
                         RoutineExercise(
                             routine_id=routine.id,
@@ -221,6 +227,7 @@ class RoutineService:
                             rest_seconds=exercise_payload.get('rest', 60),
                             suggested_weights=json.dumps(suggested),
                             technique=exercise_payload.get('technique'),
+                            block_config=json.dumps(block_config) if block_config else None,
                         )
                     )
             routine.updated_at = datetime.now(timezone.utc)

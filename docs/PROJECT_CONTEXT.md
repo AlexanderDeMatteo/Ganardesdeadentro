@@ -153,6 +153,7 @@ docker compose -p fittrack up --build -d
 - `docker-compose.yml` monta volumen `backend_data` y fuerza `DATABASE_URL` a SQLite bajo `/data`.
 - Variables frontend en compose (piloto híbrido): `AUTH_SOURCE=api`, `DATA_SOURCE=local`, overrides `METRICS`, `ROUTINES`, `USERS`, `NUTRITION`, `MEMBERSHIPS` en `api`. Con auth API, `athleteId` debe ser el `user.id` del JWT.
 - Requiere archivo `backend/.env` para variables adicionales (ver ejemplo en `backend/.env.example`). Si el puerto `5000` está ocupado, detén el otro contenedor o ajusta el mapeo de puertos.
+- **Hosting / Mac Mini / tunnel:** ver [`docs/DEPLOY_MAC_MINI.md`](./DEPLOY_MAC_MINI.md) (`docker-compose.prod.yml`, plantillas `.env.hosting.example`).
 
 Apagar:
 

@@ -7,11 +7,13 @@ import { MessageCircle, Minimize2 } from 'lucide-react';
 import { CoachAvatar } from '@/components/coach/coach-avatar';
 import { Button } from '@/components/ui/button';
 import { CoachTitanMessage } from '@/components/coach/coach-titan-message';
+import { useAuth } from '@/app/context/auth-context';
 import { useCoach } from '@/app/context/coach-context';
 import { isAdminPreviewPath, isPublicAuthPath } from '@/lib/auth/role-routes';
 import { cn } from '@/lib/utils';
 
 export function CoachMascot() {
+  const { isAuthenticated } = useAuth();
   const pathname = usePathname() ?? '';
   const messageScrollRef = useRef<HTMLDivElement>(null);
   const {
@@ -35,7 +37,7 @@ export function CoachMascot() {
   } = useCoach();
   const [nutritionInput, setNutritionInput] = useState('');
 
-  if (isAdminPreviewPath(pathname) || isPublicAuthPath(pathname)) {
+  if (!isAuthenticated || isAdminPreviewPath(pathname) || isPublicAuthPath(pathname)) {
     return null;
   }
 

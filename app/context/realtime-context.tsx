@@ -77,11 +77,14 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     };
     const onNotification = (payload: unknown) => dispatch('notification', payload);
     const onSupportMessage = (payload: unknown) => dispatch('support:message', payload);
+    const onSupportThreadUpdated = (payload: unknown) =>
+      dispatch('support:thread_updated', payload);
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('notification', onNotification);
     socket.on('support:message', onSupportMessage);
+    socket.on('support:thread_updated', onSupportThreadUpdated);
 
     if (socket.connected) {
       setIsConnected(true);
@@ -92,6 +95,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       socket.off('disconnect', onDisconnect);
       socket.off('notification', onNotification);
       socket.off('support:message', onSupportMessage);
+      socket.off('support:thread_updated', onSupportThreadUpdated);
       disconnectSocket();
       socketRef.current = null;
       setIsConnected(false);

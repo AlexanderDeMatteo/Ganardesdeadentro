@@ -12,7 +12,7 @@ from werkzeug.utils import secure_filename
 
 from app.config import get_config
 from app.database import SessionLocal
-from app.models import DifficultyEnum, Exercise, RoutineExercise
+from app.models import DifficultyEnum, Exercise, RoleEnum, RoutineExercise, User
 from app.services.exercise_api_service import ExerciseAPIService
 from app.services.video_processor import VideoProcessor, VideoProcessorError
 from app.utils.exercise_serializer import serialize_exercise
@@ -470,6 +470,35 @@ class CustomExerciseService:
             session.close()
 
     @staticmethod
+    def _apply_custom_scope(query, *, custom_scope: str | None, requester_id: int | None, requester_role: str | None):
+        scope = (custom_scope or 'mine').lower()
+        if requester_role == 'admin':
+            if scope == 'platform':
+                return query.join(User, Exercise.created_by_id == User.id).filter(
+                    User.role == RoleEnum.ADMIN,
+                )
+            if scope == 'mine' and requester_id is not None:
+                return query.filter(Exercise.created_by_id == requester_id)
+            return query
+
+        if requester_role != 'trainer' or requester_id is None:
+            if scope == 'platform':
+                return query.join(User, Exercise.created_by_id == User.id).filter(
+                    User.role == RoleEnum.ADMIN,
+                )
+            return query
+
+        if scope == 'platform':
+            return query.join(User, Exercise.created_by_id == User.id).filter(
+                User.role == RoleEnum.ADMIN,
+            )
+        if scope == 'all':
+            return query.outerjoin(User, Exercise.created_by_id == User.id).filter(
+                (Exercise.created_by_id == requester_id) | (User.role == RoleEnum.ADMIN),
+            )
+        return query.filter(Exercise.created_by_id == requester_id)
+
+    @staticmethod
     def list_exercises(
         *,
         muscle: str | None = None,
@@ -477,6 +506,7 @@ class CustomExerciseService:
         per_page: int = 20,
         custom_only: bool = False,
         source: str = 'all',
+        custom_scope: str | None = None,
         q: str | None = None,
         requester_id: int | None = None,
         requester_role: str | None = None,
@@ -493,8 +523,12 @@ class CustomExerciseService:
                 query = query.filter(Exercise.is_cached.is_(True), Exercise.is_custom.is_(False))
             elif effective_source == 'custom':
                 query = query.filter(Exercise.is_custom.is_(True))
-                if requester_role == 'trainer' and requester_id is not None:
-                    query = query.filter(Exercise.created_by_id == requester_id)
+                query = CustomExerciseService._apply_custom_scope(
+                    query,
+                    custom_scope=custom_scope,
+                    requester_id=requester_id,
+                    requester_role=requester_role,
+                )
             else:
                 query = query.filter(
                     (Exercise.is_cached.is_(True)) | (Exercise.is_custom.is_(True)),

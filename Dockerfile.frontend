@@ -29,7 +29,8 @@ RUN set -e; \
 
 COPY . .
 
-RUN sed -i 's/\r$//' docker-entrypoint.frontend.sh && chmod +x docker-entrypoint.frontend.sh
+RUN sed -i 's/\r$//' docker-entrypoint.frontend.sh docker-entrypoint.frontend.prod.sh \
+    && chmod +x docker-entrypoint.frontend.sh docker-entrypoint.frontend.prod.sh
 
 EXPOSE 3000
 

@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+# Restaura un backup creado con backup-data.sh.example en el volumen fittrack_backend_data.
+# ATENCIÓN: sobrescribe los datos actuales del volumen.
+#
+# Uso:
+#   docker compose -p fittrack -f docker-compose.prod.yml down
+#   ./deploy/restore-data.sh ./backups/fittrack-data-20260101-120000.tar.gz
+#   docker compose -p fittrack -f docker-compose.prod.yml up -d
+
+set -e
+
+VOLUME_NAME="${FITTRACK_DATA_VOLUME:-fittrack_backend_data}"
+ARCHIVE="${1:?Uso: restore-data.sh <ruta-al-tar.gz>}"
+
+if [ ! -f "$ARCHIVE" ]; then
+  echo "No existe el archivo: $ARCHIVE" >&2
+  exit 1
+fi
+
+echo "Restoring $ARCHIVE into Docker volume: $VOLUME_NAME"
+echo "Detén los contenedores que usen el volumen antes de continuar."
+read -r -p "Continuar? [y/N] " confirm
+case "$confirm" in
+  y|Y|yes|YES) ;;
+  *) echo "Cancelado."; exit 0 ;;
+esac
+
+docker run --rm \
+  -v "${VOLUME_NAME}:/data" \
+  -v "$(cd "$(dirname "$ARCHIVE")" && pwd):/backup:ro" \
+  alpine:3.20 \
+  sh -c "cd /data && rm -rf ./* ./.[!.]* 2>/dev/null; tar xzf /backup/$(basename "$ARCHIVE")"
+
+echo "Restore complete. Levanta el stack prod de nuevo."

@@ -1,7 +1,8 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, send_file
 from flask_jwt_extended import jwt_required
 
 from app.database import SessionLocal
+from app.services.session_execution_media_service import SessionExecutionMediaService
 from app.services.session_service import GENERIC_ERROR, SessionService
 from app.utils.authorization import get_current_user_id, require_athlete_access, require_active_membership
 
@@ -110,3 +111,35 @@ def exercise_progress():
     if error:
         return {'error': error}, 500
     return {'progress': points}, 200
+
+
+@sessions_bp.route('/execution-media', methods=['POST'])
+@jwt_required()
+def upload_execution_media():
+    athlete_id = request.form.get('athleteId') or get_current_user_id()
+    athlete_parsed, err = _parse_int(athlete_id, 'athleteId')
+    if err:
+        return err
+    session = SessionLocal()
+    try:
+        denied = require_athlete_access(athlete_parsed, session=session)
+        if denied:
+            return denied
+        denied = require_active_membership(athlete_parsed, session=session)
+        if denied:
+            return denied
+        payload, error, status = SessionExecutionMediaService.upload(request.files.get('file'))
+    finally:
+        session.close()
+    if error:
+        return {'error': error}, status
+    return payload, status
+
+
+@sessions_bp.route('/execution-media/<filename>', methods=['GET'])
+@jwt_required()
+def get_execution_media(filename):
+    path = SessionExecutionMediaService.resolve_media_path(filename)
+    if path is None:
+        return {'error': 'Archivo no encontrado'}, 404
+    return send_file(path, conditional=True)

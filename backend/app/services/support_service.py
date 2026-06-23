@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 
 from app.database import SessionLocal
 from app.models import RoleEnum, SupportMessage, SupportThread, User
-from app.realtime.emit import emit_to_support_thread, emit_to_user
+from app.realtime.emit import emit_to_admins, emit_to_support_thread, emit_to_user
 from app.schemas.serializers import serialize_support_message, serialize_support_thread
 from app.services.notification_service import NotificationService
 
@@ -133,6 +133,20 @@ class SupportService:
 
             serialized = serialize_support_message(message)
             emit_to_support_thread(athlete_id, 'support:message', serialized)
+
+            thread_row = (
+                session.query(SupportThread)
+                .options(joinedload(SupportThread.athlete))
+                .filter_by(athlete_id=athlete_id)
+                .first()
+            )
+            if thread_row is not None:
+                thread_payload = serialize_support_thread(thread_row, include_athlete=True)
+                emit_to_admins('support:thread_updated', thread_payload)
+                emit_to_admins('support:message', serialized)
+
+            if sender_role == RoleEnum.ADMIN.value:
+                emit_to_user(athlete_id, 'support:message', serialized)
 
             athlete = session.query(User).filter_by(id=athlete_id).first()
             athlete_name = f'{athlete.first_name} {athlete.last_name}'.strip() if athlete else 'Atleta'

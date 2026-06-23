@@ -72,6 +72,34 @@ export interface Exercise {
   createdById?: number;
 }
 
+export type RoutineStructureType = 'standard' | 'series_pull' | 'superset';
+export type SupersetSubtype = 'progressive' | 'regressive';
+
+export interface RomRange {
+  from: string;
+  to: string;
+  repsMin: number;
+  repsMax: number;
+}
+
+export interface SupersetStep {
+  weightKg: number;
+  repsTarget: string;
+}
+
+export interface SupersetFinisher {
+  weightKg: number;
+  repsTarget: string;
+}
+
+export interface RoutineExerciseBlockConfig {
+  romRanges?: RomRange[];
+  supersetSubtype?: SupersetSubtype;
+  steps?: SupersetStep[];
+  finisher?: SupersetFinisher;
+  maxTransitionRestSec?: number;
+}
+
 export interface RoutineExercise {
   exerciseId: string;
   exerciseName: string;
@@ -81,6 +109,7 @@ export interface RoutineExercise {
   /** Peso sugerido por serie (length === sets). Opcional. */
   suggestedWeightsKg?: number[];
   technique?: string;
+  blockConfig?: RoutineExerciseBlockConfig;
 }
 
 export interface Routine {
@@ -89,6 +118,7 @@ export interface Routine {
   description: string;
   difficulty: Difficulty;
   duration: number;
+  structureType?: RoutineStructureType;
   exercises: RoutineExercise[];
   createdDate: string;
   trainerId?: string;
@@ -138,6 +168,8 @@ export interface SetLogEntry {
   weightKg?: number;
   suggestedWeightKg?: number;
   result: SetResult;
+  executionVideoUrl?: string;
+  executionVideoUploadedAt?: string;
 }
 
 export interface SessionLog {

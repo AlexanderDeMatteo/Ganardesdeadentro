@@ -88,9 +88,12 @@ def get_cached_exercises():
     per_page = request.args.get('per_page', 20, type=int)
     custom_only = request.args.get('custom_only', 'false', type=str).lower() == 'true'
     source = request.args.get('source', 'all', type=str).lower()
+    custom_scope = request.args.get('custom_scope', None, type=str)
     q = request.args.get('q', None, type=str)
     if source not in ('all', 'catalog', 'custom'):
         return {'error': 'source debe ser all, catalog o custom'}, 400
+    if custom_scope is not None and custom_scope.lower() not in ('mine', 'platform', 'all'):
+        return {'error': 'custom_scope debe ser mine, platform o all'}, 400
     if per_page > 100:
         per_page = 100
     payload = CustomExerciseService.list_exercises(
@@ -99,6 +102,7 @@ def get_cached_exercises():
         per_page=per_page,
         custom_only=custom_only,
         source=source,
+        custom_scope=custom_scope.lower() if custom_scope else None,
         q=q,
         requester_id=user.id,
         requester_role=_role_value(user.role),

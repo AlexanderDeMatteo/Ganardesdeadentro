@@ -101,6 +101,8 @@ class SetLogSchema(BaseModel):
     weightKg: float | None = Field(default=None, ge=0)
     suggestedWeightKg: float | None = Field(default=None, ge=0)
     result: str = 'completed'
+    executionVideoUrl: str | None = None
+    executionVideoUploadedAt: str | None = None
 
     @field_validator('result')
     @classmethod

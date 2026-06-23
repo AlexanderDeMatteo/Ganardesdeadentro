@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNutrition } from '@/hooks/use-nutrition';
 import { clampDateKeyToLast7Days, isDateKeyOnOrBeforeToday, toLocalDateKey } from '@/lib/nutrition/dates';
 import { LoadingState } from '@/components/ui/loading-state';
+import { SectionErrorBoundary } from '@/components/ui/section-error-boundary';
 import { useMemo, useRef, useState } from 'react';
 
 export function NutritionPageContent() {
@@ -83,7 +84,12 @@ export function NutritionPageContent() {
         <TabsContent value="plan" className="space-y-6">
           <PrimeModule modId="N02" title="PLAN_COMIDAS">
             <div className="p-4">
-              <AssignedMealPlanView />
+              <SectionErrorBoundary
+                fallbackTitle="No se pudo cargar el plan de comidas"
+                fallbackMessage="El plan asignado tiene un formato incompatible. Contacta a tu entrenador o intenta de nuevo más tarde."
+              >
+                <AssignedMealPlanView />
+              </SectionErrorBoundary>
             </div>
           </PrimeModule>
         </TabsContent>

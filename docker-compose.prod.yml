@@ -1,0 +1,94 @@
+# Producción / hosting (Mac Mini, tunnel Cloudflare).
+# Uso: docker compose -p fittrack -f docker-compose.prod.yml up --build -d
+#
+# Variables públicas (URLs tunnel o dominio): copiar .env.hosting.example → .env.hosting
+# Secretos backend: copiar backend/.env.hosting.example → backend/.env
+# Ver docs/DEPLOY_MAC_MINI.md
+
+name: fittrack
+
+services:
+  fittrack-frontend:
+    container_name: fittrack-frontend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    command: ["./docker-entrypoint.frontend.prod.sh"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - path: .env.hosting
+        required: false
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_AUTH_SOURCE: api
+      NEXT_PUBLIC_DATA_SOURCE: api
+      NEXT_PUBLIC_DATA_SOURCE_METRICS: api
+      NEXT_PUBLIC_DATA_SOURCE_ROUTINES: api
+      NEXT_PUBLIC_DATA_SOURCE_USERS: api
+      NEXT_PUBLIC_DATA_SOURCE_NUTRITION: api
+      NEXT_PUBLIC_DATA_SOURCE_MEMBERSHIPS: api
+      # Smoke test local sin tunnel (sobrescribir en .env.hosting con URLs públicas):
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}
+      API_INTERNAL_URL: http://fittrack-backend:5000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    depends_on:
+      fittrack-backend:
+        condition: service_started
+      fittrack-redis:
+        condition: service_started
+    restart: unless-stopped
+
+  fittrack-backend:
+    container_name: fittrack-backend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      ENVIRONMENT: production
+      FLASK_ENV: production
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 5000
+      DATABASE_URL: sqlite:////data/fitness_platform.db
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      RATELIMIT_STORAGE_URI: redis://fittrack-redis:6379
+      EXERCISEDB_API_URL: https://oss.exercisedb.dev
+      EXERCISEDB_SSL_VERIFY: "true"
+      EXERCISE_MEDIA_UPLOAD_DIR: /data/exercise_media
+      PAYMENT_RECEIPT_UPLOAD_DIR: /data/payment_receipts
+      SEED_DEMO_TRAINERS: "false"
+      JWT_COOKIE_SECURE: "True"
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - fittrack_backend_data:/data
+    depends_on:
+      fittrack-redis:
+        condition: service_started
+    restart: unless-stopped
+
+  fittrack-redis:
+    container_name: fittrack-redis
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - fittrack_redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  fittrack_backend_data:
+    name: fittrack_backend_data
+  fittrack_redis_data:
+    name: fittrack_redis_data

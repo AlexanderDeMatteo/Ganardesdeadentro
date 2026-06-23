@@ -307,6 +307,7 @@ class Routine(Base):
     difficulty = Column(SQLEnum(DifficultyEnum), default=DifficultyEnum.BEGINNER)
     duration_minutes = Column(Integer)
     required_membership_level = Column(Integer, ForeignKey('memberships.id'))
+    structure_type = Column(String(32), nullable=False, default='standard', server_default='standard')
     is_active = Column(Boolean, default=True, nullable=False)
     is_public = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -342,6 +343,7 @@ class RoutineExercise(Base):
     rest_seconds = Column(Integer, default=60)
     suggested_weights = Column(Text)
     technique = Column(String(255))
+    block_config = Column(Text)
     notes = Column(Text)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 

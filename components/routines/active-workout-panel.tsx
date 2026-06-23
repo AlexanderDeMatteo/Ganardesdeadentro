@@ -10,9 +10,10 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { ExerciseAnimationPlayer } from '@/components/exercises/exercise-animation-player';
-import { getExerciseById, markSessionComplete } from '@/lib/data/client';
+import { getExerciseById, markSessionComplete, uploadSessionExecutionVideo } from '@/lib/data/client';
 import {
   getSuggestedWeightForSet,
+  isCompoundSetTask,
   taskUsesWeightLogging,
   totalPlannedSets,
   type RoutineTask,
@@ -103,6 +104,11 @@ export function ActiveWorkoutPanel({
   const [showCelebration, setShowCelebration] = useState(false);
   const [setValidationError, setSetValidationError] = useState<string | null>(null);
   const [yieldMode, setYieldMode] = useState(false);
+  const [compoundPhase, setCompoundPhase] = useState(0);
+  const [pendingVideo, setPendingVideo] = useState<{ exerciseId: string; setNumber: number } | null>(
+    null,
+  );
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const savedRef = useRef(false);
   const repsEditedRef = useRef(false);
   const liveRef = useRef<HTMLDivElement>(null);
@@ -119,6 +125,25 @@ export function ActiveWorkoutPanel({
     : undefined;
   const loadIndicator = weightLoadIndicator(parsedWeight, suggestedWeight);
   const usesWeight = currentTask ? taskUsesWeightLogging(currentTask) : false;
+  const isCompound = Boolean(
+    currentTask && isCompoundSetTask(currentTask, uiRoutine.structureType),
+  );
+  const compoundSteps = useMemo(() => {
+    if (!currentTask) return [];
+    if (uiRoutine.structureType === 'series_pull') {
+      return currentTask.blockConfig?.romRanges ?? [];
+    }
+    if (uiRoutine.structureType === 'superset') {
+      const steps = currentTask.blockConfig?.steps ?? [];
+      const finisher = currentTask.blockConfig?.finisher;
+      return finisher ? [...steps, finisher] : steps;
+    }
+    return [];
+  }, [currentTask, uiRoutine.structureType]);
+
+  useEffect(() => {
+    setCompoundPhase(0);
+  }, [currentExerciseIndex, currentSet]);
 
   const restoreDraft = useCallback(() => {
     if (typeof window === 'undefined') return false;
@@ -263,6 +288,7 @@ export function ActiveWorkoutPanel({
         entry,
       ];
       setSetLogs(nextLogs);
+      setPendingVideo({ exerciseId: currentTask.id, setNumber: currentSet });
       advanceAfterSet(nextLogs, currentExerciseIndex, currentSet);
     },
     [
@@ -281,6 +307,30 @@ export function ActiveWorkoutPanel({
   const handleYieldClick = () => {
     setYieldMode(true);
     recordSet('failed');
+  };
+
+  const handleVideoUpload = async (file: File) => {
+    if (!pendingVideo) return;
+    setIsUploadingVideo(true);
+    try {
+      const uploaded = await uploadSessionExecutionVideo(athleteId, file);
+      setSetLogs((prev) =>
+        prev.map((log) =>
+          log.exerciseId === pendingVideo.exerciseId && log.setNumber === pendingVideo.setNumber
+            ? {
+                ...log,
+                executionVideoUrl: uploaded.url,
+                executionVideoUploadedAt: uploaded.uploadedAt ?? new Date().toISOString(),
+              }
+            : log,
+        ),
+      );
+      setPendingVideo(null);
+    } catch {
+      setSetValidationError('No se pudo subir el video de ejecución');
+    } finally {
+      setIsUploadingVideo(false);
+    }
   };
 
   const saveSession = useCallback(async () => {
@@ -575,6 +625,31 @@ export function ActiveWorkoutPanel({
             </CollapsibleContent>
           </Collapsible>
 
+          {isCompound && compoundSteps.length > 0 ? (
+            <div className="mt-4 rounded-lg border gp-border-outline bg-muted/20 p-3 text-sm">
+              <p className="font-medium text-foreground">
+                {uiRoutine.structureType === 'series_pull' ? 'Rango de movimiento' : 'Escalón'}{' '}
+                {compoundPhase + 1} de {compoundSteps.length}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {uiRoutine.structureType === 'series_pull'
+                  ? `${(compoundSteps[compoundPhase] as { from: string; to: string }).from} → ${(compoundSteps[compoundPhase] as { from: string; to: string }).to}`
+                  : `${(compoundSteps[compoundPhase] as { weightKg: number; repsTarget: string }).weightKg} kg · ${(compoundSteps[compoundPhase] as { weightKg: number; repsTarget: string }).repsTarget} reps`}
+              </p>
+              {compoundPhase < compoundSteps.length - 1 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => setCompoundPhase((phase) => phase + 1)}
+                >
+                  Siguiente paso (≤30s)
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
           {setValidationError && (
             <p className="mt-3 text-sm text-destructive" role="alert">
               {setValidationError}
@@ -585,7 +660,10 @@ export function ActiveWorkoutPanel({
             <Button
               type="button"
               onClick={() => recordSet('completed')}
-              disabled={restSecondsLeft > 0}
+              disabled={
+                restSecondsLeft > 0 ||
+                (isCompound && compoundPhase < compoundSteps.length - 1)
+              }
               className="bg-lime-400 text-black hover:bg-lime-300"
             >
               <Check className="mr-2 size-4" aria-hidden />
@@ -600,6 +678,35 @@ export function ActiveWorkoutPanel({
               Me rindo
             </Button>
           </div>
+
+          {pendingVideo &&
+          setLogs.some(
+            (log) =>
+              log.exerciseId === pendingVideo.exerciseId &&
+              log.setNumber === pendingVideo.setNumber &&
+              !log.executionVideoUrl,
+          ) ? (
+            <div className="mt-4 rounded-lg border border-dashed gp-border-outline p-3">
+              <p className="text-sm font-medium">Subir video de ejecución (opcional)</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Serie {pendingVideo.setNumber} registrada. Adjunta un clip para que tu entrenador revise la técnica.
+              </p>
+              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm text-primary hover:underline">
+                <input
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime"
+                  className="sr-only"
+                  disabled={isUploadingVideo}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void handleVideoUpload(file);
+                    event.currentTarget.value = '';
+                  }}
+                />
+                {isUploadingVideo ? 'Subiendo video…' : 'Elegir video'}
+              </label>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -638,6 +745,7 @@ export function ActiveWorkoutPanel({
                 {l.exerciseName} s{l.setNumber}: {l.repsLogged} reps
                 {l.weightKg != null ? ` @ ${l.weightKg} kg` : ''} —{' '}
                 {l.result === 'completed' ? 'OK' : 'Fallo'}
+                {l.executionVideoUrl ? ' · video ✓' : ''}
               </li>
             ))}
           </ul>

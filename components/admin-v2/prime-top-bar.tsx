@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, History, UserCircle } from 'lucide-react';
+import { Bell, History, Menu, UserCircle } from 'lucide-react';
 import { useAuth } from '@/app/context/auth-context';
 import { PrimeActivityLogPanel } from '@/components/admin-v2/prime-activity-log-panel';
 import { PrimeAlertsPanel } from '@/components/admin-v2/prime-alerts-panel';
@@ -16,7 +16,7 @@ import { useAdminOpsFeed } from '@/hooks/use-admin-ops-feed';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { cn } from '@/lib/utils';
 
-export function PrimeTopBar() {
+export function PrimeTopBar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const { user } = useAuth();
   const { alerts, activityLog, badgeCount, markAlertsRead } = useAdminOpsFeed();
   const { open, setOpen } = useCommandPalette();
@@ -28,7 +28,17 @@ export function PrimeTopBar() {
   return (
     <>
       <header className="fixed right-0 top-0 z-50 flex h-20 w-full items-center justify-between border-b border-[#255831]/60 bg-[#0d1511]/80 px-4 backdrop-blur-md md:w-[calc(100%-280px)] md:px-10">
-        <div className="flex min-w-0 items-center gap-6">
+        <div className="flex min-w-0 items-center gap-3 md:gap-6">
+          {onOpenMobileNav ? (
+            <button
+              type="button"
+              onClick={onOpenMobileNav}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-[#becab8] transition-colors hover:text-[#95fa8b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#68ca62] md:hidden"
+              aria-label="Abrir menú de navegación"
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </button>
+          ) : null}
           <h2 className="gp-display gp-title-metallic hidden text-2xl lg:block">
             BE A GAINER LIFE
           </h2>

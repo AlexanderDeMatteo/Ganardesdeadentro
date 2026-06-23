@@ -108,7 +108,8 @@ def serialize_trainer(user, profile=None, athlete_count=0, invite_pending: bool 
 def serialize_routine_exercise(rex):
     exercise = rex.exercise
     suggested = _json_loads(rex.suggested_weights, default=[])
-    return {
+    block_config = _json_loads(rex.block_config, default=None)
+    payload = {
         'exerciseId': exercise.exercise_db_id if exercise else str(rex.exercise_id),
         'exerciseName': exercise.name if exercise else 'Exercise',
         'sets': rex.sets,
@@ -117,6 +118,9 @@ def serialize_routine_exercise(rex):
         'suggestedWeightsKg': suggested if isinstance(suggested, list) else [],
         'technique': rex.technique,
     }
+    if isinstance(block_config, dict) and block_config:
+        payload['blockConfig'] = block_config
+    return payload
 
 
 def serialize_routine(routine):
@@ -127,6 +131,7 @@ def serialize_routine(routine):
         'description': routine.description or '',
         'difficulty': routine.difficulty.value if routine.difficulty else 'beginner',
         'duration': routine.duration_minutes or 0,
+        'structureType': getattr(routine, 'structure_type', None) or 'standard',
         'exercises': [serialize_routine_exercise(rex) for rex in exercises],
         'createdDate': _dt_iso(routine.created_at),
         'trainerId': str(routine.trainer_id) if routine.trainer_id else None,

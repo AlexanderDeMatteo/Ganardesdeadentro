@@ -60,6 +60,13 @@ class Config:
     )
     EXERCISE_MEDIA_VIDEO_MAX_WIDTH = int(os.getenv('EXERCISE_MEDIA_VIDEO_MAX_WIDTH', '1280'))
     EXERCISE_MEDIA_VIDEO_CRF = int(os.getenv('EXERCISE_MEDIA_VIDEO_CRF', '26'))
+    SESSION_EXECUTION_MEDIA_UPLOAD_DIR = os.getenv(
+        'SESSION_EXECUTION_MEDIA_UPLOAD_DIR',
+        '/data/session_execution_media',
+    )
+    SESSION_EXECUTION_MEDIA_MAX_BYTES = int(
+        os.getenv('SESSION_EXECUTION_MEDIA_MAX_BYTES', '52428800'),
+    )
 
     PAYMENT_RECEIPT_UPLOAD_DIR = os.getenv('PAYMENT_RECEIPT_UPLOAD_DIR', '/data/payment_receipts')
     PAYMENT_RECEIPT_MAX_BYTES = int(os.getenv('PAYMENT_RECEIPT_MAX_BYTES', '5242880'))
@@ -91,6 +98,10 @@ class TestingConfig(Config):
     RATELIMIT_ENABLED = False
     AUTH_RATE_LIMIT = '1000 per minute'
     EXERCISE_MEDIA_UPLOAD_DIR = os.getenv('EXERCISE_MEDIA_UPLOAD_DIR', 'exercise_media_test')
+    SESSION_EXECUTION_MEDIA_UPLOAD_DIR = os.getenv(
+        'SESSION_EXECUTION_MEDIA_UPLOAD_DIR',
+        'session_execution_media_test',
+    )
     PAYMENT_RECEIPT_UPLOAD_DIR = os.getenv('PAYMENT_RECEIPT_UPLOAD_DIR', 'payment_receipts_test')
 
 

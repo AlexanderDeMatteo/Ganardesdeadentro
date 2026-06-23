@@ -1,5 +1,6 @@
 import type { MealPlan, MealSlot, MealSlotTimes, ShoppingListEntry } from './types';
 import { MEAL_SLOT_LABELS } from './types';
+import { getMealSlotItems } from './normalize-meal-plan';
 
 function normalizeName(name: string): string {
   return name.trim().toLowerCase();
@@ -17,7 +18,7 @@ export function buildWeeklyShoppingList(
   for (const day of plan.days) {
     for (const slot of Object.keys(day.meals) as MealSlot[]) {
       const time = slotTimes[slot] ?? '';
-      for (const item of day.meals[slot]) {
+      for (const item of getMealSlotItems(day.meals, slot)) {
         const trimmed = item.name.trim();
         if (!trimmed) continue;
         const key = normalizeName(trimmed);

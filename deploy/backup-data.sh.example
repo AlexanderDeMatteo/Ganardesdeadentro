@@ -1,0 +1,24 @@
+#!/usr/bin/env sh
+# Backup del volumen fittrack_backend_data (SQLite + uploads).
+# Copiar a backup-data.sh, chmod +x, ejecutar desde la raíz del repo.
+#
+# Uso:
+#   ./deploy/backup-data.sh
+#   ./deploy/backup-data.sh ./backups/mi-backup.tar.gz
+
+set -e
+
+VOLUME_NAME="${FITTRACK_DATA_VOLUME:-fittrack_backend_data}"
+OUTPUT="${1:-./backups/fittrack-data-$(date +%Y%m%d-%H%M%S).tar.gz}"
+
+mkdir -p "$(dirname "$OUTPUT")"
+
+echo "Backing up Docker volume: $VOLUME_NAME -> $OUTPUT"
+
+docker run --rm \
+  -v "${VOLUME_NAME}:/data:ro" \
+  -v "$(cd "$(dirname "$OUTPUT")" && pwd):/backup" \
+  alpine:3.20 \
+  sh -c "cd /data && tar czf /backup/$(basename "$OUTPUT") ."
+
+echo "Done: $OUTPUT"

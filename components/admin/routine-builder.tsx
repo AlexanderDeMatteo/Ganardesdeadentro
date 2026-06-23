@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { PrimeScrollableModal } from '@/components/admin-v2/prime-scrollable-modal';
 import { ExerciseAnimationPlayer } from '@/components/exercises/exercise-animation-player';
 import { ExerciseFormModal } from '@/components/exercises/exercise-form-modal';
+import { ExercisePickerPanel } from '@/components/exercises/exercise-picker-panel';
 import { cn } from '@/lib/utils';
-import { searchExercises } from '@/lib/data/client';
-import type { Routine, RoutineExercise } from '@/lib/data/types';
+import type { Routine, RoutineExercise, RoutineStructureType } from '@/lib/data/types';
 import { X, Plus, Trash2 } from 'lucide-react';
 
 import type { Exercise } from '@/lib/data/types';
@@ -22,6 +22,7 @@ interface RoutineBuilderProps {
     description: string;
     difficulty: 'beginner' | 'intermediate' | 'expert';
     duration: number;
+    structureType: RoutineStructureType;
     exercises: RoutineExercise[];
   }) => void;
   onClose: () => void;
@@ -49,6 +50,8 @@ export function RoutineBuilder({
   const [description, setDescription] = useState('');
   const [difficulty, setDifficulty] = useState<'beginner' | 'intermediate' | 'expert'>('intermediate');
   const [duration, setDuration] = useState(60);
+  const [structureType, setStructureType] = useState<RoutineStructureType>('standard');
+  const [supersetSubtype, setSupersetSubtype] = useState<'progressive' | 'regressive'>('progressive');
   const [selectedExercises, setSelectedExercises] = useState<RoutineExercise[]>([]);
   const [selectedExerciseId, setSelectedExerciseId] = useState('');
   const [sets, setSets] = useState(3);
@@ -59,29 +62,8 @@ export function RoutineBuilder({
   const [weightStep, setWeightStep] = useState('2.5');
   const [setWeights, setSetWeights] = useState<string[]>(['20', '22.5', '25']);
   const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
-  const [exerciseQuery, setExerciseQuery] = useState('');
-  const [searchedExercises, setSearchedExercises] = useState<Exercise[]>([]);
 
-  const pickerExercises = useMemo(() => {
-    const byId = new Map<string, Exercise>();
-    for (const ex of exercises) byId.set(ex.id, ex);
-    for (const ex of searchedExercises) byId.set(ex.id, ex);
-    return Array.from(byId.values());
-  }, [exercises, searchedExercises]);
-
-  useEffect(() => {
-    const q = exerciseQuery.trim();
-    if (q.length < 2) {
-      setSearchedExercises([]);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void searchExercises(q)
-        .then(setSearchedExercises)
-        .catch(() => setSearchedExercises([]));
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [exerciseQuery]);
+  const pickerExercises = useMemo(() => exercises, [exercises]);
 
   const selectedExercise = useMemo(
     () => pickerExercises.find((exercise) => exercise.id === selectedExerciseId) ?? null,
@@ -94,6 +76,7 @@ export function RoutineBuilder({
     setDescription(initialRoutine.description);
     setDifficulty(initialRoutine.difficulty);
     setDuration(initialRoutine.duration);
+    setStructureType(initialRoutine.structureType ?? 'standard');
     setSelectedExercises(initialRoutine.exercises);
   }, [initialRoutine]);
 
@@ -126,17 +109,42 @@ export function RoutineBuilder({
       .map((w) => parseFloat(w.replace(',', '.')))
       .filter((n) => Number.isFinite(n) && n >= 0);
 
+    const blockConfig =
+      structureType === 'series_pull'
+        ? {
+            romRanges: [
+              { from: 'P1', to: 'P2', repsMin: 5, repsMax: 10 },
+              { from: 'P2', to: 'P3', repsMin: 5, repsMax: 10 },
+              { from: 'P1', to: 'P3', repsMin: 5, repsMax: 10 },
+            ],
+          }
+        : structureType === 'superset'
+          ? {
+              supersetSubtype,
+              steps: [
+                { weightKg: parseFloat(baseWeight.replace(',', '.')) || 5, repsTarget: String(reps) },
+                { weightKg: (parseFloat(baseWeight.replace(',', '.')) || 5) + 5, repsTarget: String(Math.max(4, reps - 2)) },
+              ],
+              finisher:
+                supersetSubtype === 'progressive'
+                  ? { weightKg: parseFloat(baseWeight.replace(',', '.')) || 5, repsTarget: '20' }
+                  : undefined,
+              maxTransitionRestSec: 30,
+            }
+          : undefined;
+
     setSelectedExercises([
       ...selectedExercises,
       {
         exerciseId: exercise.id,
         exerciseName: exercise.name,
-        sets,
+        sets: structureType === 'standard' ? sets : 1,
         reps,
         rest,
         suggestedWeightsKg:
           suggestedWeightsKg.length === sets ? suggestedWeightsKg : undefined,
         technique: technique.trim() || undefined,
+        blockConfig,
       },
     ]);
 
@@ -157,7 +165,7 @@ export function RoutineBuilder({
       alert('Completa el nombre y agrega al menos un ejercicio');
       return;
     }
-    onSave({ name, description, difficulty, duration, exercises: selectedExercises });
+    onSave({ name, description, difficulty, duration, structureType, exercises: selectedExercises });
   };
 
   const weightPreview = useMemo(
@@ -219,6 +227,60 @@ export function RoutineBuilder({
             rows={prime ? 2 : 3}
           />
         </div>
+        <div>
+          <label className={labelClass}>Tipo de estructura</label>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ['standard', 'Formulario base'],
+                ['series_pull', 'Series Pull'],
+                ['superset', 'Super series'],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setStructureType(value)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                  structureType === value
+                    ? prime
+                      ? 'gp-bg-phosphor gp-text-on-phosphor'
+                      : 'bg-primary text-primary-foreground'
+                    : prime
+                      ? 'gp-bg-surface-high gp-text-muted'
+                      : 'bg-secondary/10 text-muted-foreground',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {structureType === 'superset' ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setSupersetSubtype('progressive')}
+                className={cn(
+                  'rounded-lg px-3 py-1 text-xs',
+                  supersetSubtype === 'progressive' ? 'bg-primary/20 text-primary' : 'text-muted-foreground',
+                )}
+              >
+                Progresiva
+              </button>
+              <button
+                type="button"
+                onClick={() => setSupersetSubtype('regressive')}
+                className={cn(
+                  'rounded-lg px-3 py-1 text-xs',
+                  supersetSubtype === 'regressive' ? 'bg-primary/20 text-primary' : 'text-muted-foreground',
+                )}
+              >
+                Regresiva
+              </button>
+            </div>
+          ) : null}
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>Dificultad</label>
@@ -253,37 +315,25 @@ export function RoutineBuilder({
       <h3 className={sectionTitle}>Agregar Ejercicios</h3>
       <div className={panelClass}>
         <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2">
-            <label className={labelClass}>Ejercicio</label>
-            <Input
-              placeholder="Buscar en catálogo (mín. 2 caracteres)..."
-              value={exerciseQuery}
-              onChange={(e) => setExerciseQuery(e.target.value)}
-              className={cn(inputClass, 'mb-2')}
+          <div className="col-span-2 space-y-3">
+            <ExercisePickerPanel
+              selectedExerciseId={selectedExerciseId}
+              onSelectExerciseId={setSelectedExerciseId}
+              fallbackExercises={exercises}
+              prime={prime}
+              labelClass={labelClass}
+              selectClass={selectClass}
+              inputClass={inputClass}
             />
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <select
-                value={selectedExerciseId}
-                onChange={(e) => setSelectedExerciseId(e.target.value)}
-                className={cn(selectClass, 'flex-1')}
-              >
-                <option value="">Selecciona un ejercicio</option>
-                {pickerExercises.map((ex) => (
-                  <option key={ex.id} value={ex.id}>
-                    {ex.name} ({ex.targetMuscle})
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="button"
-                variant="outline"
-                className={prime ? 'gp-mono shrink-0' : 'shrink-0'}
-                onClick={() => setIsExerciseFormOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Crear ejercicio
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className={prime ? 'gp-mono shrink-0' : 'shrink-0'}
+              onClick={() => setIsExerciseFormOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Crear ejercicio
+            </Button>
             {selectedExercise ? (
               <div className="mt-3">
                 <ExerciseAnimationPlayer

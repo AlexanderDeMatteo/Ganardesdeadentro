@@ -56,6 +56,7 @@ export const updateExercise = routinesClient.updateExercise;
 export const deleteExercise = routinesClient.deleteExercise;
 export const matchExerciseAnimation = routinesClient.matchExerciseAnimation;
 export const uploadExerciseMedia = routinesClient.uploadExerciseMedia;
+export const uploadSessionExecutionVideo = routinesClient.uploadSessionExecutionVideo;
 export const listExerciseMuscles = routinesClient.listExerciseMuscles;
 export const listRoutines = routinesClient.listRoutines;
 export const listAssignments = routinesClient.listAssignments;

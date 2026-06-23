@@ -31,6 +31,7 @@ import type {
   DiaryWaterPatchRequest,
 } from '@/lib/api/contracts/nutrition-diary';
 import type { AssignedNutritionPlan, AthleteDiaryState, CoachNutritionDraft } from '@/lib/nutrition/types';
+import { normalizeMealPlan } from '@/lib/nutrition/normalize-meal-plan';
 import { normalizeActivityLevel } from '@/lib/nutrition/activity-level';
 import { getMondayOfWeek } from '@/lib/workout/session-utils';
 
@@ -90,6 +91,7 @@ type ApiRoutineExercisePayload = {
   rest: number;
   suggestedWeightsKg?: number[] | null;
   technique?: string | null;
+  blockConfig?: RoutineExercise['blockConfig'] | null;
 };
 
 type ApiRoutinePayload = {
@@ -98,6 +100,7 @@ type ApiRoutinePayload = {
   description: string;
   difficulty: Difficulty;
   duration: number;
+  structureType?: Routine['structureType'];
   exercises: ApiRoutineExercisePayload[];
   createdDate: string;
   trainerId?: string | null;
@@ -121,6 +124,8 @@ type ApiSetLogPayload = {
   weightKg?: number | null;
   suggestedWeightKg?: number | null;
   result: SetLogEntry['result'];
+  executionVideoUrl?: string | null;
+  executionVideoUploadedAt?: string | null;
 };
 
 type ApiSessionPayload = {
@@ -158,6 +163,7 @@ function mapApiRoutineExercise(raw: ApiRoutineExercisePayload): RoutineExercise 
     rest: raw.rest,
     suggestedWeightsKg: nullToUndefined(raw.suggestedWeightsKg),
     technique: nullToUndefined(raw.technique),
+    blockConfig: raw.blockConfig ?? undefined,
   };
 }
 
@@ -168,6 +174,7 @@ function mapApiRoutine(raw: ApiRoutinePayload): Routine {
     description: raw.description,
     difficulty: raw.difficulty,
     duration: raw.duration,
+    structureType: raw.structureType ?? 'standard',
     exercises: raw.exercises.map(mapApiRoutineExercise),
     createdDate: raw.createdDate,
     trainerId: nullToUndefined(raw.trainerId),
@@ -195,6 +202,8 @@ function mapApiSetLog(raw: ApiSetLogPayload): SetLogEntry {
     weightKg: nullToUndefined(raw.weightKg),
     suggestedWeightKg: nullToUndefined(raw.suggestedWeightKg),
     result: raw.result,
+    executionVideoUrl: nullToUndefined(raw.executionVideoUrl),
+    executionVideoUploadedAt: nullToUndefined(raw.executionVideoUploadedAt),
   };
 }
 
@@ -434,7 +443,7 @@ function mapApiNutritionPlan(raw: ApiNutritionPlanPayload): AssignedNutritionPla
   return {
     athleteId: raw.athleteId,
     macroTargets: raw.macroTargets,
-    mealPlan: raw.mealPlan,
+    mealPlan: normalizeMealPlan(raw.mealPlan),
     slotTimes: raw.slotTimes,
     activityLevel: raw.activityLevel,
     goal: raw.goal,
@@ -1173,6 +1182,7 @@ export type ExercisesListResult = {
 };
 
 export type ExerciseSource = 'all' | 'catalog' | 'custom';
+export type ExerciseCustomScope = 'mine' | 'platform' | 'all';
 
 export async function listExercisesPaginated(opts?: {
   muscle?: string;
@@ -1180,12 +1190,14 @@ export async function listExercisesPaginated(opts?: {
   perPage?: number;
   customOnly?: boolean;
   source?: ExerciseSource;
+  customScope?: ExerciseCustomScope;
   q?: string;
 }): Promise<ExercisesListResult> {
   const params = new URLSearchParams();
   if (opts?.muscle) params.set('muscle', opts.muscle);
   if (opts?.customOnly) params.set('custom_only', 'true');
   if (opts?.source) params.set('source', opts.source);
+  if (opts?.customScope) params.set('custom_scope', opts.customScope);
   if (opts?.q) params.set('q', opts.q);
   params.set('page', String(opts?.page ?? 1));
   params.set('per_page', String(opts?.perPage ?? 20));
@@ -1322,6 +1334,23 @@ export async function uploadExerciseMedia(exerciseId: string, file: File): Promi
     },
   );
   return mapApiExercise(response.exercise);
+}
+
+export async function uploadSessionExecutionVideo(
+  athleteId: string,
+  file: File,
+): Promise<{ url: string; uploadedAt: string | null }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('athleteId', athleteId);
+  const response = await httpRequest<{ url: string; uploadedAt: string | null }>(
+    '/api/sessions/execution-media',
+    {
+      method: 'POST',
+      body: formData,
+    },
+  );
+  return response;
 }
 
 export type ExerciseMusclesSource = 'api' | 'catalog';

@@ -116,6 +116,16 @@ export function AthleteSessionDayDetail({
               {set.weightKg != null ? ` · ${set.weightKg} kg` : ''}
               {set.result === 'failed' ? ' · Me rindo' : ''}
             </span>
+            {set.executionVideoUrl ? (
+              <video
+                src={set.executionVideoUrl}
+                controls
+                className="mt-2 w-full max-w-xs rounded-md border gp-border-outline/40"
+                preload="metadata"
+              >
+                <track kind="captions" />
+              </video>
+            ) : null}
           </li>
         ))}
       </ul>

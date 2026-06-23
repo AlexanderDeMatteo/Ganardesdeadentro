@@ -1,0 +1,22 @@
+# Cloudflare Tunnel nombrado (fase 2 — dominio fijo en Cloudflare).
+# Copiar a ~/.cloudflared/config.yml (o ruta indicada por cloudflared) y ajustar.
+# Crear tunnel: cloudflared tunnel create fittrack
+# DNS: cloudflared tunnel route dns fittrack app.tudominio.com
+#       cloudflared tunnel route dns fittrack api.tudominio.com
+# Ver docs/DEPLOY_MAC_MINI.md
+
+tunnel: fittrack
+credentials-file: /ruta/a/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  - hostname: app.tudominio.com
+    service: http://127.0.0.1:3000
+  - hostname: api.tudominio.com
+    service: http://127.0.0.1:5000
+  - service: http_status:404
+
+# WebSockets (Socket.IO) funcionan por defecto con cloudflared.
+# Variables en hosting:
+#   NEXT_PUBLIC_API_BASE_URL=https://api.tudominio.com
+#   CORS_ORIGINS=https://app.tudominio.com
+#   FRONTEND_URL=https://app.tudominio.com

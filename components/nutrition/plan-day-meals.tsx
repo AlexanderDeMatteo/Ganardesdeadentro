@@ -1,6 +1,7 @@
 'use client';
 
 import { MEAL_SLOT_LABELS, type DayPlan, type MealSlot, type MealSlotTimes } from '@/lib/nutrition/types';
+import { getMealSlotItems } from '@/lib/nutrition/normalize-meal-plan';
 
 export function PlanDayMeals({
   dayPlan,
@@ -15,7 +16,9 @@ export function PlanDayMeals({
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {(Object.keys(MEAL_SLOT_LABELS) as MealSlot[]).map((slot) => (
+      {(Object.keys(MEAL_SLOT_LABELS) as MealSlot[]).map((slot) => {
+        const slotItems = getMealSlotItems(dayPlan.meals, slot);
+        return (
         <div key={slot} className="rounded-lg border border-border/80 p-3">
           <div className="mb-2 flex items-baseline justify-between gap-2">
             <h4 className="text-xs font-extrabold uppercase tracking-wide text-primary">
@@ -23,11 +26,11 @@ export function PlanDayMeals({
             </h4>
             <span className="text-xs text-muted-foreground">{slotTimes[slot]}</span>
           </div>
-          {dayPlan.meals[slot].length === 0 ? (
+          {slotItems.length === 0 ? (
             <p className="text-xs text-muted-foreground">Sin ítems</p>
           ) : (
             <ul className="space-y-2">
-              {dayPlan.meals[slot].map((item) => (
+              {slotItems.map((item) => (
                 <li key={item.id} className="flex items-start justify-between gap-2 text-sm">
                   <div className="min-w-0 flex-1">
                     <span className="font-medium">{item.name}</span>
@@ -51,7 +54,8 @@ export function PlanDayMeals({
             </ul>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

@@ -84,6 +84,14 @@ export function useSupportChat({ athleteId, mode, enabled = true }: UseSupportCh
     });
   }, [athleteId, mode, subscribe]);
 
+  useEffect(() => {
+    if (!athleteId || !enabled || !isAuthenticated || isConnected) return;
+    const intervalId = window.setInterval(() => {
+      void load();
+    }, 10_000);
+    return () => window.clearInterval(intervalId);
+  }, [athleteId, enabled, isAuthenticated, isConnected, load]);
+
   const send = useCallback(
     async (body: string) => {
       const trimmed = body.trim();
@@ -117,6 +125,7 @@ export function useSupportChat({ athleteId, mode, enabled = true }: UseSupportCh
     error,
     send,
     refresh: load,
+    isConnected,
   };
 }
 
@@ -152,7 +161,7 @@ export function SupportChat({
   enabled = true,
   onLoadError,
 }: SupportChatProps) {
-  const { messages, isLoading, isSending, error, send, refresh } = useSupportChat({
+  const { messages, isLoading, isSending, error, send, refresh, isConnected } = useSupportChat({
     athleteId,
     mode,
     enabled,
@@ -189,8 +198,17 @@ export function SupportChat({
       )}
     >
       <div className="border-b gp-border-outline px-5 py-4">
-        <h1 className="gp-display text-2xl gp-text-phosphor">{title}</h1>
-        <p className="mt-1 text-sm gp-text-muted">{subtitle}</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="gp-display text-2xl gp-text-phosphor">{title}</h1>
+            <p className="mt-1 text-sm gp-text-muted">{subtitle}</p>
+          </div>
+          {!isConnected ? (
+            <span className="gp-mono shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] font-bold uppercase text-amber-300">
+              Reconectando…
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">

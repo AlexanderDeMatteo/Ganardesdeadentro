@@ -1162,6 +1162,7 @@ export type ExercisesListResult = {
 };
 
 export type ExerciseSource = 'all' | 'catalog' | 'custom';
+export type ExerciseCustomScope = 'mine' | 'platform' | 'all';
 
 export async function listExercisesPaginated(opts?: {
   muscle?: string;
@@ -1169,6 +1170,7 @@ export async function listExercisesPaginated(opts?: {
   perPage?: number;
   customOnly?: boolean;
   source?: ExerciseSource;
+  customScope?: ExerciseCustomScope;
   q?: string;
 }): Promise<ExercisesListResult> {
   await delay();
@@ -1176,6 +1178,12 @@ export async function listExercisesPaginated(opts?: {
   let items = [...state.exercises];
   if (opts?.customOnly || opts?.source === 'custom') {
     items = items.filter((ex) => ex.isCustom);
+    const scope = opts?.customScope ?? 'mine';
+    if (scope === 'platform') {
+      items = items.filter((ex) => ex.createdById === 2);
+    } else if (scope === 'mine') {
+      items = items.filter((ex) => ex.createdById !== 2);
+    }
   } else if (opts?.source === 'catalog') {
     items = items.filter((ex) => !ex.isCustom);
   }
@@ -1331,6 +1339,17 @@ export async function uploadExerciseMedia(exerciseId: string, file: File): Promi
     return { ...prev, exercises };
   });
   return updated;
+}
+
+export async function uploadSessionExecutionVideo(
+  _athleteId: string,
+  file: File,
+): Promise<{ url: string; uploadedAt: string | null }> {
+  await delay();
+  return {
+    url: URL.createObjectURL(file),
+    uploadedAt: new Date().toISOString(),
+  };
 }
 
 export type ExerciseMusclesSource = 'api' | 'catalog';
