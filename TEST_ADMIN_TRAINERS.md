@@ -5,10 +5,18 @@ Requisitos: backend Flask en `:5000`, frontend Next en `:3000`, `.env.local` con
 ## 1. Invitar entrenador (admin)
 
 1. Inicia sesión como admin.
-2. Ve a `/admin/trainers`.
+2. Ve a `/admin-v2/trainers` (o `/admin/trainers`).
 3. Pulsa **Invitar entrenador** y completa email, nombre, apellido y especialización.
 4. Esperado: toast de éxito; tarjeta con badge **Pendiente activación**.
 5. Sin `RESEND_API_KEY`: revisa logs del backend (envío simulado). Con Resend: revisa bandeja o dashboard de Resend.
+
+**Correo esperado (invitación inicial):**
+
+- Asunto: `Te invitaron a Be a Gainer como entrenador`
+- Remitente: `EMAIL_FROM` (ej. `Be a Gainer <onboarding@tudominio.com>`)
+- CTA: **Activar mi cuenta** → `/activate?token=...`
+- Menciona expiración según `INVITATION_EXPIRY_HOURS` (default 72 h)
+- Incluye versión texto plano con la URL completa
 
 **Entrenadores demo (desarrollo):** al arrancar el backend con `SEED_DEMO_TRAINERS=true` (default en development) se crean 3 entrenadores activos si no existen:
 
@@ -24,12 +32,13 @@ Reinicia el contenedor backend (`docker compose -p fittrack restart fittrack-bac
 
 1. Abre el enlace del correo (`/activate?token=...`) o usa el token desde prueba automatizada.
 2. Define contraseña (mín. 8 caracteres) y confirma.
-3. Esperado: redirección a `/login`; login con el email invitado funciona con rol `trainer`.
+3. Esperado: pantalla con marca **Be a Gainer**; redirección a `/login`; login con el email invitado funciona con rol `trainer`.
 
 ## 3. Reenviar invitación
 
 1. Con un entrenador pendiente, pulsa **Reenviar invitación**.
 2. Esperado: toast de éxito; el enlace anterior deja de ser válido.
+3. Correo de reenvío: asunto `Nuevo enlace para activar tu cuenta en Be a Gainer` y aviso de que el enlace anterior ya no sirve.
 
 ## 4. Asignar atletas
 
@@ -45,9 +54,22 @@ Reinicia el contenedor backend (`docker compose -p fittrack restart fittrack-bac
 3. Confirma la baja.
 4. Esperado: entrenador desaparece de asignaciones activas (`is_active=false`); atletas según la decisión del modal.
 
+## Variables de entorno (correo)
+
+En `backend/.env`:
+
+```env
+RESEND_API_KEY=re_...
+EMAIL_FROM=Be a Gainer <onboarding@tudominio.com>
+FRONTEND_URL=http://localhost:3000
+INVITATION_EXPIRY_HOURS=72
+```
+
+En producción, `FRONTEND_URL` debe ser la URL pública del frontend (tunnel o dominio).
+
 ## Validación automatizada
 
 ```bash
-cd backend && python -m pytest tests/test_trainer_invitations.py -q
+cd backend && python -m pytest tests/test_email_service.py tests/test_trainer_invitations.py -q
 cd .. && pnpm lint && pnpm typecheck && pnpm test
 ```

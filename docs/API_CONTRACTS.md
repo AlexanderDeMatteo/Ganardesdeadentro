@@ -2,9 +2,9 @@
 
 Fuente de verdad que mapea cada función del cliente frontend (`lib/data/client.ts`, `lib/auth/auth-client.ts`) al endpoint Flask futuro. Tipos TypeScript en `lib/api/contracts/`.
 
-**Estado backend (jun 2026):** blueprints implementados en `/api/auth`, `/api/users`, `/api/routines`, `/api/memberships`, `/api/metrics`, `/api/sessions`, `/api/nutrition`, `/api/admin`, `/api/exercises`, `/api/payments`, `/api/exchange-rates`, `/api/notifications`, `/api/support`. Tests: `cd backend && python -m pytest` (168 tests). CI: `.github/workflows/ci.yml`.
+**Estado backend (jun 2026):** 13 blueprints implementados. Tests: `cd backend && python -m pytest` (**~197 tests**). CI: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
-**Estado adaptador remoto (Fase 1):** `lib/data/client.remote.ts` cableado a Flask para overview admin, CRUD de planes, `updateAthlete`, `assignTrainerToAthlete`, métricas, rutinas, sesiones, nutrición y usuarios (ver tablas por dominio). `membershipLevelToPlanId` / `membershipNameToPlanId` usan mapeo síncrono local (sin endpoint `plan-map`). Validación manual: [TEST_FASE1_API.md](../TEST_FASE1_API.md).
+**Estado adaptador remoto:** `lib/data/client.remote.ts` cableado a Flask para prácticamente todos los dominios (~97 funciones exportadas). Modo `local` solo en desarrollo sin Docker. Go-live: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
 
 **Convención IDs:** el frontend usa `string`; el ORM Flask usa `number`. El adaptador remoto debe convertir explícitamente (`String(id)` / `Number(id)`).
 
@@ -22,6 +22,8 @@ Fuente de verdad que mapea cada función del cliente frontend (`lib/data/client.
 | `getAuthClient().logout` | POST | `/api/auth/logout` | Bearer JWT | ✅ |
 | `getAuthClient().validateInviteToken` | GET | `/api/auth/invite/:token` | — | ✅ |
 | `getAuthClient().acceptInvite` | POST | `/api/auth/accept-invite` | — | ✅ |
+| `getAuthClient().changePassword` | POST | `/api/auth/change-password` | Bearer JWT | ✅ |
+| `getAuthClient().updateProfile` | PATCH | `/api/users/athletes/:id` | Bearer JWT | ✅ |
 
 ### auth-login {#auth-login}
 
@@ -286,6 +288,14 @@ Cuerpo típico: `{ "error": "mensaje" }` — ver `ApiErrorBody` en `lib/api/cont
 | `NEXT_PUBLIC_DATA_SOURCE_*` | `local` \| `api` | hereda `DATA_SOURCE` | Overrides por dominio: `METRICS`, `ROUTINES`, `USERS`, `NUTRITION`, `MEMBERSHIPS` |
 | `NEXT_PUBLIC_API_BASE_URL` | URL Flask | `http://localhost:5000` | `lib/api/http-client.ts` |
 
-Con `DATA_SOURCE=api` (y overrides en `api`), el facade en `lib/data/client.ts` resuelve contra `client.remote.ts`, que llama a Flask vía `httpRequest` + Bearer. **Fase 4:** listados admin, `subscribeMembership`, catálogo de ejercicios y diario nutricional cableados en el remoto. El modo **local** (default) sigue usando seeds/`localStorage` donde aplique.
+Con `DATA_SOURCE=api` (y overrides en `api`), el facade en `lib/data/client.ts` resuelve contra `client.remote.ts`, que llama a Flask vía `httpRequest` + Bearer. Dominios cubiertos: auth, users, routines, sessions, metrics, nutrition, memberships, payments, exchange-rates, notifications, support, admin, exercises. El modo **local** (default en `.env.local.example`) usa seeds/`localStorage`.
+
+### Endpoints huérfanos (sin cliente remoto dedicado)
+
+| Endpoint | Decisión |
+|----------|----------|
+| `GET /api/exercises/muscles`, `/by-muscle/:m`, `/:id` | API interna; UI usa `/cached` y `/search` |
+| `POST /api/exercises/clear-cache` | Admin-only; sin UI (operación manual) |
+| `GET /api/health` | Infra / smoke tests |
 
 `getStateSnapshot()` solo disponible con `DATA_SOURCE=local` y `NODE_ENV !== 'production'`.

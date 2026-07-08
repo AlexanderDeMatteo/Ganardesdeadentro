@@ -5,8 +5,7 @@
 > Complementa y CORRIGE `docs/PROJECT_CONTEXT.md`, `docs/API_CONTRACTS.md` y `docs/planOpus.md`,
 > que están parcialmente desfasados.
 >
-> **Última revisión:** 9 jun 2026 — auditoría completa por rol (atleta/trainer/admin) y capa de peticiones.
-> Fases 0–6 y 9.1 cerradas. Nuevas Fases 10–13 con los gaps detectados, ordenadas por prioridad.
+> **Última revisión:** 25 jun 2026 — sincronización documental + verificaciones locales. Veredicto go-live: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
 
 ## Leyenda de prioridad
 - 🔴 Crítico (seguridad / bloquea producción)
@@ -18,20 +17,15 @@
 
 ## Diagnóstico de partida
 
-- **Backend:** ~completo. ~66 endpoints + `/api/health`, 10 blueprints. **114 tests** (`test_exercises.py`, `test_authz.py`, `test_api_domains.py`, `test_trainer_invitations.py`, etc.).
-- **Frontend:** modo API completo (Fase 5). Vitest ampliado (config, resolve-athlete-id, body-profile/composition, Titan guard).
-- **Seguridad:** Fase 2 (backend) + Fase 3 (Titan) cerradas. Redis rate limit Titan → Fase 7.
+- **Backend:** ~completo. ~107 rutas HTTP + `/api/health`, 13 blueprints. **~197 tests** pytest (25 jun 2026: 195 passed, 2 failed por Resend en entorno local con API key real).
+- **Frontend:** modo API completo (Fase 5). **95 tests** Vitest (23 archivos).
+- **Seguridad:** Fase 2 (backend) + Fase 3 (Titan) cerradas. Redis rate limit Titan → Fase 7. Plan de implementación detallado: [PLAN_SEGURIDAD.md](./PLAN_SEGURIDAD.md).
 - **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — pytest + lint + typecheck + test + build en `main`.
-- **Docs:** guías `TEST_FASE1/3/4/5_API.md`, `TEST_AUTH_API.md`, `TEST_DOCKER.md`. Pendiente: `PROJECT_CONTEXT.md` §5/§6 (0.4).
+- **Docs:** maestros sincronizados (jun 2026). Veredicto go-live: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
 
-### Auditoría 9 jun 2026 (por rol + capa de peticiones)
+### Auditoría 9 jun 2026 — estado posterior (25 jun 2026)
 
-Hallazgos que originan las Fases 10–13 (detalle de archivo y línea en cada fase):
-
-- **Atleta:** perfil sin editar identidad ni contraseña (backend listo); membresía API llega sin `features`/fechas; errores del diario se revierten en silencio; link a `/settings` inexistente; datos decorativos en dashboard.
-- **Trainer:** página Progreso inútil en modo API (depende de `athlete.metrics` de seeds); plan semanal nunca lee `GET /weekly-plan` y pisa el plan existente; bug `isCompleted` vs `isActive` en asignaciones; botón Editar rutina muerto.
-- **Admin:** rutinas creadas por admin invisibles en listado API; sin UI para editar atleta/membresía/plan; sin reactivar trainer; capacidad 10 hardcodeada; tarjeta de asignaciones mezcla tipos.
-- **Peticiones:** adaptador remoto cubre ~59/66 endpoints. Huérfanos: `change-password`, `PUT /api/memberships/users/:id`, 4 de exercises, `sessions/progress`. Sin manejo global de 401; JWT en `localStorage`; `resolveAthleteId` ignora `ROUTINES=api`; `canTrainerAccessAthlete` consulta store local en modo API.
+Los hallazgos de Fases 10–12 están **cerrados en código**. Pendientes reales: Fase 7 (infra), 9.2 (Resend operativo), 13 (sesión/JWT), 8 (limpieza legacy).
 
 ---
 
@@ -45,7 +39,7 @@ Objetivo: dejar el repo limpio y la documentación veraz antes de tocar funciona
       **Hecho:** no aparecen en `git ls-files`.
 - [x] **0.3** 🟢 Resolver duplicado Windows `backend/Dockerfile` vs `backend\Dockerfile`.
       **Hecho:** solo `backend/Dockerfile` trackeado.
-- [ ] **0.4** 🟡 Actualizar `docs/PROJECT_CONTEXT.md` — **parcial:** Fases 3–5 no reflejadas aún en §5/§6.
+- [x] **0.4** 🟡 Actualizar `docs/PROJECT_CONTEXT.md` — **hecho (jun 2026)** junto con Fase 14.
 - [x] **0.5** 🟡 Actualizar `docs/API_CONTRACTS.md` — **hecho (jun 2026):** Fases 4–5 (admin lists, subscribe, exercises, diary, body-profile).
 - [x] **0.6** 🟢 Marcar `docs/planOpus.md` como histórico/parcial.
 
@@ -162,9 +156,9 @@ Validación manual: [TEST_FASE5_API.md](../TEST_FASE5_API.md). Plantilla: `.env.
 
 ## Fase 7 — Docker / infraestructura / producción 🟡
 
-- [ ] **7.1** 🟡 Healthchecks en `docker-compose.yml`.
-- [ ] **7.2** 🟡 Ollama en compose o documentación externa.
-- [ ] **7.3** 🟠 Targets de producción (`next build`+`start`, gunicorn).
+- [ ] **7.1** 🟡 Healthchecks en `docker-compose.yml` y `docker-compose.prod.yml`.
+- [ ] **7.2** 🟡 Ollama en compose o documentación externa (documentado en DEPLOY_MAC_MINI).
+- [x] **7.3** 🟠 Targets de producción (`next build`+`start` en prod compose). **Pendiente:** Gunicorn backend (hoy `socketio.run` + Werkzeug en `run.py`).
 - [ ] **7.4** 🟡 Unificar migraciones Alembic vs `create_all()` en prod.
 - [ ] **7.5** 🟢 Actualizar `init_db.py` standalone.
 - [ ] **7.6** 🟢 `restart` policies y red explícita.
@@ -194,7 +188,7 @@ Validación manual: [TEST_ADMIN_TRAINERS.md](../TEST_ADMIN_TRAINERS.md). Contrat
 - [ ] **9.2.1** 🟠 Crear cuenta en [Resend](https://resend.com) (plan **Free**: 3.000 emails/mes, 100/día; sin tarjeta).
 - [ ] **9.2.2** 🟠 Verificar **dominio de envío** en Resend (o email de prueba verificado en sandbox).
 - [ ] **9.2.3** 🟠 Configurar en `backend/.env` (usado por Docker vía `env_file` en `docker-compose.yml`):
-      `RESEND_API_KEY`, `EMAIL_FROM` (dominio verificado), `FRONTEND_URL=http://localhost:3000`.
+      `RESEND_API_KEY`, `EMAIL_FROM=Be a Gainer <onboarding@tudominio.com>`, `FRONTEND_URL=http://localhost:3000`.
 - [ ] **9.2.4** 🟡 Reiniciar backend tras cambios: `docker compose -p fittrack restart fittrack-backend`.
 - [ ] **9.2.5** 🟡 Probar flujo completo: invitar → correo → `/activate?token=...` → login trainer → reenviar invitación si hace falta.
 - [ ] **9.2.6** 🟢 (Opcional) Modo dev: log seguro del enlace de activación cuando no hay API key, para no depender del correo en local.
@@ -220,31 +214,31 @@ Objetivo: corregir comportamientos rotos o que pierden datos en modo `api`. **Es
 
 ---
 
-## Fase 11 — UI pendiente con backend ya listo 🟠
+## Fase 11 — UI pendiente con backend ya listo 🟠 ✅ (cerrada jun 2026)
 
 Objetivo: cablear pantallas/botones muertos a endpoints que ya existen. Sin cambios de esquema.
 
-- [ ] **11.1** 🟠 **Perfil atleta: editar identidad y contraseña.** Botones sin `onClick` en `app/profile/page-client.tsx` (~L244-249). Backend listo: `POST /api/auth/change-password` (sin cliente: añadir a `lib/auth/auth-client.remote.ts` + contrato ya en `lib/api/contracts/auth.ts`) y `PATCH /api/users/athletes/:id` para nombre/apellido.
-- [ ] **11.2** 🟠 **Editar rutina (trainer y admin).** Botón "Editar" sin acción en `components/admin/routines-list.tsx` (L65-72); `updateRoutine` ya existe en hook, facade, remoto y backend (`PATCH /api/routines/:id`). Abrir `RoutineBuilder` en modo edición.
-- [x] **11.3** 🟠 **Admin: editar atleta y asignar membresía.** Modal **Asignar plan** en `/admin-v2/athletes`; `assignUserMembership` en remoto.
-- [ ] **11.4** 🟡 **Admin: editar plan de membresía.** `updateMembershipPlan`/`updatePlan` existen en hook y backend (`PATCH /api/memberships/plans/:id`) pero `/admin/memberships` solo crea/elimina. Añadir edición + estados de carga/error (el hook ya expone `isLoading`).
-- [ ] **11.5** 🟡 **Admin: reactivar entrenador inactivo.** Hoy solo se desactiva (`DELETE /api/admin/trainers/:id`). Requiere endpoint nuevo (p. ej. `PATCH /api/admin/trainers/:id` con `isActive: true`) + botón en `components/admin/trainers-list.tsx`.
-- [x] **11.6** 🟠 **Membresía completa en sesión API.** `serialize_me_membership` + `functionalTier`; `mapMeMembership` acepta nombres custom y `daysRemaining`.
-- [ ] **11.7** 🟢 **Diario: macros en registro manual.** El formulario de `components/nutrition/food-diary` solo pide nombre+kcal; añadir P/C/G opcionales (el modelo y la API ya los soportan).
+- [x] **11.1** 🟠 **Perfil atleta: editar identidad y contraseña.** `athlete-prime-profile.tsx` + `auth-client.remote.ts` (`changePassword`, `updateProfile`).
+- [x] **11.2** 🟠 **Editar rutina (trainer y admin).** `trainer-v2/routines` y `admin-v2/routines` con `RoutineBuilder` en modo edición.
+- [x] **11.3** 🟠 **Admin: editar atleta y asignar membresía.** Modal en `/admin-v2/athletes`.
+- [x] **11.4** 🟡 **Admin: editar plan de membresía.** `admin-v2/memberships` con `updatePlan`.
+- [x] **11.5** 🟡 **Admin: reactivar entrenador inactivo.** `PATCH /api/admin/trainers/:id` + UI admin-v2.
+- [x] **11.6** 🟠 **Membresía completa en sesión API.**
+- [x] **11.7** 🟢 **Diario: macros en registro manual.** FIX-19 (QA Sprint 5).
 
 **Validación:** lint + typecheck + build; prueba manual por flujo (cambiar contraseña con caso negativo, editar rutina, asignar membresía); casos authz positivo/negativo en pytest para 11.5.
 
 ---
 
-## Fase 12 — Visibilidad de datos para trainer/admin en modo API 🟠
+## Fase 12 — Visibilidad de datos para trainer/admin en modo API 🟠 ✅ (cerrada jun 2026)
 
 Objetivo: que trainer y admin vean datos reales del atleta (hoy dependen de `athlete.metrics` embebido en seeds, vacío en API).
 
 - [x] **12.1** 🟠 **Página Progreso del trainer.** `progress-overview.tsx` usa `useAthleteMetrics` + carga comparativa vía API cuando `METRICS=api`.
 - [x] **12.2** 🟠 **Métricas en listados/modales de atletas.** `athlete-detail-modal` y `prime-athlete-inspector` cargan métricas bajo demanda con `useAthleteMetrics`.
-- [ ] **12.3** 🟡 **Coach/admin ven el diario nutricional del atleta.** Endpoints `/api/nutrition/diary/*` + `can_modify_athlete_diary` ya existen; añadir vista de solo lectura en `/trainer|admin/athletes/[id]/nutrition`.
-- [ ] **12.4** 🟡 **Metabolismo del coach desde body-profile real.** `metabolismInputFromAthlete` usa peso/talla/edad del listado, no `GET /api/users/me/body-profile` del atleta. Requiere endpoint para que coach lea el body-profile de su atleta (hoy solo `me`).
-- [ ] **12.5** 🟢 **Capacidad de atletas por trainer.** `capacity = 10` hardcodeado en `app/admin/assignments/page-client.tsx` (~L124). Mover a config o campo del trainer.
+- [x] **12.3** 🟡 **Coach/admin ven el diario nutricional del atleta.** Pestaña Diario en `nutrition-coach-editor.tsx` + `CoachDiaryView` (FIX-20).
+- [x] **12.4** 🟡 **Body-profile del atleta para coach.** `GET /api/users/athletes/:id/body-profile` implementado.
+- [x] **12.5** 🟢 **Capacidad de atletas por trainer.** `maxAthletes` en backend + `client.remote.ts` (fallback 10).
 
 **Validación:** prueba manual trainer/admin en modo API completo (Docker); pytest para endpoints nuevos (12.4) con casos de autorización.
 
@@ -258,7 +252,7 @@ Objetivo: endurecer la capa HTTP/auth del frontend para uso real sostenido.
 - [ ] **13.2** 🟡 **Estrategia de expiración/refresh.** No hay refresh token; `refreshSession()` re-llama `/api/auth/me` con el mismo JWT. Decidir: refresh tokens en Flask-JWT-Extended o TTL largo documentado + re-login.
 - [ ] **13.3** 🟡 **Token fuera de `localStorage` (XSS).** Migrar a cookies httpOnly (preparado en `lib/auth/session-store.ts` según docs); implica CORS con credenciales y CSRF en Flask. Coordinar con `middleware.ts` (hoy lee header Bearer).
 - [ ] **13.4** 🟡 **Errores silenciados restantes.** Revisar `catch {}` en logout remoto y `refreshSession` (`lib/auth/auth-client.remote.ts`), quota de localStorage, y fallback de body-profile — registrar o notificar según caso (sin loguear tokens/PII, regla `security-core`).
-- [ ] **13.5** 🟢 **Endpoints huérfanos: decidir.** `GET /api/exercises/muscles|/by-muscle/:m|/:id`, `POST /clear-cache` (sin UI admin), `GET /api/health` (helper sin uso). Consumir o documentar como API pública/interna.
+- [x] **13.5** 🟢 **Endpoints huérfanos: decidir.** Documentados en [API_CONTRACTS.md](./API_CONTRACTS.md) §Adaptadores.
 
 **Validación:** Vitest para interceptor 401; prueba manual con token expirado/manipulado (caso negativo); revisión de logs sin datos sensibles.
 
@@ -268,8 +262,7 @@ Objetivo: endurecer la capa HTTP/auth del frontend para uso real sostenido.
 
 - [x] **8.1** Eliminar `app/dashboard-2/*` y `app/dashboard-3/*` (redirect permanente en `next.config.mjs`).
 - [x] **8.2** Nav obsoleta eliminada con `dashboard-shell.tsx` y rutas legacy.
-- [ ] **8.3** Limpiar `lib/data/migration.ts` y `lib/nutrition/storage.ts` cuando local se deprecie.
-      **Parcial Fase 5:** `isFullApiMode()` retorna store vacío; modo `local` sigue activo por defecto en `.env.local.example`.
+- [ ] **8.3** Limpiar `lib/data/migration.ts` y `lib/nutrition/storage.ts` cuando local se deprecie; **eliminar** `app/admin/*` y `app/trainer/*` (código legacy con redirect a v2).
 - [ ] **8.4** Revisar reglas `react-hooks` desactivadas en `eslint.config.mjs`.
 - [x] **8.5** Quitar enlace `/settings` del menú del dashboard (`fitness-dashboard-view.tsx`); perfil en `/profile`.
 - [x] **8.6** Datos decorativos en dashboard atleta: sparkline PROGRESO desde métricas reales; badge "mejorando" fijo eliminado.
@@ -278,23 +271,29 @@ Objetivo: endurecer la capa HTTP/auth del frontend para uso real sostenido.
 
 ---
 
+## Fase 14 — Documentación y go-live 🟠 ✅ (sincronización jun 2026)
+
+- [x] **14.1** Actualizar docs maestros: `README.md`, `PROJECT_CONTEXT.md`, `plan-actual.md`, `API_CONTRACTS.md`.
+- [x] **14.2** Crear [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md) con criterios y veredicto.
+- [x] **14.3** Archivar snapshots históricos en `docs/archive/`.
+- [x] **14.4** Marcar `SETUP.md`, `QUICKSTART.md`, `SETUP_INSTRUCTIONS.md` como históricos.
+- [x] **14.5** Ejecutar verificaciones locales y volcar evidencia en readiness.
+
+---
+
 ## Orden de ejecución y dependencias
 
 ```
-[CERRADAS] Fase 0 ──► 1 ──► 2 ──► 3 ──► 4 ──► 5 ──► 6 ──► 9.1
+[CERRADAS] Fase 0 ──► 1 ──► 2 ──► 3 ──► 4 ──► 5 ──► 6 ──► 9.1 ──► 10 ──► 11 ──► 12 ──► 14
 
-[PENDIENTES]
-Fase 10 (bugs) ──► Fase 11 (UI con backend listo) ──► Fase 12 (visibilidad trainer/admin)
-Fase 13 (robustez HTTP/sesión) ── tras 10; en paralelo con 11–12
-Fase 7 (infra/prod) y 9.2 (Resend) ── independientes, en paralelo
-Fase 8 (limpieza) ── al final o intercalada en huecos
+[PENDIENTES — bloquean prod abierta]
+Fase 7 (infra/prod) + 9.2 (Resend operativo) + 13 (sesión/JWT)
+Fase 8 (limpieza: código legacy app/admin|trainer, modo local)
 ```
 
-- **Fases 0–6:** cerradas en código (0.4 docs parcial → ahora 8.8; 3.5/7.7 Redis pendiente).
-- **Fase 9.1:** gestión entrenadores en código ✅; **9.2 Resend** pendiente operativo (correos reales).
-- **Fase 10** es la nueva prioridad: bugs que pierden datos o muestran estado falso en modo API.
-- **Fases 11–12** completan la paridad funcional entre UI y backend ya implementado.
-- **Fase 13** endurece la sesión antes de cualquier despliegue real (junto con Fase 7).
+- **Fases 10–12:** cerradas en código (jun 2026).
+- **Fase 14:** documentación sincronizada; veredicto en [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
+- **Prioridad actual:** Fase 7 + 9.2 antes de piloto; Fase 13 antes de prod abierta.
 
 ---
 
@@ -312,6 +311,7 @@ Fase 8 (limpieza) ── al final o intercalada en huecos
 - Backend: ownership rutinas (Fase 2), diary + subscribe + admin lists (Fase 4), body-profile en `user_profiles` (Fase 5), migración `005_invitation_tokens` + invitaciones entrenador (Fase 9); doble mecanismo migración pendiente (Fase 7.4).
 - Titan/seguridad: introspección JWT, gating server-side, rate limit por `userId` en memoria, `middleware.ts` básico, fallbacks servidor (Fase 3 ✅; Redis → 7.7).
 - Frontend: `adminClient` para overview; admin trainers/assignments con invitación y activación; sin auto-seed métricas ni `MOCK_*` en hooks; body profile API + migración localStorage; plantilla `.env.local.api.example`; docker `DATA_SOURCE=api`.
-- Tests: **168 backend**; **83 Vitest**; CI en `.github/workflows/ci.yml`.
-- Infra: sin healthchecks, sin Ollama en compose, dev-only (`next dev`); **Resend sin configurar en prod/local Docker** → invitaciones simuladas (Fase 9.2).
-- Auditoría 9 jun 2026 (origen de Fases 10–13): revisión por pestaña de los 3 roles + cruce frontend↔backend de los ~66 endpoints. Cobertura remota ~59/66; huérfanos y UI muerta detallados en cada fase.
+- Tests: **~197 pytest** (195 passed local jun 2026); **95 Vitest**; CI en `.github/workflows/ci.yml`.
+- Infra: sin healthchecks; prod frontend `next start` ✅; backend Werkzeug ❌; Resend operativo pendiente (Fase 9.2).
+- Código legacy: `app/admin/*`, `app/trainer/*` redirigen a v2 — eliminar en Fase 8.
+- Go-live: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).

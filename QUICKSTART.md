@@ -1,3 +1,5 @@
+> **Documento histórico** — ver [README.md](README.md) para instrucciones actuales.
+
 # Quick Start Guide - Personal Trainers Platform
 
 ## Prerequisites

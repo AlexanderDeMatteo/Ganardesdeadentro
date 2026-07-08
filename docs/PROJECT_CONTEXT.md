@@ -1,4 +1,4 @@
-# Contexto del proyecto FitTrack
+# Contexto del proyecto Be a Gainer
 
 Documento de referencia para trabajo en frontend, backend, Docker y pruebas. **No incluye secretos:** usa solo `backend/.env.example` como plantilla; los valores reales viven en `backend/.env` (local) y no deben copiarse a la documentación.
 
@@ -6,7 +6,7 @@ Documento de referencia para trabajo en frontend, backend, Docker y pruebas. **N
 
 ## 1. Resumen ejecutivo
 
-- **Frontend:** Next.js 16 (App Router), React 19, Tailwind v4, componentes en `components/ui` (shadcn/Radix). Gran parte del flujo actual es **demo/mock** (usuarios en memoria, `localStorage` para sesión y datos auxiliares).
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind v4, componentes en `components/ui` (shadcn/Radix). **Docker dev y prod** usan modo API completo (`AUTH_SOURCE=api`, todos los `DATA_SOURCE_*=api`). Sin Docker, el default en `.env.local.example` es modo `local` (mock/`localStorage`).
 - **Backend:** Flask, SQLAlchemy, JWT (`Flask-JWT-Extended`), CORS, Alembic. **Implementados:** autenticación (`/api/auth/*`), ejercicios (`/api/exercises/*`), usuarios (`/api/users/*`), rutinas (`/api/routines/*`), métricas (`/api/metrics/*`), membresías (`/api/memberships/*`), pagos (`/api/payments/*`), tasas de cambio (`/api/exchange-rates/*`), sesiones (`/api/sessions/*`), nutrición (`/api/nutrition/*`), notificaciones (`/api/notifications/*`), soporte (`/api/support/*`), admin overview (`/api/admin/overview`). Contratos en `docs/API_CONTRACTS.md`.
 - **Membresía activa (gating atleta):** atletas con rol `user` **sin** `UserMembership` vigente solo acceden a `/dashboard`, `/memberships`, `/profile` y `/support` (UX en `lib/membership/access.ts`; barrera real en backend vía `require_active_membership`). Métricas, rutinas, sesiones y nutrición devuelven **403** con `code: membership_required`. La membresía se otorga al aprobar un pago (`POST /api/memberships/payment-requests/:id/approve`) o por asignación admin (`PUT /api/memberships/users/:id`). Entrenadores y admin **no** están sujetos a este gating.
 - **IA / Coach "Titan":** asistente conversacional servido por **Ollama** (modelo `granite4.1:3b`) mediante rutas Next en `app/api/coach/*` y `app/api/nutrition/titan`. Genera motivación contextual, reseña de sesión de entrenamiento y estimación de calorías/macros. Requiere `ollama serve` local (`OLLAMA_BASE_URL`, default `http://localhost:11434`); incluye *fallbacks* si el modelo no está disponible. Acceso al asistente nutricional gateado a membresías Premium/Pro.
@@ -39,7 +39,7 @@ flowchart LR
   BE --> ExerciseDB
 ```
 
-Hoy el navegador habla principalmente con Next; el backend está disponible en `localhost:5000` pero **el frontend no consume de forma sistemática la API Flask** (auth y muchas pantallas siguen en modo mock). Las rutas API de Next (`/api/coach/*`, `/api/nutrition/titan`) hablan directamente con **Ollama** para el coach Titan.
+Hoy el navegador habla con Next (UI + rutas Titan) y con Flask (datos de negocio vía adaptador remoto cuando `AUTH_SOURCE=api` / `DATA_SOURCE=api`). En Docker dev y prod el frontend **siempre** usa API. Las rutas Next (`/api/coach/*`, `/api/nutrition/titan`) hablan con **Ollama** para el coach Titan (con fallback si no está disponible).
 
 ---
 
@@ -49,12 +49,13 @@ Hoy el navegador habla principalmente con Next; el backend está disponible en `
 
 | Área | Ruta(s) | Notas |
 |------|---------|--------|
-| Público | `/`, `/login`, `/register` | Login/register contra usuarios mock en `AuthProvider` |
-| Usuario | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile`, `/support` | Protegidas por shell Phosphor Prime en `app/(athlete-prime)/*`. Sin membresía activa solo `/dashboard`, `/memberships`, `/profile`, `/support` (ver `lib/membership/access.ts`). Layout: [`components/athlete-prime/`](components/athlete-prime/) + `gainer-prime-theme.css`. |
-| Admin V2 (pagos) | `/admin-v2/payments`, `/admin-v2/payment-methods`, `/admin-v2/exchange-rates`, `/admin-v2/support` | Aprobación de solicitudes de pago, CRUD métodos/tasas, tickets de soporte. Rol `admin`. |
-| Trainer | `/trainer`, `/trainer/*` | Rol `trainer` (cliente). Gestiona atletas, rutinas, asignaciones, progreso y nutrición asignada (`/trainer/athletes/[athleteId]/nutrition`) |
-| Admin | `/admin-v2`, `/admin-v2/*` | Plantilla oficial Phosphor V2. Rutas `/admin/*` redirigen aquí. Rol `admin` verificado en cliente. Incluye ejercicios, atletas, entrenadores, rutinas, membresías, asignaciones y nutrición por atleta |
-| API Next (IA) | `/api/coach/titan`, `/api/coach/session-review`, `/api/nutrition/titan` | Route handlers que hablan con Ollama (coach Titan). No dependen de Flask |
+| Público | `/`, `/login`, `/register`, `/activate` | Con `AUTH_SOURCE=api`: login/register contra Flask JWT |
+| Atleta (oficial) | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/memberships`, `/profile`, `/support` | Shell Phosphor Prime en `app/(athlete-prime)/*`. Gating membresía: `lib/membership/access.ts` |
+| Admin (oficial) | `/admin-v2`, `/admin-v2/*` | Pagos, métodos, tasas, soporte, atletas, trainers, rutinas, membresías, asignaciones. `/admin/*` redirige aquí |
+| Trainer (oficial) | `/trainer-v2`, `/trainer-v2/*` | Atletas, rutinas, asignaciones, progreso, nutrición por atleta. `/trainer/*` redirige aquí |
+| API Next (IA) | `/api/coach/titan`, `/api/coach/session-review`, `/api/nutrition/titan` | Ollama + guard JWT server-side |
+
+**Código legacy:** `app/admin/*` y `app/trainer/*` siguen en el árbol pero redirigen a v2; candidatos a eliminación (ver [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md)).
 
 ### Backend (prefijo `/api`)
 
@@ -106,37 +107,35 @@ Health: `GET /api/health` → `{ "status": "ok" }`.
 
 | Capa | Implementado | Mock / demo | Pendiente o riesgo |
 |------|----------------|-------------|---------------------|
-| UI + navegación | Sí | Auth, métricas, membresías, mucho admin | Conectar a API real con contrato estable |
-| Protección admin | Solo en cliente (UX); backend valida rol vs BD | — | Barrera real en backend (Fase 2): `role_required` revalida rol e `is_active` contra BD |
-| API Flask auth + JWT | Sí | — | Registro público fuerza `role='user'`; revalidación JWT vs BD resuelta en Fase 2 (`user_lookup_loader` rechaza inactivo; `/api/auth/me` devuelve 401 si desactivado) |
-| Autorización por recurso (rutinas) | Sí (Fase 2) | — | `can_manage_routine`/`can_read_routine` impiden IDOR en GET/PATCH/DELETE, assign/unassign y weekly-plan |
-| Membresías de usuario | Sí (Fase 2 + pagos) | — | `UserMembership` se asigna/revoca de verdad; alta vía aprobación de pago o admin; gating activo en métricas/rutinas/sesiones/nutrición para `role=user` sin plan vigente |
-| Pagos y tasas de cambio | Sí | — | Solicitudes con comprobante (`multipart`), métodos de pago, tasas USD→VES; aprobación admin activa membresía |
-| Gating membresía atleta | Sí (frontend + backend) | — | UX: `lib/membership/access.ts`; API: `require_active_membership` → 403 `membership_required`. Titan sigue con gating Premium/Pro aparte |
-| Validación de entrada | Pydantic v2 (Fase 2) | — | Nutrición, weekly-plan y `setLogs` validados; errores genéricos sin `str(e)` |
-| Rate limiting | Flask-Limiter (Fase 2) | — | `login`/`register`/`change-password`; storage `memory://` dev, Redis en prod (`RATELIMIT_STORAGE_URI`) |
-| API ejercicios | Sí | — | Requiere clave RapidAPI en env; `clear-cache` con `@role_required('admin')` |
-| Users / routines / memberships / metrics / sessions / nutrition API | Implementados | — | Frontend: adaptador remoto cableado por dominio (Fase 1: overview admin, CRUD planes, patch/asignación atleta); default sigue `local` |
-| Coach IA "Titan" (rutas Next + Ollama) | Sí | — | Fase 3: introspección JWT vía Flask `/api/auth/me`, gating membresía/rol server-side, rate limit por `userId`, `middleware.ts` ligero, fallbacks servidor si Ollama cae |
-| Nutrición (metabolismo, macros, plan, diario) | UI + API Flask cuando `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` | Modo `local`: `localStorage` | Coach/admin leen diario del atleta; interceptor 401 global (Sprint 4) |
-| Typecheck en build | `ignoreBuildErrors: false` en Next | — | Build puede fallar si hay errores TS; ESLint no se ignora en build |
-| `.env` en repo | `.gitignore` ignora `.env`, `.env*.local`, `backend/.env` y `backend/fitness_platform.db` (Fase 0) | — | No versionar secretos ni la DB local |
+| UI + navegación | Sí | Solo en modo `local` sin Docker | Shells oficiales: athlete-prime, admin-v2, trainer-v2 |
+| Protección rutas (UX) | Sí | — | `ProtectedRoute` es cliente; barrera real en Flask |
+| API Flask auth + JWT | Sí | — | JWT en `localStorage` (riesgo XSS); sin refresh token |
+| Autorización por recurso | Sí | — | Ownership rutinas, revalidación JWT vs BD |
+| Membresías + pagos | Sí | — | Resend operativo pendiente si `RESEND_API_KEY` vacía |
+| Adaptador remoto frontend | Sí (~97 funciones) | Modo `local` en `.env.local.example` | Endpoints huérfanos menores (ejercicios admin, clear-cache) |
+| Coach Titan | Sí | — | Rate limit en memoria; Redis pendiente (Fase 7.7) |
+| Typecheck / build | Sí | — | `ignoreBuildErrors: false` |
+| Producción | Parcial | — | Ver [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md) |
 
 ---
 
 ## 6. Flujos actuales (resumidos)
 
-1. **Login frontend:** valida contra `MOCK_USERS` en `auth-context.tsx`, guarda `user` y `access_token` ficticio en `localStorage`.
-2. **Register frontend:** crea usuario en memoria + `localStorage`; no llama a `/api/auth/register`.
-3. **ProtectedRoute:** redirige a `/login` si no hay usuario; comprueba `requiredRole` solo en cliente.
-4. **Backend register:** persiste usuario con rol forzado `'user'` en la ruta (`auth.py`); el body `role` del cliente se ignora.
-5. **Ejercicios:** servicio intenta caché en SQLite; si no hay datos, llama a ExerciseDB y persiste ejercicios cacheados.
-6. **Métricas (piloto API):** con `NEXT_PUBLIC_AUTH_SOURCE=api` y/o `NEXT_PUBLIC_DATA_SOURCE_METRICS=api`, el frontend resuelve `athleteId` como `user.id` del JWT (no usa el mapa demo `EMAIL_TO_ATHLETE_ID`). En backend, `athleteId` ≡ `users.id` ≡ `metrics_history.user_id`. El mapa demo y seeds solo aplican en modo fully-local.
-7. **Rutinas/sesiones (piloto API):** con `NEXT_PUBLIC_DATA_SOURCE_ROUTINES=api`, entrenador y atleta comparten datos vía Flask: listados (`GET /api/routines/`, `GET /api/routines/assignments`), CRUD/asignaciones del entrenador y lectura/completar sesión del atleta (`/api/routines/*`, `/api/sessions/*`).
-8. **Datos auxiliares atleta (piloto API):** con `NEXT_PUBLIC_DATA_SOURCE_USERS=api` → tarjeta “Mi entrenador”; `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api` → plan nutricional asignado y diario persistido en Flask; `NEXT_PUBLIC_DATA_SOURCE_MEMBERSHIPS=api` → membresía activa.
-9. **Resolución de atleta en nutrición API:** si `NEXT_PUBLIC_DATA_SOURCE_NUTRITION=api`, `resolveAthleteId` debe usar `user.id` del JWT igual que métricas/rutinas. Páginas coach/admin de nutrición deben cargar el atleta con API (`getAthleteById`) en lugar de seeds (`findAthleteById`).
-10. **Gating membresía atleta:** sin `UserMembership` vigente (`end_date` futura, `is_active=true`), el atleta con rol `user` recibe **403** en métricas, rutinas (`/my`, weekly-plan, GET por id), sesiones y nutrición (plan + diario). Frontend restringe nav y rutas a `/dashboard`, `/memberships`, `/profile`, `/support`. Flujo de alta: atleta envía solicitud de pago con comprobante → admin aprueba → `MembershipService.assign_membership_on_payment` activa el plan.
-11. **Tests backend y membresía:** el fixture `athlete_user` en `backend/tests/conftest.py` **no** incluye membresía por defecto (para cubrir el caso negativo en `TestPaymentFlow`). Los tests de dominio atleta usan `grant_active_membership` vía fixture `athlete_membership` (autouse en clases de métricas, rutinas, sesiones y nutrición).
+**Modo API (Docker dev/prod, o `.env.local.api.example`):**
+
+1. **Login/register:** `lib/auth/auth-client.remote.ts` → Flask `/api/auth/login|register`; JWT en `localStorage` vía `session-store.ts`.
+2. **ProtectedRoute:** redirige en cliente; API valida JWT y roles en cada request.
+3. **Datos:** `lib/data/client.remote.ts` (~97 funciones) → Flask por dominio.
+4. **Membresía atleta:** gating UX + `require_active_membership` en API; alta vía pago aprobado o asignación admin.
+5. **Invitaciones trainer:** admin invita → Resend (o simulado sin API key) → `/activate?token=...`.
+6. **Titan:** rutas Next con introspección JWT vía `/api/auth/me`, rate limit por userId, fallback si Ollama cae.
+
+**Modo local (solo sin Docker, `.env.local.example`):**
+
+1. Auth y datos en mock/`localStorage`; seeds demo en hooks locales.
+2. Útil para desarrollo UI aislado; no representa el flujo de producción.
+
+**Tests backend:** `athlete_user` sin membresía por defecto; dominios atleta usan fixture `athlete_membership`.
 
 ---
 
@@ -151,9 +150,8 @@ docker compose -p fittrack up --build -d
 - Frontend: `http://localhost:3000`
 - Backend: `http://localhost:5000/api/health`
 - `docker-compose.yml` monta volumen `backend_data` y fuerza `DATABASE_URL` a SQLite bajo `/data`.
-- Variables frontend en compose (piloto híbrido): `AUTH_SOURCE=api`, `DATA_SOURCE=local`, overrides `METRICS`, `ROUTINES`, `USERS`, `NUTRITION`, `MEMBERSHIPS` en `api`. Con auth API, `athleteId` debe ser el `user.id` del JWT.
-- Requiere archivo `backend/.env` para variables adicionales (ver ejemplo en `backend/.env.example`). Si el puerto `5000` está ocupado, detén el otro contenedor o ajusta el mapeo de puertos.
-- **Hosting / Mac Mini / tunnel:** ver [`docs/DEPLOY_MAC_MINI.md`](./DEPLOY_MAC_MINI.md) (`docker-compose.prod.yml`, plantillas `.env.hosting.example`).
+- Variables frontend en compose: **modo API completo** (`AUTH_SOURCE=api`, `DATA_SOURCE=api`, todos los overrides en `api`).
+- **Hosting / prod:** [DEPLOY_MAC_MINI.md](./DEPLOY_MAC_MINI.md) (`docker-compose.prod.yml`). **Go-live:** [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
 
 Apagar:
 
@@ -171,11 +169,9 @@ Las reglas completas están en `.cursor/rules/*.mdc`. Aquí solo se cruza **esta
 |---------------|-----------|---------------------------|
 | `security-core.mdc` | Sin secretos en código; errores genéricos al cliente | Revisar que nuevos cambios no logueen tokens ni PII; algunos mensajes de error aún pueden filtrar detalle — alinear al endurecer API |
 | `env-config-security.mdc` | `.env` real fuera de repo; sin defaults inseguros en prod | Usar solo `JWT_SECRET_KEY` fuerte en entornos reales; `config.py` tiene fallback de desarrollo — documentar y no usar en producción |
-| `auth-authorization.mdc` | Permisos reales en backend | Admin y rutas sensibles hoy dependen del cliente; integración futura debe validar JWT/rol en servidor |
-| `python-backend-security.mdc` | CORS estricto; sin roles desde registro abusivo | CORS en compose apunta a `http://localhost:3000`; endpoint register acepta `role` del body — **gap** a corregir cuando se endurezca auth |
-| `frontend-security.mdc` | No tratar `localStorage` como almacén seguro para tokens reales | Tokens actuales son mock — si se integra JWT real, usar cookies httpOnly o patrón acordado con backend |
-| `backend-architecture.mdc` | Rutas delgadas; lógica en `services` | Mantener al añadir rutas reales a blueprints placeholder |
-| `database-security-and-design.mdc` | Integridad y no borrado destructivo sin plan | Modelos amplios; migraciones no vía Alembic en árbol — cambios de esquema con cuidado |
+| `auth-authorization.mdc` | Permisos reales en backend | Flask valida JWT/rol en endpoints; UX en cliente es capa adicional |
+| `frontend-security.mdc` | No tratar `localStorage` como almacén seguro | JWT real en `localStorage` en modo API — migrar a httpOnly (Fase 13.3) |
+| `database-security-and-design.mdc` | Integridad y migraciones | Alembic 001–012; `init_db()` también llama `create_all()` al arrancar |
 | `task-validation-and-testing.mdc` / `testing-standards.mdc` | Cada tarea cierra con validación explícita | Hay guías manuales `TEST_*.md`; añadir tests automatizados cuando se toquen flujos críticos |
 | `frontend-structure-and-reuse.mdc` | Reutilizar `components/ui` | Preferir composición sobre duplicar estilos |
 | `accessibility-frontend.mdc` / `seo-next.mdc` | a11y y metadata | Revisar al crear páginas nuevas en `app/` |
@@ -192,16 +188,15 @@ Las reglas completas están en `.cursor/rules/*.mdc`. Aquí solo se cruza **esta
 
 ---
 
-## 10. Pendientes (retomar al arrancar backend)
+## 10. Deuda conocida para producción
 
-> Items conocidos que **no** se abordan todavía y deben revisarse cuando se inicie el trabajo de backend, junto con el endurecimiento general de seguridad.
+Ver checklist completo y veredicto en **[PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md)**.
 
-- **[Seguridad] Autenticación/autorización en rutas IA de Next.** Las rutas Titan aplican `applyRouteGuard` (Bearer + rate limit), pero en modo `api` **no verifican JWT real** ni membresía desde claims; el gating nutricional confía en campos del body. Ver Fase 3 en [plan-actual.md](./plan-actual.md).
-- **[Seguridad] Endurecimiento auth general.** Con `NEXT_PUBLIC_AUTH_SOURCE=api` el frontend usa JWT real vía `lib/auth/auth-client.remote.ts`; en modo `local` (default) persiste sesión mock en `localStorage`. La protección de rutas del frontend sigue siendo UX, pero la autorización por recurso en Flask ya está endurecida (Fase 2: ownership de rutinas, revalidación JWT vs BD, rate limiting, validación Pydantic). Falta la capa IA "Titan" (Fase 3).
+Resumen: runtime Flask dev (Werkzeug), sin healthchecks Docker, Resend no configurado = invitaciones simuladas, JWT en localStorage, sin `/terms`, SQLite single-node, código legacy `app/admin`/`app/trainer`.
 
 ---
 
-## 11. Integración frontend ↔ backend (Fase 5)
+## 11. Integración frontend ↔ backend
 
 Adaptadores activos por flags de entorno. Contratos: [API_CONTRACTS.md](./API_CONTRACTS.md). Plan de ejecución: [plan-actual.md](./plan-actual.md) (Fase 1 **culminada** jun 2026).
 
@@ -221,7 +216,7 @@ Variables en `.env.local.example`:
 
 Validación local: `npm run lint` → `npm run typecheck` → `npm run build`. Prueba manual en modo `local`; con backend levantado, modo API: login con `AUTH_SOURCE=api` y guía [TEST_FASE1_API.md](../TEST_FASE1_API.md).
 
-**Backend (Flask):** blueprints implementados en `backend/app/routes/` con servicios en `backend/app/services/`. Migraciones: `docs/MIGRATIONS.md`. Setup: `backend/README.md`. Tests: `cd backend && python -m pytest` (168 tests; Python 3.11–3.14; SQLAlchemy ≥ 2.0.49 para 3.14). Frontend: `npm test` (83 tests Vitest).
+**Backend (Flask):** blueprints en `backend/app/routes/`. Migraciones Alembic **001–012** (`docs/MIGRATIONS.md`). Tests: `cd backend && python -m pytest` (**~197 tests**, jun 2026). Frontend: `pnpm test` (**95 tests** Vitest, 23 archivos). CI: `.github/workflows/ci.yml`.
 
 **Instalación de dependencias:** `socket.io-client` es dependencia de realtime; tras clonar, ejecutar `pnpm install`. En entornos con proxy/certificado corporativo puede requerirse `NODE_OPTIONS=--use-system-ca` antes de `pnpm install`.
 
@@ -235,4 +230,4 @@ Actualiza este archivo cuando:
 - cambien puertos, variables de entorno o flujo de despliegue,
 - se introduzcan tests automatizados o se deprecie el modo mock.
 
-Última orientación (jun 2026): el frontend expone adaptadores (`local` \| `api`) documentados en [API_CONTRACTS.md](./API_CONTRACTS.md). El modo **local** sigue siendo el default para demo; activar `api` por dominio cuando se valide el flujo (piloto Docker o `.env.local`). Fase 1 del [plan-actual.md](./plan-actual.md) conectó overview admin, CRUD de planes y operaciones admin de usuarios. **Gating membresía atleta** activo en frontend (`lib/membership/access.ts`) y backend (`require_active_membership`); flujo de pagos con aprobación admin documentado en `TestPaymentFlow` (`backend/tests/test_api_domains.py`).
+Última orientación (jun 2026): modo **API** es el flujo principal en Docker. Modo **local** solo para dev UI sin backend. Go-live: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md). Plan vivo: [plan-actual.md](./plan-actual.md).

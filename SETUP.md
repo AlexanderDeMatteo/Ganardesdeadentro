@@ -1,3 +1,5 @@
+> **Documento histórico** — ver [README.md](README.md) y [TEST_DOCKER.md](TEST_DOCKER.md) para instrucciones actuales.
+
 # Personal Trainers Platform - Setup Guide
 
 ## Project Architecture

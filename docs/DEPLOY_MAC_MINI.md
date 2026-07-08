@@ -227,11 +227,25 @@ Variables estables:
 ```env
 # .env.hosting
 NEXT_PUBLIC_API_BASE_URL=https://api.tudominio.com
+TITAN_RATELIMIT_REDIS_URL=redis://fittrack-redis:6379
 
 # backend/.env
 CORS_ORIGINS=https://app.tudominio.com
 FRONTEND_URL=https://app.tudominio.com
 ```
+
+### Headers recomendados en reverse proxy (Cloudflare/nginx)
+
+Además de los headers definidos en Next (`X-Frame-Options`, `nosniff`, `Referrer-Policy`,
+`Permissions-Policy`), añade en el borde:
+
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+- CSP de borde (iniciar en report-only si hay riesgo de romper UI):
+  - `default-src 'self'`
+  - `connect-src 'self' https://api.tudominio.com`
+  - `img-src 'self' data: blob: https://api.tudominio.com`
+
+Si usas Cloudflare, configura estas cabeceras con Transform Rules o en el proxy aguas arriba.
 
 ---
 
@@ -313,3 +327,4 @@ Al implementar esta guía, ejecutar como mínimo:
 3. `GET /api/health` en `127.0.0.1:5000`
 4. Smoke test frontend en `127.0.0.1:3000`
 5. Quick tunnel: checklist manual documentado en Fase B
+6. Completar checklist en [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md)

@@ -2,7 +2,7 @@
 
 Una plataforma moderna y hermosa para gestionar entrenamientos personalizados, seguir el progreso fitness y conectar con entrenadores profesionales.
 
-**Contexto técnico (arquitectura, estado mock vs API, Docker, reglas):** [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · **Plan de trabajo:** [docs/plan-actual.md](docs/plan-actual.md)
+**Contexto técnico:** [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · **Plan de trabajo:** [docs/plan-actual.md](docs/plan-actual.md) · **Go-live:** [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) · **Despliegue prod:** [docs/DEPLOY_MAC_MINI.md](docs/DEPLOY_MAC_MINI.md)
 
 ## Características
 
@@ -12,7 +12,7 @@ Una plataforma moderna y hermosa para gestionar entrenamientos personalizados, s
 - Dark/Light mode compatible
 
 💪 **Funcionalidades Principales**
-- Autenticación (mock para pruebas; backend Flask con JWT disponible)
+- Autenticación JWT real (modo API en Docker y prod) o mock local (solo desarrollo UI sin backend)
 - Dashboard personalizado con resumen, membresía y métricas
 - Gestión de rutinas de entrenamiento y biblioteca de ejercicios (ExerciseDB)
 - Seguimiento de métricas y composición corporal (peso, grasa, músculo, medidas)
@@ -33,7 +33,15 @@ Una plataforma moderna y hermosa para gestionar entrenamientos personalizados, s
 
 ## Cómo correr el proyecto
 
-Hay tres formas de levantar FitTrack. **Docker** es la recomendada: incluye frontend + backend con datos reales vía API.
+Hay **tres modos** de levantar FitTrack:
+
+| Modo | Compose / comando | Datos | Uso |
+|------|-------------------|-------|-----|
+| **A — Docker dev** | `docker compose -p fittrack up -d` | API Flask (JWT real) | Desarrollo diario recomendado |
+| **B — Docker prod** | `docker compose -p fittrack -f docker-compose.prod.yml up -d` | API + Redis + `next start` | Piloto / hosting — ver [DEPLOY_MAC_MINI.md](docs/DEPLOY_MAC_MINI.md) |
+| **C — Local sin Docker** | `pnpm dev` + opcional `python run.py` | Mock (`local`) o API (`.env.local.api.example`) | Solo UI o backend aislado |
+
+**Docker dev** es la opción recomendada para trabajo con datos reales.
 
 ### Opción A — Docker (recomendado)
 
@@ -169,7 +177,9 @@ API en http://localhost:5000. Combínalo con la **Opción B** y `.env.local.api.
 | Solo UI (mock) | `pnpm install && pnpm dev` |
 | Backend local | `cd backend && python run.py` |
 
-Documentación adicional: [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md)
+Documentación adicional: [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) · [TEST_DOCKER.md](TEST_DOCKER.md) · [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)
+
+> `SETUP.md`, `QUICKSTART.md` y `SETUP_INSTRUCTIONS.md` son documentos históricos; usar este README.
 
 ## Credenciales de Prueba
 
@@ -266,21 +276,24 @@ Edita `/app/globals.css` para cambiar los tokens de diseño:
 - **Framework**: Next.js 16
 - **Estilización**: Tailwind CSS v4
 - **UI Components**: shadcn/ui
-- **Autenticación**: Mock (localStorage) + backend Flask con JWT
+- **Autenticación**: JWT Flask (`AUTH_SOURCE=api`) o mock local (`AUTH_SOURCE=local`)
 - **IA (coach Titan)**: Ollama (modelo `granite4.1:3b`) vía rutas Next API
 - **Iconos**: Lucide React
 - **Lenguaje**: TypeScript
 
-## Próximas Características
+## Estado y producción
 
-- [x] Integración con backend Flask (piloto API en Docker)
-- [x] Integración con ExerciseDB API (backend)
-- [x] Gráficos interactivos de progreso
-- [x] Panel de administración
-- [ ] Conexión con base de datos PostgreSQL en producción
-- [ ] Sistema de pagos con Stripe
-- [ ] Notificaciones en tiempo real
-- [ ] Comunidad y desafíos
+- Modo API completo en Docker dev y prod compose.
+- Pagos con comprobante, tasas de cambio, invitaciones trainer (Resend), notificaciones Socket.IO implementados.
+- **¿Listo para producción?** Ver [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) — veredicto actual: piloto cerrado posible con reservas; producción abierta no aún.
+
+## Próximas mejoras (infra / prod)
+
+- [ ] Runtime backend de producción (Gunicorn)
+- [ ] PostgreSQL opcional en prod
+- [ ] Healthchecks Docker, observabilidad (Sentry)
+- [ ] JWT en cookies httpOnly
+- [ ] Páginas legales (`/terms`, privacidad)
 
 ## Contribución
 

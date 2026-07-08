@@ -2,12 +2,15 @@
 
 > Registro de hallazgos, bugs y mejoras identificadas durante revisión.
 > Estado: **en curso** (hasta indicar "terminado").
+>
+> **Última revisión implementación:** 2026-06-24 — ver estado por sección.
 
 ---
 
 ## 1. Vista previa de nutrición (panel entrenador) — crash
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Resuelto** — `normalizeMealPlan()` al cargar API, `getMealSlotItems` en UI, seed corregido, `SectionErrorBoundary` en vista previa coach, validación backend al publicar.  
 **Severidad:** Alta (bloquea funcionalidad)  
 **Área:** Frontend nutrición + datos en backend / seed
 
@@ -98,6 +101,7 @@ Componentes que fallan al iterar:
 ## 2. Crear rutina — filtrar ejercicios por músculo y ver los del admin
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Resuelto** — `ExercisePickerPanel` con tabs Catálogo / Del admin / Mis ejercicios + `custom_scope` en backend.  
 **Severidad:** Media (UX / productividad del entrenador)  
 **Área:** Frontend rutinas · catálogo de ejercicios · backend ejercicios custom
 
@@ -164,6 +168,7 @@ El backend **no expone** hoy un scope para custom del admin (`custom_scope=platf
 ## 3. Entrenamientos del periodo — aspecto visual semanal y mensual
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Resuelto** — `WeekActivityView` y `MonthActivityView` en `workout-activity-heatmap.tsx`.  
 **Severidad:** Media (UX / legibilidad)  
 **Área:** Modal desempeño atleta · heatmap de actividad
 
@@ -221,6 +226,7 @@ Componentes implicados:
 ## 4. Nutrición atleta — pestaña Plan rompe la página
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Resuelto** — misma corrección que §1 (`normalizeMealPlan` + error boundary en pestaña Plan).  
 **Severidad:** Alta (bloquea funcionalidad)  
 **Área:** Frontend nutrición · vista atleta (`/nutrition`)  
 **Relacionado con:** [§1 — Vista previa nutrición entrenador](#1-vista-previa-de-nutrición-panel-entrenador--crash) (misma causa raíz)
@@ -286,6 +292,7 @@ Aplicar las mismas correcciones del **§1**:
 ## 5. Soporte — mensajería no se actualiza en tiempo real
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Mitigado** — `emit_to_admins` en backend, suscripciones + polling 15s en admin, socket con `polling` primero detrás de Cloudflare. WebSocket puede seguir fallando en quick tunnel; polling cubre bandeja.  
 **Severidad:** Alta (UX / operación del admin)  
 **Área:** Chat de soporte · Socket.io · notificaciones
 
@@ -358,7 +365,9 @@ Además, si el WebSocket falla detrás de Cloudflare y no hay **fallback por pol
 ## 6. Entrenamiento en vivo — video por serie para evaluación de ejecución
 
 **Fecha:** 2026-06-23  
-**Severidad:** Media (nueva funcionalidad / valor coaching)  
+**Actualizado:** 2026-06-24  
+**Estado (2026-06-24):** **Parcial** — subida corregida (cross-device); reproducción entrenador corregida (`ExecutionVideoPlayer` con JWT); validar en tunnel.  
+**Severidad:** Alta (funcionalidad visible pero rota en deploy)  
 **Área:** Flujo atleta · registro de sesión · revisión por entrenador
 
 ### Petición
@@ -373,70 +382,121 @@ Comportamiento deseado:
 4. En el **registro del día** (historial / detalle de sesión / vista entrenador) se puede reproducir el clip por serie.
 5. El entrenador puede revisar técnica sin depender solo de reps/peso.
 
+---
+
+### Síntoma — video guardado pero no reproduce (entrenador)
+
+Tras subida exitosa, en **Desempeño → detalle del día** aparece el reproductor pero queda en **0:00** / pantalla negra (Bench Press serie 2 y 3, Carlos Méndez).
+
+- `executionVideoUrl` sí está en `setLogs` (el player se renderiza).
+- El navegador pide el MP4 sin cabecera `Authorization` → **401** del backend.
+- Fix: `components/routines/execution-video-player.tsx`.
+
+---
+
+### Síntoma — subida de video no funciona (histórico en deploy)
+
+**Estado:** Implementación parcial; el flujo UI existe pero **la subida falla** en tunnel Cloudflare (p. ej. Carlos, serie con reps/peso OK).
+
+Tras completar una serie, el atleta ve el bloque «Subir video de ejecución (opcional)» y el enlace **Elegir video**. Al seleccionar un archivo:
+
+- Mensaje en pantalla: **«No se pudo subir el video de ejecución»** (`active-workout-panel.tsx`).
+- DevTools → Network → `POST /api/sessions/execution-media` → **500**.
+- Respuesta: `{ "error": "Error interno del servidor" }` o error genérico del servicio.
+
+La serie sí queda registrada (reps/peso); solo falla el adjunto de video.
+
+**Reproducido (2026-06-24):** `POST https://raleigh-validation-zip-career.trycloudflare.com/api/sessions/execution-media` desde frontend `fell-pensions-cindy-reality.trycloudflare.com`.
+
+### Causa raíz
+
+| Hallazgo | Detalle |
+|----------|---------|
+| **Fix 1 (hecho)** | Import incorrecto `config` vs `get_config()` — provocaba `AttributeError` en local/tests. |
+| **Fix 2 (hecho)** | **`OSError: [Errno 18] Invalid cross-device link`** — temp en `/data` + `shutil.move()`. |
+| **Fix 3 (hecho)** | **Reproducción entrenador en 0:00** — `GET /execution-media/<file>` exige JWT; `<video src="…">` no envía `Authorization`. El reproductor nativo recibía 401 (cuerpo JSON) → duración 0:00. Solución: `ExecutionVideoPlayer` hace `fetch` con Bearer y reproduce vía `blob:` URL (mismo patrón que comprobantes de pago). |
+
+### Solución propuesta
+
+1. **Guardar el temporal en el mismo directorio de destino** (`/data/session_execution_media`) o usar `shutil.move()` en lugar de `Path.replace()` entre `/tmp` y `/data`.
+2. Rebuild backend Docker y validar upload real desde móvil/tunnel.
+3. Test de integración que simule destino en subdirectorio distinto al temp system (mock o temp dir separado).
+
+**Correcciones ya aplicadas (parciales):**
+
+- `get_config()` en `session_execution_media_service.py`
+- URLs absolutas en cliente (`resolveApiUrl`)
+- `SESSION_EXECUTION_MEDIA_UPLOAD_DIR` en `docker-compose.prod.yml`
+
 ### Estado actual del código
 
 | Pieza | Situación |
 |-------|-----------|
-| `components/routines/active-workout-panel.tsx` | Registra series en `SetLogEntry` y guarda sesión al final con `markSessionComplete` |
-| `lib/data/types.ts` → `SetLogEntry` | Campos: reps, peso, result — **sin** `videoUrl` / media |
-| `backend/app/models.py` → `WorkoutSession` | `set_logs` JSON en texto; sin soporte de media por serie |
-| `backend/app/services/session_service.py` | Persiste `setLogs` tal cual |
-| `components/routines/athlete-session-day-detail.tsx` | Muestra series del día; sin video |
-| Subida de media existente | Patrón en ejercicios custom (`uploadExerciseMedia`, `EXERCISE_MEDIA_UPLOAD_DIR`) — reutilizable como referencia |
+| `components/routines/active-workout-panel.tsx` | Tras `recordSet()`, muestra CTA «Subir video»; llama `uploadSessionExecutionVideo`; error UX implementado |
+| `lib/data/types.ts` → `SetLogEntry` | Campos `executionVideoUrl`, `executionVideoUploadedAt` — **definidos** |
+| `lib/data/client.remote.ts` | `uploadSessionExecutionVideo` → `POST /api/sessions/execution-media` (multipart) |
+| `backend/app/routes/sessions.py` | Rutas `POST /execution-media` y `GET /execution-media/<filename>` con JWT + membresía activa |
+| `backend/app/services/session_execution_media_service.py` | Validación MIME/tamaño, guardado en disco — **bug de config** (ver arriba) |
+| `backend/app/schemas/request_schemas.py` | `SetLogSchema` incluye campos de video |
+| `components/routines/athlete-session-day-detail.tsx` | `ExecutionVideoPlayer` si `executionVideoUrl` existe |
+| `components/routines/execution-video-player.tsx` | Descarga autenticada + blob URL para `<video>` |
+| `backend/.env` / compose prod | Sin `SESSION_EXECUTION_MEDIA_*` explícito en muchos entornos locales |
 
-Hoy el atleta solo registra datos numéricos; no hay captura ni almacenamiento de video por serie.
+**Resumen:** la UI y el contrato API están; el endpoint de subida **no opera** en deploy actual por error interno al resolver directorio de upload.
+
+### Cómo reproducir / confirmar
+
+1. Login atleta con membresía activa → iniciar entrenamiento de una rutina.
+2. Completar serie 1 (reps + peso) → aparece bloque de video opcional.
+3. Elegir video (mp4/webm/mov) → error «No se pudo subir el video de ejecución».
+4. Network: `POST …/api/sessions/execution-media` → 500 + `Error interno del servidor`.
+5. Logs backend: buscar `AttributeError` en `SessionExecutionMediaService._upload_dir` (si aplica el bug de config).
 
 ### Solución propuesta
 
-**Modelo / API**
+**Corrección inmediata**
 
-1. Extender `SetLogEntry` con campos opcionales, p. ej. `executionVideoUrl`, `executionVideoUploadedAt`.
-2. Endpoint `POST /api/sessions/{sessionId}/sets/{setKey}/video` o subida junto al completar serie si la sesión ya existe en borrador.
-3. Alternativa: subida inmediata al completar serie → PATCH sesión borrador en local + sync al cerrar entrenamiento.
-4. Almacenamiento en directorio dedicado (p. ej. `SESSION_EXECUTION_MEDIA_DIR`), validación MIME/tamaño, sin exponer rutas internas.
-5. Migración Alembic si se normaliza en tabla aparte (`set_execution_videos`).
+1. En `session_execution_media_service.py`: usar `config = get_config()` (mismo patrón que `custom_exercise_service.py`).
+2. Añadir test unitario de upload con archivo temporal.
+3. Verificar escritura en `/data/session_execution_media` dentro del contenedor prod.
 
-**Frontend atleta**
+**Completar flujo (si falta tras el fix)**
 
-1. Tras `recordSet()` exitoso, mostrar CTA «Subir video» (opcional, no bloqueante).
-2. Componente de captura/subida (mp4/webm, límite de duración/tamaño).
-3. Indicador visual en series que ya tienen video adjunto.
-4. Incluir URLs en payload final de `markSessionComplete` o subir en caliente por serie.
-
-**Frontend entrenador / admin**
-
-1. Reproductor en detalle de sesión del día (`athlete-session-day-detail`, modal desempeño).
-2. Acceso desde ficha del atleta al historial con filtros por fecha.
+1. Devolver URL absoluta o asegurar que el cliente prefija `getApiBaseUrl()` al guardar y al reproducir.
+2. Persistir `executionVideoUrl` en `setLogs` al `markSessionComplete` (ya viaja en payload si la subida tuvo éxito).
+3. Vista entrenador: confirmar reproducción en detalle de sesión / desempeño.
 
 **Seguridad**
 
 - Solo el atleta dueño (o su entrenador asignado / admin) puede ver/subir.
-- No loguear URLs con tokens; servir media con auth o URLs firmadas de corta duración.
+- No loguear URLs con tokens; servir media con auth (`GET` ya exige JWT).
+- Validar MIME/tamaño (ya en servicio).
 
-### Archivos implicados (estimado)
+### Archivos implicados
 
-- `components/routines/active-workout-panel.tsx`
-- `lib/data/types.ts`
-- `lib/workout/session-utils.ts`
-- `lib/data/client.remote.ts`
-- `backend/app/schemas/request_schemas.py` (`SetLogSchema`)
-- `backend/app/services/session_service.py`
+- `backend/app/services/session_execution_media_service.py` — **fix prioritario**
 - `backend/app/routes/sessions.py`
+- `components/routines/active-workout-panel.tsx`
+- `lib/data/client.remote.ts`
+- `lib/data/types.ts`
+- `backend/app/schemas/request_schemas.py`
 - `components/routines/athlete-session-day-detail.tsx`
-- `components/routines/session-history-list.tsx`
-- Referencia: `backend/app/services/custom_exercise_service.py` (upload media)
+- `docker-compose.prod.yml` / `backend/.env.hosting.example` — documentar `SESSION_EXECUTION_MEDIA_UPLOAD_DIR`
+- Referencia: `backend/app/services/custom_exercise_service.py` (upload media correcto)
 
 ---
 
 ## 7. Crear rutina — reformulación con 3 tipos de estructura
 
 **Fecha:** 2026-06-23  
-**Severidad:** Media (nueva funcionalidad / producto)  
+**Actualizado:** 2026-06-24  
+**Estado (2026-06-24):** **Resuelto** — subformularios dedicados por modo, validación explícita, resumen por tipo, edición en lista; atleta muestra reps por rango en Series Pull.  
+**Severidad:** Alta (funcionalidad entregada a medias — UX engañosa)  
 **Área:** Constructor de rutinas · modelo de datos · flujo atleta
 
 ### Petición
 
-Reformular el modal **Crear rutina** (`RoutineBuilder`) para soportar **3 categorías / modos de construcción**:
+Reformular el modal **Crear rutina** (`RoutineBuilder`) para soportar **3 categorías / modos de construcción**, cada una con **su propio formulario** en «Agregar ejercicios»:
 
 | Modo | Descripción resumida |
 |------|----------------------|
@@ -444,7 +504,75 @@ Reformular el modal **Crear rutina** (`RoutineBuilder`) para soportar **3 catego
 | **2. Series Pull** | Rangos de movimiento consecutivos dentro de **una sola serie** (ver definición abajo). |
 | **3. Super series** | Dos subtipos (progresiva / regresiva) con escalado de peso-reps en **una sola serie total** (ver definición abajo). |
 
-El entrenador elige el **tipo de estructura** al crear/editar la rutina; el formulario de «Agregar ejercicios» y la vista del atleta deben adaptarse al modo seleccionado.
+El entrenador elige el **tipo de estructura** al crear/editar la rutina; al cambiar de botón, el panel derecho debe **reemplazarse por el subformulario correspondiente**. La vista del atleta (`ActiveWorkoutPanel`) también debe adaptarse al modo seleccionado.
+
+---
+
+### Implementación (2026-06-24)
+
+| Componente | Descripción |
+|------------|-------------|
+| `lib/routines/exercise-block-config.ts` | Validadores, builders, resumen por tipo |
+| `components/admin/routine-forms/standard-exercise-form.tsx` | Formulario base (series, reps, progresión) |
+| `components/admin/routine-forms/series-pull-exercise-form.tsx` | 3 rangos ROM, reps fijas o min/max (5–10) |
+| `components/admin/routine-forms/superset-exercise-form.tsx` | Escalones dinámicos; remate obligatorio en progresiva |
+| `components/admin/routine-builder.tsx` | Render condicional + edición en lista |
+| `components/routines/active-workout-panel.tsx` | Muestra reps objetivo por rango ROM |
+
+**Validación manual pendiente en tunnel:** crear rutina de cada tipo → asignar atleta → entrenar flujo guiado.
+
+---
+
+### Implementación anterior — no quedó bien (histórico)
+
+**Estado:** Parcial / incorrecta. Los botones de tipo de estructura existen en UI pero **no cumplen el objetivo de producto**.
+
+#### Qué se ve hoy (modal Crear rutina)
+
+- Pills: **Formulario base** | **Series Pull** | **Super series**.
+- Si se elige Super series, aparecen además **Progresiva** | **Regresiva**.
+- El panel **Agregar ejercicios** sigue siendo **siempre el mismo**: Series, Repeticiones, Descanso, Técnica y Progresión de peso — como si fuera solo formulario base.
+- Cambiar el tipo de estructura **no muestra campos distintos** ni oculta los que no aplican.
+
+#### Qué hace el código por detrás (insuficiente)
+
+En `routine-builder.tsx`, al pulsar «Agregar ejercicio»:
+
+| Modo seleccionado | Comportamiento real |
+|-------------------|---------------------|
+| **Formulario base** | Guarda `sets`, `reps`, `rest`, pesos y técnica — correcto. |
+| **Series Pull** | Ignora la UI específica; inyecta `blockConfig.romRanges` **hardcodeado** (P1→P2, P2→P3, P1→P3 con 5–10 reps fijos). Fuerza `sets: 1`. |
+| **Super series** | Ignora escalones editables; arma `blockConfig.steps` con **2 escalones derivados** del peso base y reps genéricos; remate fijo en progresiva. Fuerza `sets: 1`. |
+
+El entrenador cree que configuró una superserie o series pull, pero en realidad solo eligió una etiqueta: **los datos se autogeneran sin formulario dedicado**.
+
+#### Brecha respecto al diseño esperado
+
+| Pieza | Esperado | Actual |
+|-------|----------|--------|
+| Selector de modo | Cambia el formulario de agregar ejercicio | Solo cambia estado + sub-pills en superserie |
+| Series Pull | Editor de 3 rangos ROM + reps por rango (5–10, editable) | Mismos campos lineales; ROM por defecto al guardar |
+| Super series progresiva | Lista de escalones peso/reps + remate final obligatorio | Progresión de peso lineal estándar; escalones inventados al guardar |
+| Super series regresiva | Escalones decrecientes configurables hasta fallo | Igual que progresiva con otro flag |
+| Lista de ejercicios añadidos | Resumen según tipo (rangos, escalones, etc.) | Siempre `N x M · descanso` + pesos por serie |
+| Edición de rutina existente | Cargar y mostrar `blockConfig` en el subformulario correcto | No hay UI para editar `romRanges` ni `steps` |
+
+#### Impacto
+
+- **UX engañosa:** cinco botones visibles (3 modos + 2 subtipos) sugieren flujos distintos que no existen.
+- **Datos incorrectos en producción:** rutinas guardadas como `series_pull` o `superset` pueden no reflejar la intención del entrenador.
+- **Atleta:** `ActiveWorkoutPanel` ya tiene lógica para flujos compuestos, pero recibe configuraciones por defecto poco útiles.
+
+#### Próximo paso (rehacer formulario)
+
+1. **Un subformulario por modo** — no reutilizar el bloque lineal para todo:
+   - `StandardExerciseForm` — campos actuales (series, reps, descanso, progresión, técnica).
+   - `SeriesPullExerciseForm` — 3 filas ROM (P1→P2, P2→P3, P1→P3) con reps min/max o valor fijo; descanso **entre series completas**; sin campo «Series» (siempre 1 serie compuesta).
+   - `SupersetExerciseForm` — selector progresiva/regresiva **dentro del panel**; tabla de escalones `{ pesoKg, repsObjetivo }` (añadir/quitar filas); remate final en progresiva; aviso «máx. 30 s entre escalones».
+2. **Renderizado condicional** en `addExerciseSection` según `structureType` (y `supersetSubtype` si aplica).
+3. **Resumen en lista** de ejercicios seleccionados adaptado al tipo.
+4. **Carga en edición** — poblar subformulario desde `exercise.blockConfig` existente.
+5. Mantener persistencia y adaptador atleta ya iniciados (`blockConfig`, `routine-ui-adapter`, `active-workout-panel`).
 
 ---
 
@@ -514,14 +642,24 @@ Inverso a la progresiva: se empieza con **carga máxima** (bajo volumen) y se **
 
 ### Estado actual del código
 
-Un solo modelo **lineal** sin tipos ni agrupaciones:
+**Infraestructura parcial (backend + atleta), formulario trainer incompleto:**
 
-- `components/admin/routine-builder.tsx` — un ejercicio = `{ sets, reps, rest, suggestedWeightsKg, technique }`
-- `lib/data/types.ts` → `RoutineExercise` / `Routine.exercises[]` — lista plana ordenada
-- `backend/app/models.py` → `RoutineExercise` — `order`, `sets`, `reps`, `rest_seconds`; sin `block_type`, ROM ni escalones
-- `lib/data/routine-ui-adapter.ts` → `UiRoutine.tasks[]` — tareas secuenciales para `ActiveWorkoutPanel`
+| Pieza | Estado |
+|-------|--------|
+| `components/admin/routine-builder.tsx` | Pills de `structureType` + subtipo superserie; **mismo formulario lineal para todos**; `blockConfig` autogenerado al agregar ejercicio |
+| `lib/data/types.ts` | `RoutineStructureType`, `RomRange`, `blockConfig` en `RoutineExercise` — definidos |
+| `backend/app/models.py` / `routine_service.py` | `structure_type` persistido en create/update |
+| `lib/data/routine-ui-adapter.ts` | Adapta rutinas compuestas a tareas UI |
+| `components/routines/active-workout-panel.tsx` | Flujo guiado por rangos/escalones si `blockConfig` existe |
+| **Falta** | Subformularios `StandardExerciseForm`, `SeriesPullExerciseForm`, `SupersetExerciseForm`; resumen en lista; edición de `blockConfig` |
 
-No existe soporte para rangos ROM, escalones progresivos/regresivos ni conteo de «una serie compuesta».
+Modelo lineal original ampliado en tipos, pero **sin UI de captura** para Series Pull ni Super series:
+
+- `RoutineExercise` / `Routine.exercises[]` — admite `blockConfig` opcional además de campos lineales
+- `backend/app/models.py` → `RoutineExercise` — `order`, `sets`, `reps`, `rest_seconds`; metadata compuesta vía JSON embebido en ejercicio (según implementación actual)
+- `lib/data/routine-ui-adapter.ts` → `UiRoutine.tasks[]` — tareas secuenciales; compuestas si hay `blockConfig`
+
+No hay editor visual para rangos ROM ni escalones progresivos/regresivos; el entrenador no puede configurarlos desde el modal.
 
 ### Comportamiento esperado (implementación)
 
@@ -557,11 +695,13 @@ No existe soporte para rangos ROM, escalones progresivos/regresivos ni conteo de
    - **superset:** `supersetSubtype: 'progressive' | 'regressive'`, `steps: [{ weightKg, repsTarget }]`, `finisher?: { weightKg, repsTarget }`, `maxTransitionRestSec: 30`.
 3. Extender API create/update rutina y serializers backend.
 
-**Frontend**
+**Frontend (prioridad: rehacer formulario)**
 
-1. Selector de modo (tabs o pills) en `RoutineBuilder`.
-2. Subformularios: `StandardExerciseForm`, `SeriesPullEditor`, `SupersetStepEditor` (con subtipo A/B).
-3. Actualizar `storeRoutineToUi` y `ActiveWorkoutPanel` para flujos compuestos por serie.
+1. ~~Selector de modo (tabs o pills)~~ — **hecho**, pero debe **conmutar subformularios**, no solo estado.
+2. Implementar y enlazar: `StandardExerciseForm`, `SeriesPullEditor`, `SupersetStepEditor` (con subtipo A/B integrado en el panel derecho).
+3. Eliminar autogeneración silenciosa de `blockConfig` en `handleAddExercise`; leer valores del subformulario activo.
+4. Actualizar resumen de ejercicios seleccionados por tipo.
+5. Actualizar `storeRoutineToUi` y `ActiveWorkoutPanel` para flujos compuestos (atleta — parcialmente hecho).
 
 **Validación**
 
@@ -585,6 +725,7 @@ No existe soporte para rangos ROM, escalones progresivos/regresivos ni conteo de
 ## 8. Titan — no debe mostrarse sin login
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Resuelto** — `CoachMascot` retorna `null` si `!isAuthenticated`.  
 **Severidad:** Media (UX / privacidad / expectativa de producto)  
 **Área:** Coach visual · `CoachMascot` · contexto Titan
 
@@ -640,6 +781,7 @@ Hoy un visitante sin cuenta puede ver el coach flotante (minimizable) con mensaj
 ## 9. Admin mobile — sin icono de menú / navegación
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Resuelto** — drawer móvil en `PrimeShell` + botón hamburguesa en `PrimeTopBar`.  
 **Severidad:** Alta (UX móvil — bloquea navegación)  
 **Área:** Panel admin v2 · shell · sidebar
 
@@ -712,6 +854,7 @@ Comparación en el mismo proyecto:
 ## 10. Admin — listado de atletas apretado en mobile (responsive)
 
 **Fecha:** 2026-06-23  
+**Estado (2026-06-24):** **Resuelto** — cards móviles + menú `⋯` en `PrimeAthletesTable`; inspector en `Sheet` en `athletes/page-client.tsx`.  
 **Severidad:** Media (UX móvil / legibilidad)  
 **Área:** `/admin-v2/athletes` · tabla `REGISTRO_ATLETAS`
 
@@ -780,6 +923,114 @@ Acciones: agrupar en menú «⋯» en mobile para reducir ancho.
 
 ---
 
-## 11. (próximas entradas)
+## 11. Calculadora de macros — franja de resultados y guardado con % ≠ 100
+
+**Fecha:** 2026-06-24  
+**Actualizado:** 2026-06-24  
+**Estado (2026-06-24):** **Parcial** — preview siempre visible + confirmación al guardar con % ≠ 100% (hecho en frontend); validar en deploy tunnel.  
+**Severidad:** Media (UX / feedback visual)  
+**Área:** Nutrición entrenador · `MacroCalculator` · pestaña Macros del editor
+
+### Síntoma / petición (original)
+
+En la **Calculadora de macros**, la franja inferior con **kcal · Proteína · Carbos · Grasa** desaparecía cuando los sliders en modo **Personalizado** no sumaban 100%.
+
+**Estado tras primer fix:** la franja **ya se muestra** con suma ≠ 100% (p. ej. 104% → 405 g proteína, 276 g carbos, 96 g grasas). Mensaje ámbar: «Suma actual: 104% — ajusta a 100% para guardar».
+
+### Petición adicional (2026-06-24)
+
+Si la suma de porcentajes está **por encima o por debajo de 100%** (o fuera del rango 5–70 por macro):
+
+1. Mostrar **alerta de confirmación** (dialog o confirm nativo) explicando que no cumple la regla porcentual recomendada.
+2. El entrenador debe poder **guardar igualmente** si confirma explícitamente («Guardar de todos modos» / «Continuar»).
+3. No bloquear los botones **Guardar objetivo en borrador** ni **Guardar macros para el atleta** solo por suma ≠ 100%; la confirmación sustituye el bloqueo duro actual (`disabled={!valid}`).
+4. Mantener preview siempre visible (ya implementado).
+
+**Comportamiento esperado al guardar con % inválidos:**
+
+- Clic en guardar → modal: «La suma es 104% (recomendado 100%). ¿Guardar estos macros de todos modos?»
+- **Cancelar** → no persiste.
+- **Confirmar** → guarda borrador o publica al atleta con los valores actuales del preview.
+
+### Causa raíz (guardado bloqueado)
+
+En `macro-calculator.tsx`:
+
+```ts
+<Button onClick={handleApply} disabled={!valid || !canEdit} />
+<Button onClick={handleSaveForAthlete} disabled={!valid || !canEdit || isPublishing} />
+```
+
+Los botones quedan deshabilitados cuando `!isValidMacroSplit(split)`; no hay flujo de confirmación.
+
+### Solución propuesta
+
+**Frontend (`macro-calculator.tsx`)**
+
+1. ~~Calcular siempre preview~~ — **hecho**.
+2. ~~Habilitar botones de guardar aunque `!valid`~~ — **hecho**.
+3. ~~Confirmación en `handleApply` / `handleSaveForAthlete` si `!valid`~~ — **hecho** (`window.confirm`).
+4. Mensaje inline de advertencia permanece; la confirmación se muestra al pulsar guardar.
+
+### Archivos implicados
+
+- `components/nutrition/macro-calculator.tsx`
+- `lib/nutrition/macros.ts` (`isValidMacroSplit`, `macrosFromCalories`)
+- Opcional: `components/ui/alert-dialog.tsx` (confirmación accesible)
+
+### Validación manual
+
+1. Preset **Personalizado** → sliders a suma 104% (como captura).
+2. Franja inferior visible con gramos calculados.
+3. Clic **Guardar objetivo en borrador** → aparece confirmación; cancelar no guarda; confirmar guarda.
+4. Mismo flujo con **Guardar macros para el atleta**.
+5. Con suma exactamente 100% → guardar sin confirmación extra.
+
+---
+
+## 12. Responsive Prime — atleta, trainer-v2, admin-v2
+
+**Fecha:** 2026-06-24  
+**Estado:** **Implementado** (auditoría y correcciones en áreas Prime activas)
+
+### Cambios principales
+
+| Área | Cambio |
+|------|--------|
+| **Nav móvil atleta/trainer** | `PrimeMobileNavDrawer` + `PrimeMobileBottomDock` (4 ítems + «Más») + hamburger en top bar |
+| **Inspectores split** | `Sheet` bottom en `< xl` para atletas (admin + trainer) y entrenadores (admin) |
+| **Tablas vs cards** | Breakpoint `lg` (1024px) en `PrimeAthletesTable`, cola operaciones, progreso trainer, pagos, métricas historial |
+| **Flujo atleta** | Plan semanal con scroll horizontal; workout activo con botones full-width en móvil; tabs nutrición flexibles |
+| **Formularios rutina** | Padding responsive en `RoutineBuilder`; grids `grid-cols-1 sm:grid-cols-2` en forms |
+| **Hook** | `useIsBelowXl()` para alinear Sheet con `xl:grid-cols-[…]` del inspector lateral |
+
+### Archivos clave
+
+- `components/admin-v2/prime-mobile-nav-drawer.tsx`
+- `components/admin-v2/prime-mobile-bottom-dock.tsx`
+- `lib/admin-v2/prime-mobile-nav.ts`
+- `components/athlete-prime/athlete-prime-shell.tsx`
+- `components/trainer-v2/trainer-prime-shell.tsx`
+- `components/admin-v2/prime-athletes-table.tsx`
+- `components/routines/weekly-plan-strip.tsx`
+- `hooks/use-mobile.ts` (`useIsBelowXl`)
+
+### Validación automatizada (2026-06-24)
+
+- `npm run lint` → 0 errores (6 warnings preexistentes)
+- `npx vitest run lib/admin-v2/prime-mobile-nav.test.ts` → 2/2 OK
+- `npm run build` → OK
+
+### Validación manual recomendada
+
+| Viewport | Rutas |
+|----------|-------|
+| **390px** | `/dashboard`, `/routines`, `/metrics`, `/nutrition`, `/trainer-v2/athletes`, `/admin-v2/athletes`, `/admin-v2/payments` |
+| **768px** | Transición sidebar; bottom dock + hamburger; cards en tablas |
+| **1024px** | Tabla desktop; inspector lateral split en `xl+` |
+
+---
+
+## 13. (próximas entradas)
 
 _Se irán añadiendo hallazgos aquí._

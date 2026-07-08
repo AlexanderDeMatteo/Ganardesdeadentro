@@ -1,3 +1,5 @@
+> **Documento histórico** — ver [README.md](README.md) para instrucciones actuales.
+
 # 🚀 Instrucciones de Instalación - FitTrack
 
 ## Paso 1: Iniciar el Frontend (Next.js)
