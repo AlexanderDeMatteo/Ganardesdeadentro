@@ -1,12 +1,18 @@
 'use client';
 
-import Link from 'next/link';
+import { useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { TrainerPrimeSidebar } from '@/components/trainer-v2/trainer-prime-sidebar';
 import { TrainerPrimeTopBar } from '@/components/trainer-v2/trainer-prime-top-bar';
+import { PrimeMobileBottomDock } from '@/components/admin-v2/prime-mobile-bottom-dock';
+import { PrimeMobileNavDrawer } from '@/components/admin-v2/prime-mobile-nav-drawer';
 import { TRAINER_V2_NAV_ICON_MAP } from '@/lib/trainer-v2/trainer-v2-nav-icons';
-import { TRAINER_V2_NAV_ITEMS, isNavItemActive } from '@/lib/auth/role-routes';
-import { cn } from '@/lib/utils';
+import {
+  TRAINER_MOBILE_DOCK_HREFS,
+  getPrimeMobileDockItems,
+  getPrimeMobileOverflowItems,
+} from '@/lib/admin-v2/prime-mobile-nav';
+import { TRAINER_V2_NAV_ITEMS } from '@/lib/auth/role-routes';
 
 type TrainerPrimeShellProps = {
   children: React.ReactNode;
@@ -14,12 +20,22 @@ type TrainerPrimeShellProps = {
 
 export function TrainerPrimeShell({ children }: TrainerPrimeShellProps) {
   const pathname = usePathname() ?? '';
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const dockItems = useMemo(
+    () => getPrimeMobileDockItems(TRAINER_V2_NAV_ITEMS, TRAINER_MOBILE_DOCK_HREFS),
+    [],
+  );
+  const overflowItems = useMemo(
+    () => getPrimeMobileOverflowItems(TRAINER_V2_NAV_ITEMS, dockItems),
+    [dockItems],
+  );
 
   return (
     <div className="gainer-prime-root flex min-h-screen">
       <TrainerPrimeSidebar />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col md:ml-[280px]">
-        <TrainerPrimeTopBar />
+        <TrainerPrimeTopBar onOpenMobileNav={() => setMobileNavOpen(true)} />
         <div className="gp-canvas-wrap flex-1 pt-20">
           <main id="main-content" className="gp-canvas gp-vignette flex-1">
             <div className="gp-scanline" aria-hidden />
@@ -30,31 +46,23 @@ export function TrainerPrimeShell({ children }: TrainerPrimeShellProps) {
         </div>
       </div>
 
-      <nav
-        className="fixed bottom-0 left-0 z-40 flex w-full items-center justify-around overflow-x-auto border-t border-[#3f4a3c] bg-[#0d1511]/95 py-2 px-1 backdrop-blur-sm md:hidden"
-        aria-label="Navegación principal"
-      >
-        {TRAINER_V2_NAV_ITEMS.map((item) => {
-          const Icon = TRAINER_V2_NAV_ICON_MAP[item.href];
-          if (!Icon) return null;
-          const isActive = isNavItemActive(pathname, item);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex min-w-[3rem] flex-col items-center gap-0.5 p-1.5 transition-colors',
-                isActive ? 'text-[#83e77b]' : 'text-[#becab8]/70',
-              )}
-            >
-              <Icon className="size-4 shrink-0" aria-hidden />
-              <span className="truncate text-[8px] font-bold uppercase tracking-wide">
-                {item.label.split(' ')[0]}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+      <PrimeMobileBottomDock
+        dockItems={dockItems}
+        overflowItems={overflowItems}
+        iconMap={TRAINER_V2_NAV_ICON_MAP}
+        activeHref={pathname}
+        onOpenMore={() => setMobileNavOpen(true)}
+        variant="trainer"
+      />
+
+      <PrimeMobileNavDrawer
+        open={mobileNavOpen}
+        onOpenChange={setMobileNavOpen}
+        navItems={TRAINER_V2_NAV_ITEMS}
+        iconMap={TRAINER_V2_NAV_ICON_MAP}
+        activeHref={pathname}
+        ariaLabel="Menú de navegación entrenador"
+      />
     </div>
   );
 }

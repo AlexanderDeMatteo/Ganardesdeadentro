@@ -1,17 +1,31 @@
 'use client';
 
 import Link from 'next/link';
-import { Shield, UserCircle } from 'lucide-react';
+import { Menu, Shield, UserCircle } from 'lucide-react';
 import { useAuth } from '@/app/context/auth-context';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 
-export function AthletePrimeTopBar() {
+type AthletePrimeTopBarProps = {
+  onOpenMobileNav?: () => void;
+};
+
+export function AthletePrimeTopBar({ onOpenMobileNav }: AthletePrimeTopBarProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
   return (
     <header className="fixed right-0 top-0 z-50 flex h-20 w-full items-center justify-between border-b border-[#255831]/60 bg-[#0d1511]/80 px-4 backdrop-blur-md md:w-[calc(100%-280px)] md:px-10">
-      <div className="flex min-w-0 items-center gap-4">
+      <div className="flex min-w-0 items-center gap-3 md:gap-4">
+        {onOpenMobileNav ? (
+          <button
+            type="button"
+            onClick={onOpenMobileNav}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md gp-text-muted transition-colors hover:gp-text-phosphor focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#68ca62] md:hidden"
+            aria-label="Abrir menú de navegación"
+          >
+            <Menu className="h-5 w-5" aria-hidden />
+          </button>
+        ) : null}
         <h2 className="gp-display gp-title-metallic hidden text-2xl lg:block">
           BE A GAINER LIFE
         </h2>
