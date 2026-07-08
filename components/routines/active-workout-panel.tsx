@@ -32,6 +32,7 @@ import {
   type SetDraft,
 } from '@/lib/workout/session-utils';
 import { cn } from '@/lib/utils';
+import { formatRomRangeLabel } from '@/lib/routines/exercise-block-config';
 import { Check, ChevronDown, Clock, Loader2, Trophy } from 'lucide-react';
 
 interface WorkoutDraft {
@@ -459,7 +460,7 @@ export function ActiveWorkoutPanel({
         </p>
         <Button
           type="button"
-          className="mt-4 bg-cyan-400 text-black hover:bg-cyan-300"
+          className="mt-4 w-full bg-cyan-400 text-black hover:bg-cyan-300 sm:w-auto"
           onClick={startSession}
         >
           Comenzar sesión
@@ -470,9 +471,9 @@ export function ActiveWorkoutPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
         <p className="text-xs font-bold uppercase gp-text-phosphor">Sesión en curso</p>
-        <span className="text-xs text-muted-foreground">
+        <span className="shrink-0 text-xs text-muted-foreground">
           {completedSets}/{totalSets} series ({progressPct}%)
         </span>
       </div>
@@ -496,7 +497,7 @@ export function ActiveWorkoutPanel({
             </p>
           )}
 
-          <h3 className="text-lg font-bold text-foreground">
+          <h3 className="break-words text-base font-bold text-foreground sm:text-lg">
             {currentTask.label} — Serie {currentSet}/{currentTask.setsPlanned}
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -633,7 +634,14 @@ export function ActiveWorkoutPanel({
               </p>
               <p className="mt-1 text-muted-foreground">
                 {uiRoutine.structureType === 'series_pull'
-                  ? `${(compoundSteps[compoundPhase] as { from: string; to: string }).from} → ${(compoundSteps[compoundPhase] as { from: string; to: string }).to}`
+                  ? formatRomRangeLabel(
+                      compoundSteps[compoundPhase] as {
+                        from: string;
+                        to: string;
+                        repsMin: number;
+                        repsMax: number;
+                      },
+                    )
                   : `${(compoundSteps[compoundPhase] as { weightKg: number; repsTarget: string }).weightKg} kg · ${(compoundSteps[compoundPhase] as { weightKg: number; repsTarget: string }).repsTarget} reps`}
               </p>
               {compoundPhase < compoundSteps.length - 1 ? (
@@ -656,7 +664,7 @@ export function ActiveWorkoutPanel({
             </p>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <Button
               type="button"
               onClick={() => recordSet('completed')}
@@ -664,7 +672,7 @@ export function ActiveWorkoutPanel({
                 restSecondsLeft > 0 ||
                 (isCompound && compoundPhase < compoundSteps.length - 1)
               }
-              className="bg-lime-400 text-black hover:bg-lime-300"
+              className="w-full bg-lime-400 text-black hover:bg-lime-300 sm:w-auto"
             >
               <Check className="mr-2 size-4" aria-hidden />
               Completar serie
@@ -674,6 +682,7 @@ export function ActiveWorkoutPanel({
               variant="outline"
               disabled={restSecondsLeft > 0}
               onClick={handleYieldClick}
+              className="w-full sm:w-auto"
             >
               Me rindo
             </Button>

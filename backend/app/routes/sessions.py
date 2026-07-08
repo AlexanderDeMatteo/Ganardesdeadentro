@@ -1,12 +1,29 @@
 from flask import Blueprint, request, send_file
 from flask_jwt_extended import jwt_required
+from flask_limiter.util import get_remote_address
+from flask_jwt_extended import get_jwt_identity
+import mimetypes
 
 from app.database import SessionLocal
+from app.extensions import limiter
 from app.services.session_execution_media_service import SessionExecutionMediaService
 from app.services.session_service import GENERIC_ERROR, SessionService
 from app.utils.authorization import get_current_user_id, require_athlete_access, require_active_membership
 
 sessions_bp = Blueprint('sessions', __name__)
+
+
+def _upload_rate_limit() -> str:
+    from flask import current_app
+
+    return str(current_app.config.get('UPLOAD_RATE_LIMIT', '10 per minute'))
+
+
+def _jwt_user_or_ip_key() -> str:
+    identity = get_jwt_identity()
+    if identity:
+        return f'user:{identity}'
+    return f'ip:{get_remote_address()}'
 
 
 def _parse_int(value, name='id'):
@@ -115,6 +132,7 @@ def exercise_progress():
 
 @sessions_bp.route('/execution-media', methods=['POST'])
 @jwt_required()
+@limiter.limit(_upload_rate_limit, key_func=_jwt_user_or_ip_key)
 def upload_execution_media():
     athlete_id = request.form.get('athleteId') or get_current_user_id()
     athlete_parsed, err = _parse_int(athlete_id, 'athleteId')
@@ -128,7 +146,11 @@ def upload_execution_media():
         denied = require_active_membership(athlete_parsed, session=session)
         if denied:
             return denied
-        payload, error, status = SessionExecutionMediaService.upload(request.files.get('file'))
+        payload, error, status = SessionExecutionMediaService.upload(
+            request.files.get('file'),
+            athlete_id=athlete_parsed,
+            uploaded_by_id=get_current_user_id(),
+        )
     finally:
         session.close()
     if error:
@@ -142,4 +164,11 @@ def get_execution_media(filename):
     path = SessionExecutionMediaService.resolve_media_path(filename)
     if path is None:
         return {'error': 'Archivo no encontrado'}, 404
-    return send_file(path, conditional=True)
+    owner_athlete_id = SessionExecutionMediaService.get_media_owner_athlete_id(filename)
+    if owner_athlete_id is None:
+        return {'error': 'Archivo no encontrado'}, 404
+    denied = require_athlete_access(owner_athlete_id)
+    if denied:
+        return denied
+    mime_type, _ = mimetypes.guess_type(str(path))
+    return send_file(path, mimetype=mime_type or 'application/octet-stream', conditional=True)

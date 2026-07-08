@@ -444,6 +444,23 @@ class WorkoutSession(Base):
     user = relationship('User', back_populates='workout_sessions')
 
 
+class SessionExecutionMedia(Base):
+    __tablename__ = 'session_execution_media'
+
+    id = Column(Integer, primary_key=True)
+    filename = Column(String(255), nullable=False, unique=True, index=True)
+    athlete_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    uploaded_by_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    athlete = relationship('User', foreign_keys=[athlete_id])
+    uploaded_by = relationship('User', foreign_keys=[uploaded_by_id])
+
+    __table_args__ = (
+        Index('idx_session_media_athlete_created', 'athlete_id', 'created_at'),
+    )
+
+
 class NutritionPlan(Base):
     __tablename__ = 'nutrition_plans'
 

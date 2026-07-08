@@ -1,5 +1,6 @@
 'use client';
 
+import { ExecutionVideoPlayer } from '@/components/routines/execution-video-player';
 import { useState } from 'react';
 import type { SessionLog } from '@/lib/data/types';
 import { formatHeatmapDateLabel } from '@/lib/workout/activity-heatmap';
@@ -117,14 +118,14 @@ export function AthleteSessionDayDetail({
               {set.result === 'failed' ? ' · Me rindo' : ''}
             </span>
             {set.executionVideoUrl ? (
-              <video
+              <ExecutionVideoPlayer
                 src={set.executionVideoUrl}
-                controls
-                className="mt-2 w-full max-w-xs rounded-md border gp-border-outline/40"
-                preload="metadata"
-              >
-                <track kind="captions" />
-              </video>
+                className={cn(
+                  'mt-2 w-full max-w-xs rounded-md border',
+                  theme === 'prime' ? 'gp-border-outline/40' : 'border-border',
+                )}
+                mutedClassName={theme === 'prime' ? 'gp-mono gp-text-dim' : undefined}
+              />
             ) : null}
           </li>
         ))}
