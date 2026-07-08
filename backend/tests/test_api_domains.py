@@ -1047,6 +1047,16 @@ class TestNutritionRoutes:
         assert get_plan.status_code == 200
         assert get_plan.get_json()['plan'] is not None
 
+    def test_rejects_invalid_meal_plan_shape(self, client, athlete_user, trainer_headers):
+        payload = self._nutrition_plan_payload(athlete_user.id)
+        payload['mealPlan'] = {'days': [{'day': 0, 'meals': 42}]}
+        response = client.put(
+            '/api/nutrition/plan',
+            headers=trainer_headers,
+            json=payload,
+        )
+        assert response.status_code == 400
+
     def test_coach_draft_round_trip(self, client, athlete_user, trainer_headers):
         draft = {
             'activityLevel': 'active',

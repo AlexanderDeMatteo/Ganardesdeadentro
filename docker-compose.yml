@@ -24,7 +24,7 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       # Piloto híbrido: auth + métricas + rutinas + users/nutrition/memberships vía API
       # Con AUTH_SOURCE=api, athleteId === user.id del JWT (no usar IDs del seed demo)
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:5000
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}
       NEXT_PUBLIC_AUTH_SOURCE: api
       NEXT_PUBLIC_DATA_SOURCE: api
       NEXT_PUBLIC_DATA_SOURCE_METRICS: api
@@ -36,8 +36,18 @@ services:
       API_INTERNAL_URL: http://fittrack-backend:5000
       # Ollama en el host (Windows/Mac: host.docker.internal)
       OLLAMA_BASE_URL: http://host.docker.internal:11434
+      TITAN_RATELIMIT_REDIS_URL: redis://fittrack-redis:6379
     depends_on:
-      - fittrack-backend
+      fittrack-backend:
+        condition: service_healthy
+      fittrack-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   fittrack-backend:
     container_name: fittrack-backend
@@ -55,10 +65,11 @@ services:
       FLASK_HOST: 0.0.0.0
       FLASK_PORT: 5000
       DATABASE_URL: sqlite:////data/fitness_platform.db
-      CORS_ORIGINS: http://localhost:3000
+      # CORS_ORIGINS y FRONTEND_URL: definir en backend/.env (tunnel o localhost)
       EXERCISEDB_API_URL: https://oss.exercisedb.dev
       # Docker Desktop en Windows puede fallar verificación SSL hacia APIs externas
       EXERCISEDB_SSL_VERIFY: "false"
+      RATELIMIT_STORAGE_URI: redis://fittrack-redis:6379
     ports:
       - "5000:5000"
     volumes:
@@ -67,6 +78,29 @@ services:
       - ./backend/alembic:/app/alembic
       - ./backend/scripts:/app/scripts
       - fittrack_backend_data:/data
+    depends_on:
+      fittrack-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  fittrack-redis:
+    container_name: fittrack-redis
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - fittrack_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
   fittrack_backend_data:
@@ -75,3 +109,5 @@ volumes:
     name: fittrack_frontend_node_modules
   fittrack_frontend_next:
     name: fittrack_frontend_next
+  fittrack_redis_data:
+    name: fittrack_redis_data

@@ -451,7 +451,7 @@ def fill_admin_profile(admin_id: int) -> None:
                 session.add(profile)
             profile.phone = '+58 212-0000000'
             profile.country = 'Venezuela'
-            profile.bio = 'Administrador de la plataforma FitTrack.'
+            profile.bio = 'Administrador de la plataforma Be a Gainer.'
             session.commit()
     finally:
         session.close()

@@ -36,11 +36,15 @@ class Config:
     DEBUG = ENVIRONMENT == 'development'
 
     AUTH_RATE_LIMIT = os.getenv('AUTH_RATE_LIMIT', '10 per minute')
+    GLOBAL_RATE_LIMIT = os.getenv('GLOBAL_RATE_LIMIT', '120 per minute')
+    PUBLIC_API_RATE_LIMIT = os.getenv('PUBLIC_API_RATE_LIMIT', '60 per minute')
+    UPLOAD_RATE_LIMIT = os.getenv('UPLOAD_RATE_LIMIT', '10 per minute')
     RATELIMIT_ENABLED = os.getenv('RATELIMIT_ENABLED', 'True') == 'True'
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
 
     RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
-    EMAIL_FROM = os.getenv('EMAIL_FROM', 'FitTrack <onboarding@fittrack.local>')
+    EMAIL_FROM = os.getenv('EMAIL_FROM', 'Be a Gainer <invitaciones@beagainer.life>')
+    EMAIL_REPLY_TO = os.getenv('EMAIL_REPLY_TO', 'soporte@beagainer.life')
     FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
     INVITATION_EXPIRY_HOURS = int(os.getenv('INVITATION_EXPIRY_HOURS', '72'))
 
@@ -97,6 +101,9 @@ class TestingConfig(Config):
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'test-secret-key-for-pytest-only')
     RATELIMIT_ENABLED = False
     AUTH_RATE_LIMIT = '1000 per minute'
+    GLOBAL_RATE_LIMIT = '1000 per minute'
+    PUBLIC_API_RATE_LIMIT = '1000 per minute'
+    UPLOAD_RATE_LIMIT = '1000 per minute'
     EXERCISE_MEDIA_UPLOAD_DIR = os.getenv('EXERCISE_MEDIA_UPLOAD_DIR', 'exercise_media_test')
     SESSION_EXECUTION_MEDIA_UPLOAD_DIR = os.getenv(
         'SESSION_EXECUTION_MEDIA_UPLOAD_DIR',

@@ -15,6 +15,11 @@ backend/.env
 # Local SQLite database
 backend/fitness_platform.db
 
+# Test upload artifacts (no versionar)
+backend/exercise_media_test/
+backend/payment_receipts_test/
+backend/session_execution_media_test/
+
 # Common ignores
 node_modules
 .pnpm-store/

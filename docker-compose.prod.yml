@@ -37,11 +37,18 @@ services:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:5000}
       API_INTERNAL_URL: http://fittrack-backend:5000
       OLLAMA_BASE_URL: http://host.docker.internal:11434
+      TITAN_RATELIMIT_REDIS_URL: redis://fittrack-redis:6379
     depends_on:
       fittrack-backend:
-        condition: service_started
+        condition: service_healthy
       fittrack-redis:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
 
   fittrack-backend:
@@ -66,6 +73,7 @@ services:
       EXERCISEDB_API_URL: https://oss.exercisedb.dev
       EXERCISEDB_SSL_VERIFY: "true"
       EXERCISE_MEDIA_UPLOAD_DIR: /data/exercise_media
+      SESSION_EXECUTION_MEDIA_UPLOAD_DIR: /data/session_execution_media
       PAYMENT_RECEIPT_UPLOAD_DIR: /data/payment_receipts
       SEED_DEMO_TRAINERS: "false"
       JWT_COOKIE_SECURE: "True"
@@ -75,7 +83,13 @@ services:
       - fittrack_backend_data:/data
     depends_on:
       fittrack-redis:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
 
   fittrack-redis:
@@ -85,6 +99,12 @@ services:
       - "127.0.0.1:6379:6379"
     volumes:
       - fittrack_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     restart: unless-stopped
 
 volumes:

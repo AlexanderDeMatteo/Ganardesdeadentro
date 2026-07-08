@@ -7,3 +7,6 @@ __pycache__
 .venv
 venv
 fitness_platform.db
+session_execution_media_test
+exercise_media_test
+payment_receipts_test

@@ -465,6 +465,8 @@ class AdminService:
                 to=email.strip().lower(),
                 first_name=first_name.strip(),
                 invite_url=invite_url,
+                variant='initial',
+                specialization=specialization,
             )
             if not sent:
                 return None, email_error or GENERIC_ERROR
@@ -494,6 +496,7 @@ class AdminService:
                 to=user.email,
                 first_name=user.first_name,
                 invite_url=invite_url,
+                variant='resend',
             )
             if not sent:
                 return False, email_error or GENERIC_ERROR

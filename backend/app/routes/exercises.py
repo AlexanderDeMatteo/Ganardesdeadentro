@@ -2,9 +2,11 @@ import logging
 import mimetypes
 
 from flask import Blueprint, request, send_file
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_limiter.util import get_remote_address
 
 from app.database import SessionLocal
+from app.extensions import limiter
 from app.models import Exercise
 from app.schemas.request_schemas import (
     CreateCustomExerciseSchema,
@@ -26,6 +28,25 @@ logger = logging.getLogger(__name__)
 exercises_bp = Blueprint('exercises', __name__)
 
 
+def _public_api_rate_limit() -> str:
+    from flask import current_app
+
+    return str(current_app.config.get('PUBLIC_API_RATE_LIMIT', '60 per minute'))
+
+
+def _upload_rate_limit() -> str:
+    from flask import current_app
+
+    return str(current_app.config.get('UPLOAD_RATE_LIMIT', '10 per minute'))
+
+
+def _jwt_user_or_ip_key() -> str:
+    identity = get_jwt_identity()
+    if identity:
+        return f'user:{identity}'
+    return f'ip:{get_remote_address()}'
+
+
 def _staff_roles_only():
     user = get_verified_user()
     if user is None:
@@ -36,6 +57,7 @@ def _staff_roles_only():
 
 
 @exercises_bp.route('/muscles', methods=['GET'])
+@limiter.limit(_public_api_rate_limit)
 def get_all_muscles():
     source = request.args.get('source', 'api', type=str).lower()
     if source == 'catalog':
@@ -51,6 +73,7 @@ def get_all_muscles():
 
 
 @exercises_bp.route('/by-muscle/<muscle>', methods=['GET'])
+@limiter.limit(_public_api_rate_limit)
 def get_exercises_by_muscle(muscle):
     limit = request.args.get('limit', 50, type=int)
     if limit > 100:
@@ -141,6 +164,7 @@ def clear_exercise_cache():
 
 
 @exercises_bp.route('/media/<filename>', methods=['GET'])
+@limiter.limit(_public_api_rate_limit)
 def serve_exercise_media(filename):
     media_path = CustomExerciseService.get_media_path(filename)
     if media_path is None:
@@ -190,6 +214,7 @@ def match_exercise_animation(exercise_id):
 
 @exercises_bp.route('/<exercise_id>/media', methods=['POST'])
 @jwt_required()
+@limiter.limit(_upload_rate_limit, key_func=_jwt_user_or_ip_key)
 def upload_exercise_media(exercise_id):
     user, err_body, err_status = _staff_roles_only()
     if user is None:

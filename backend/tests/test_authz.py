@@ -242,6 +242,28 @@ class TestRateLimiting:
         finally:
             SessionLocal.remove()
 
+    def test_global_rate_limit_on_health(self):
+        from app import create_app
+        from app.config import TestingConfig
+        from app.database import SessionLocal, drop_db, init_db
+
+        class RateLimitConfig(TestingConfig):
+            RATELIMIT_ENABLED = True
+            GLOBAL_RATE_LIMIT = '2 per minute'
+
+        app = create_app(RateLimitConfig)
+        with app.app_context():
+            drop_db()
+            init_db()
+        try:
+            with app.test_client() as client:
+                assert client.get('/api/health').status_code == 200
+                assert client.get('/api/health').status_code == 200
+                response = client.get('/api/health')
+                assert response.status_code == 429
+        finally:
+            SessionLocal.remove()
+
 
 class TestErrorSanitization:
     def test_exercise_service_does_not_leak_internal_errors(self):
