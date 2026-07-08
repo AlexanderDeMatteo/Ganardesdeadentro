@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{subject}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0d1511;font-family:Arial,Helvetica,sans-serif;color:#dce5de;">
+  <span style="display:none;max-height:0;overflow:hidden;mso-hide:all;">{preheader}</span>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0d1511;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background-color:#19211d;border:1px solid #3f4a3c;border-radius:12px;">
+          <tr>
+            <td style="padding:32px 32px 16px;text-align:center;">
+              <p style="margin:0;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#7ee081;">{brand_name}</p>
+              <h1 style="margin:12px 0 0;font-size:24px;line-height:1.3;color:#ffffff;">{headline}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 24px;font-size:16px;line-height:1.6;color:#dce5de;">
+              <p style="margin:0 0 16px;">Hola {first_name},</p>
+              <p style="margin:0 0 16px;">{intro_paragraph}</p>
+              {specialization_block}
+              <p style="margin:0 0 8px;font-weight:bold;color:#ffffff;">Desde la plataforma podrás:</p>
+              <ul style="margin:0 0 20px;padding-left:20px;">
+                <li style="margin-bottom:6px;">Gestionar atletas asignados</li>
+                <li style="margin-bottom:6px;">Crear rutinas y plan semanal</li>
+                <li style="margin-bottom:6px;">Revisar sesiones y progreso</li>
+                <li style="margin-bottom:6px;">Asignar planes nutricionales</li>
+              </ul>
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
+                <tr>
+                  <td style="border-radius:999px;background-color:#7ee081;">
+                    <a href="{invite_url}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:bold;color:#003906;text-decoration:none;">Activar mi cuenta</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 12px;">Al abrir el enlace, crea tu contraseña (mínimo 8 caracteres) y accede con <strong>{email}</strong>.</p>
+              <p style="margin:0 0 12px;">Este enlace caduca en <strong>{expiry_hours} horas</strong>. Si expira, pide al administrador que reenvíe la invitación desde el panel.</p>
+              {resend_note}
+              <p style="margin:16px 0 0;font-size:14px;color:#9aa89c;">Si no esperabas este correo, puedes ignorarlo con tranquilidad.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 28px;border-top:1px solid #3f4a3c;text-align:center;font-size:12px;color:#9aa89c;">
+              <p style="margin:0;">© {year} {brand_name} · Ganar desde adentro</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from app.database import SessionLocal
 from app.models import InvitationToken, RoleEnum, User, UserProfile
 from app.services.auth_service import AuthService
-from app.services.email_service import EmailService
 from app.utils.validation import validate_email
 
 logger = logging.getLogger(__name__)

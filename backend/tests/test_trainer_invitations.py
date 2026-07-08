@@ -1,5 +1,6 @@
 import hashlib
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from app.database import SessionLocal
 from app.models import InvitationToken, RoleEnum, User
@@ -46,6 +47,27 @@ class TestTrainerInvitations:
             assert user.is_active is False
         finally:
             session.close()
+
+    @patch('app.services.admin_service.EmailService.send_trainer_invitation', return_value=(True, ''))
+    def test_admin_create_trainer_sends_initial_invite_email(self, mock_send, client, admin_headers):
+        response = client.post(
+            '/api/admin/trainers',
+            headers=admin_headers,
+            json={
+                'email': 'email-variant@example.com',
+                'firstName': 'Mail',
+                'lastName': 'Test',
+                'specialization': 'HIIT',
+            },
+        )
+        assert response.status_code == 201
+        mock_send.assert_called_once()
+        kwargs = mock_send.call_args.kwargs
+        assert kwargs['variant'] == 'initial'
+        assert kwargs['specialization'] == 'HIIT'
+        assert kwargs['to'] == 'email-variant@example.com'
+        assert kwargs['first_name'] == 'Mail'
+        assert '/activate?token=' in kwargs['invite_url']
 
     def test_trainer_cannot_create_invitation(self, client, trainer_headers):
         response = client.post(
@@ -125,6 +147,21 @@ class TestTrainerInvitations:
             session.close()
 
         assert client.get(f'/api/auth/invite/{first_token}').status_code == 400
+
+    @patch('app.services.admin_service.EmailService.send_trainer_invitation', return_value=(True, ''))
+    def test_admin_resend_invite_sends_resend_email(self, mock_send, client, admin_headers):
+        trainer, _ = _create_invited_trainer('resend-mail@example.com')
+        trainer_id = trainer['id']
+
+        response = client.post(
+            f'/api/admin/trainers/{trainer_id}/resend-invite',
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        mock_send.assert_called_once()
+        kwargs = mock_send.call_args.kwargs
+        assert kwargs['variant'] == 'resend'
+        assert kwargs['to'] == 'resend-mail@example.com'
 
     def test_admin_deactivate_trainer_with_reassign(
         self, client, admin_headers, athlete_user, trainer_user
