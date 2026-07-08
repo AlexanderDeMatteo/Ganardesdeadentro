@@ -11,6 +11,7 @@ import { CoachMascot } from '@/components/coach/coach-mascot'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
+import { BRAND_NAME, DEFAULT_SITE_URL } from '@/lib/landing/brand-logo'
 
 const geist = Geist({
   subsets: ['latin'],
@@ -27,13 +28,13 @@ const landingDisplay = Bebas_Neue({
   variable: '--font-landing-display',
 })
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://fittrack.app';
+const SITE_URL = DEFAULT_SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'FitTrack - Transforma tu Cuerpo',
-    template: '%s | FitTrack',
+    default: `${BRAND_NAME} - Transforma tu Cuerpo`,
+    template: `%s | ${BRAND_NAME}`,
   },
   description: 'Entrenamientos personalizados, seguimiento de progreso y transformación fitness',
   robots: {
@@ -43,14 +44,14 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'es_ES',
-    siteName: 'FitTrack',
-    title: 'FitTrack - Transforma tu Cuerpo',
+    siteName: BRAND_NAME,
+    title: `${BRAND_NAME} - Transforma tu Cuerpo`,
     description: 'Entrenamientos personalizados, seguimiento de progreso y transformación fitness',
     url: SITE_URL,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FitTrack - Transforma tu Cuerpo',
+    title: `${BRAND_NAME} - Transforma tu Cuerpo`,
     description: 'Entrenamientos personalizados, seguimiento de progreso y transformación fitness',
   },
   icons: {

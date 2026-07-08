@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import Redis from 'ioredis';
 import type { MeResponse } from '@/lib/api/contracts/auth';
 import { isApiAuthSource } from '@/lib/api/config';
 import { serverHttpRequest } from '@/lib/api/http-server';
@@ -14,6 +15,8 @@ type RateLimitBucket = {
 };
 
 const memoryBuckets = new Map<string, RateLimitBucket>();
+let redisClient: Redis | null = null;
+let redisUnavailable = false;
 
 const DEFAULT_MAX_REQUESTS = Number(process.env.TITAN_RATELIMIT_MAX_REQUESTS ?? 30);
 const DEFAULT_WINDOW_MS = Number(process.env.TITAN_RATELIMIT_WINDOW_MS ?? 60_000);
@@ -74,8 +77,33 @@ export async function checkRateLimitAsync(
   maxRequests = DEFAULT_MAX_REQUESTS,
   windowMs = DEFAULT_WINDOW_MS,
 ): Promise<boolean> {
-  // Map en proceso por userId. Redis distribuido (TITAN_RATELIMIT_REDIS_URL) → Fase 7.
-  return checkRateLimit(key, maxRequests, windowMs);
+  const redisUrl = process.env.TITAN_RATELIMIT_REDIS_URL?.trim();
+  if (!redisUrl || redisUnavailable) {
+    return checkRateLimit(key, maxRequests, windowMs);
+  }
+
+  try {
+    if (!redisClient) {
+      redisClient = new Redis(redisUrl, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+        enableReadyCheck: true,
+      });
+      redisClient.on('error', () => {
+        redisUnavailable = true;
+      });
+      await redisClient.connect();
+    }
+
+    const count = await redisClient.incr(key);
+    if (count === 1) {
+      await redisClient.pexpire(key, windowMs);
+    }
+    return count <= maxRequests;
+  } catch {
+    redisUnavailable = true;
+    return checkRateLimit(key, maxRequests, windowMs);
+  }
 }
 
 export function rateLimitResponse(): NextResponse {
@@ -221,4 +249,9 @@ export async function applyRouteGuard(
 export function resetTitanGuardState(): void {
   memoryBuckets.clear();
   sessionCache.clear();
+  if (redisClient) {
+    void redisClient.quit().catch(() => {});
+    redisClient = null;
+  }
+  redisUnavailable = false;
 }

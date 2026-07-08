@@ -2,28 +2,29 @@ import type { Metadata } from 'next';
 import PageClient from './page-client';
 import { FaqJsonLd, OrganizationJsonLd } from '@/components/seo/json-ld';
 import { LANDING_FAQ_ITEMS } from '@/lib/landing/faq';
+import { BRAND_NAME, DEFAULT_SITE_URL } from '@/lib/landing/brand-logo';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://fittrack.app';
+const SITE_URL = DEFAULT_SITE_URL;
 
 export const metadata: Metadata = {
-  title: 'FitTrack — Entrenamiento personalizado y seguimiento fitness',
+  title: `${BRAND_NAME} — Entrenamiento personalizado y seguimiento fitness`,
   description:
-    'FitTrack conecta atletas, entrenadores y administradores: rutinas asignadas, métricas, nutrición, membresías y coach IA Titan.',
+    `${BRAND_NAME} conecta atletas, entrenadores y administradores: rutinas asignadas, métricas, nutrición, membresías y coach IA Titan.`,
   alternates: {
     canonical: SITE_URL,
   },
   openGraph: {
-    title: 'FitTrack — Transforma tu cuerpo con entrenamiento guiado',
+    title: `${BRAND_NAME} — Transforma tu cuerpo con entrenamiento guiado`,
     description:
       'Plataforma fitness con planes personalizados, progreso medible y supervisión profesional.',
     url: SITE_URL,
-    siteName: 'FitTrack',
+    siteName: BRAND_NAME,
     locale: 'es_ES',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FitTrack — Entrenamiento personalizado',
+    title: `${BRAND_NAME} — Entrenamiento personalizado`,
     description:
       'Rutinas, métricas, nutrición y membresías en una sola plataforma para atletas y entrenadores.',
   },

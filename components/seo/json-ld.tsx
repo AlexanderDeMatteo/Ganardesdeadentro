@@ -1,19 +1,21 @@
+import { BRAND_NAME, DEFAULT_SITE_URL } from '@/lib/landing/brand-logo';
+
 export function OrganizationJsonLd() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
       {
         '@type': 'Organization',
-        name: 'FitTrack',
-        url: 'https://fittrack.app',
+        name: BRAND_NAME,
+        url: DEFAULT_SITE_URL,
         description:
           'Plataforma de entrenamiento personalizado con seguimiento de progreso, nutrición y supervisión por entrenadores.',
         sameAs: [],
       },
       {
         '@type': 'WebSite',
-        name: 'FitTrack',
-        url: 'https://fittrack.app',
+        name: BRAND_NAME,
+        url: DEFAULT_SITE_URL,
         description:
           'Entrenamientos personalizados, métricas, nutrición y membresías para atletas, entrenadores y administradores.',
         inLanguage: 'es',

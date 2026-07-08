@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   checkRateLimit,
+  checkRateLimitAsync,
   requireTitanNutritionAccess,
   requireTitanMotivationAccess,
   resetTitanGuardState,
@@ -18,9 +19,62 @@ vi.mock('@/lib/api/http-server', () => ({
 
 import { serverHttpRequest } from '@/lib/api/http-server';
 
+const redisState = new Map<string, number>();
+const redisExpiry = new Map<string, number>();
+
+vi.mock('ioredis', () => {
+  class MockRedis {
+    private readonly url: string;
+    private handlers: Record<string, Array<() => void>> = {};
+
+    constructor(url: string) {
+      this.url = url;
+    }
+
+    on(event: string, handler: () => void) {
+      this.handlers[event] = this.handlers[event] || [];
+      this.handlers[event].push(handler);
+      return this;
+    }
+
+    async connect() {
+      if (this.url.includes('unavailable')) {
+        this.handlers.error?.forEach((handler) => handler());
+        throw new Error('redis unavailable');
+      }
+    }
+
+    async incr(key: string) {
+      const now = Date.now();
+      const exp = redisExpiry.get(key);
+      if (exp && exp <= now) {
+        redisState.delete(key);
+        redisExpiry.delete(key);
+      }
+      const next = (redisState.get(key) ?? 0) + 1;
+      redisState.set(key, next);
+      return next;
+    }
+
+    async pexpire(key: string, ttlMs: number) {
+      redisExpiry.set(key, Date.now() + ttlMs);
+      return 1;
+    }
+
+    async quit() {
+      return 'OK';
+    }
+  }
+
+  return { default: MockRedis };
+});
+
 describe('titan-route-guard', () => {
   beforeEach(() => {
     resetTitanGuardState();
+    redisState.clear();
+    redisExpiry.clear();
+    delete process.env.TITAN_RATELIMIT_REDIS_URL;
   });
 
   it('limits requests per key', () => {
@@ -29,6 +83,22 @@ describe('titan-route-guard', () => {
       expect(checkRateLimit(key, 30, 60_000)).toBe(true);
     }
     expect(checkRateLimit(key, 30, 60_000)).toBe(false);
+  });
+
+  it('uses redis rate limit when configured', async () => {
+    process.env.TITAN_RATELIMIT_REDIS_URL = 'redis://fittrack-redis:6379';
+    const key = 'titan:redis-user';
+    expect(await checkRateLimitAsync(key, 2, 60_000)).toBe(true);
+    expect(await checkRateLimitAsync(key, 2, 60_000)).toBe(true);
+    expect(await checkRateLimitAsync(key, 2, 60_000)).toBe(false);
+  });
+
+  it('falls back to memory rate limit when redis fails', async () => {
+    process.env.TITAN_RATELIMIT_REDIS_URL = 'redis://unavailable:6379';
+    const key = 'titan:fallback-user';
+    expect(await checkRateLimitAsync(key, 2, 60_000)).toBe(true);
+    expect(await checkRateLimitAsync(key, 2, 60_000)).toBe(true);
+    expect(await checkRateLimitAsync(key, 2, 60_000)).toBe(false);
   });
 
   it('allows Premium nutrition access for athletes', () => {

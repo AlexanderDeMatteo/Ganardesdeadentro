@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
+import { DEFAULT_SITE_URL } from '@/lib/landing/brand-logo';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://fittrack.app';
+const BASE_URL = DEFAULT_SITE_URL;
 
 export default function robots(): MetadataRoute.Robots {
   return {
