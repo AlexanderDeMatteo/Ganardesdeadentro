@@ -128,7 +128,7 @@ export function CreateTrainerModal({
         />
       </div>
       <p className={cn('text-sm', prime ? 'gp-mono gp-text-muted' : 'text-muted-foreground')}>
-        Se enviará un correo con un enlace para que el entrenador active su cuenta y defina su contraseña.
+        Se enviará un correo de Be a Gainer con un enlace para que el entrenador active su cuenta y defina su contraseña.
       </p>
     </form>
   );

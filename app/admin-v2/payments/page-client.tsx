@@ -203,7 +203,8 @@ export default function AdminV2PaymentsPage() {
           {isLoading ? (
             <Skeleton className="m-4 h-48" />
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="gp-mono border-b gp-border-outline text-xs uppercase gp-text-muted">
@@ -240,6 +241,38 @@ export default function AdminV2PaymentsPage() {
                 </tbody>
               </table>
             </div>
+
+            <ul className="space-y-3 p-4 lg:hidden" aria-label="Solicitudes de pago">
+              {requests.map((req) => (
+                <li key={req.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(req)}
+                    className={cn(
+                      'w-full rounded-lg border p-4 text-left transition-colors',
+                      selected?.id === req.id
+                        ? 'border-[var(--gp-phosphor)]/50 bg-[#2e3732]/40'
+                        : 'gp-border-outline/50 hover:bg-[#2e3732]/30',
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium">{req.athleteName || req.fullName}</p>
+                      <span className={cn('shrink-0 text-xs font-medium uppercase', statusClass(req.status))}>
+                        {req.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs gp-text-muted">{req.planName}</p>
+                    <p className="gp-mono mt-2 text-sm">
+                      ${(req.amountUsd ?? req.amount).toFixed(2)} USD
+                      {req.amountConverted != null && req.convertedCurrency
+                        ? ` · ${req.amountConverted.toFixed(2)} ${req.convertedCurrency}`
+                        : ''}
+                    </p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            </>
           )}
         </PrimeModule>
 
@@ -269,7 +302,7 @@ export default function AdminV2PaymentsPage() {
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
                   />
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <PrimeChamferButton
                       type="button"
                       disabled={busy}

@@ -12,6 +12,8 @@ import { PrimePageHeader } from '@/components/admin-v2/prime-page-header';
 import { PrimeTrainerInspector } from '@/components/admin-v2/prime-trainer-inspector';
 import { PrimeTrainersGrid } from '@/components/admin-v2/prime-trainers-grid';
 import { useAdmin, type Trainer } from '@/hooks/use-admin';
+import { useIsBelowXl } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, UserPlus, Users } from 'lucide-react';
 
@@ -32,6 +34,7 @@ function matchesFilter(trainer: Trainer, filter: FilterKey): boolean {
 }
 
 export default function AdminV2TrainersPage() {
+  const isBelowXl = useIsBelowXl();
   const {
     athletes,
     trainers,
@@ -173,7 +176,7 @@ export default function AdminV2TrainersPage() {
         </div>
       </PrimeModule>
 
-      <div className="flex flex-col gap-6 lg:flex-row">
+      <div className="flex flex-col gap-6 xl:flex-row">
         <PrimeTrainersGrid
           trainers={filteredTrainers}
           selectedId={selectedId}
@@ -182,7 +185,7 @@ export default function AdminV2TrainersPage() {
           onSearchChange={setSearch}
         />
 
-        <aside className="w-full shrink-0 lg:w-[360px]">
+        <aside className="hidden min-w-0 shrink-0 xl:block xl:w-[360px]">
           {selectedTrainer ? (
             <PrimeTrainerInspector
               trainer={selectedTrainer}
@@ -201,6 +204,27 @@ export default function AdminV2TrainersPage() {
           )}
         </aside>
       </div>
+
+      <Sheet
+        open={isBelowXl && Boolean(selectedTrainer)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null);
+        }}
+      >
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto gp-bg-surface p-0">
+          <SheetTitle className="sr-only">Detalle del entrenador</SheetTitle>
+          {selectedTrainer ? (
+            <PrimeTrainerInspector
+              trainer={selectedTrainer}
+              onResendInvite={() => void handleResend()}
+              onDeactivate={() => setDeactivateTarget(selectedTrainer)}
+              onReactivate={() => void handleReactivate()}
+              isResending={isResendingId === selectedTrainer.id}
+              isReactivating={isReactivatingId === selectedTrainer.id}
+            />
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
       <CreateTrainerModal
         open={isCreateOpen}

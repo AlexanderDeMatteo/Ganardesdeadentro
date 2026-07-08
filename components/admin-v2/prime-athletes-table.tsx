@@ -90,7 +90,7 @@ export function PrimeAthletesTable({
             ariaLabel="Buscar atletas por nombre o email"
           />
 
-          <div className="hidden overflow-x-auto gp-scroll-thin md:block">
+          <div className="hidden overflow-x-auto gp-scroll-thin lg:block">
             <table
               className="w-full table-fixed border-collapse text-left"
               aria-label="Listado de atletas"
@@ -101,7 +101,7 @@ export function PrimeAthletesTable({
                   <th scope="col" className="w-[26%] p-3 font-medium sm:p-4">
                     Nombre
                   </th>
-                  <th scope="col" className="hidden w-[28%] p-3 font-medium md:table-cell sm:p-4">
+                  <th scope="col" className="hidden w-[28%] p-3 font-medium lg:table-cell sm:p-4">
                     Email
                   </th>
                   <th scope="col" className="w-[16%] p-3 font-medium sm:p-4">
@@ -136,7 +136,7 @@ export function PrimeAthletesTable({
                       <td className="truncate p-3 font-medium gp-text-primary sm:p-4">
                         {athlete.name}
                       </td>
-                      <td className="hidden truncate p-3 normal-case gp-text-muted md:table-cell sm:p-4">
+                      <td className="hidden truncate p-3 normal-case gp-text-muted lg:table-cell sm:p-4">
                         {athlete.email}
                       </td>
                       <td className="p-3 sm:p-4">
@@ -220,7 +220,7 @@ export function PrimeAthletesTable({
             </table>
           </div>
 
-          <ul className="space-y-3 md:hidden" aria-label="Listado de atletas">
+          <ul className="space-y-3 lg:hidden" aria-label="Listado de atletas">
             {paginated.items.map((athlete) => {
               const trainer =
                 mode === 'admin' && getTrainerById && athlete.trainerId
@@ -231,78 +231,77 @@ export function PrimeAthletesTable({
 
               return (
                 <li key={athlete.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectRow(athlete.id)}
+                  <div
                     className={cn(
-                      'w-full rounded-lg border p-4 text-left transition-colors',
+                      'flex w-full items-start justify-between gap-3 rounded-lg border p-4 transition-colors',
                       isSelected
                         ? 'gp-table-row-active border-[#68ca62]/50'
                         : 'gp-border-outline/40 hover:gp-bg-surface-variant/20',
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="gp-mono truncate text-sm font-bold gp-text-primary">{athlete.name}</p>
-                        <p className="gp-mono mt-0.5 truncate text-xs gp-text-muted">{athlete.email}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <PrimeMembershipBadge
-                            level={athlete.membershipLevel}
-                            className="px-2 py-0.5 text-[10px]"
-                          />
-                          {mode === 'trainer' ? (
-                            <span className="gp-mono truncate text-xs gp-text-muted">
-                              {routineSummary?.shortLabel ?? getRoutineLabel?.(athlete.id) ?? 'Sin rutina'}
-                            </span>
-                          ) : trainer ? (
-                            <span className="gp-mono truncate text-xs gp-text-phosphor">{trainer.name}</span>
-                          ) : (
-                            <span className="gp-mono text-xs gp-text-critical">Sin asignar</span>
-                          )}
-                        </div>
+                    <button
+                      type="button"
+                      onClick={() => onSelectRow(athlete.id)}
+                      className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gp-phosphor)]"
+                    >
+                      <p className="gp-mono truncate text-sm font-bold gp-text-primary">{athlete.name}</p>
+                      <p className="gp-mono mt-0.5 truncate text-xs gp-text-muted">{athlete.email}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <PrimeMembershipBadge
+                          level={athlete.membershipLevel}
+                          className="px-2 py-0.5 text-[10px]"
+                        />
+                        {mode === 'trainer' ? (
+                          <span className="gp-mono truncate text-xs gp-text-muted">
+                            {routineSummary?.shortLabel ?? getRoutineLabel?.(athlete.id) ?? 'Sin rutina'}
+                          </span>
+                        ) : trainer ? (
+                          <span className="gp-mono truncate text-xs gp-text-phosphor">{trainer.name}</span>
+                        ) : (
+                          <span className="gp-mono text-xs gp-text-critical">Sin asignar</span>
+                        )}
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md gp-text-muted hover:gp-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gp-phosphor)]"
-                            aria-label={`Acciones de ${athlete.name}`}
-                          >
-                            <MoreHorizontal className="h-5 w-5" aria-hidden />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenuItem asChild>
-                            <Link href={`${nutritionBasePath}/${athlete.id}/nutrition`}>
-                              <UtensilsCrossed className="mr-2 h-4 w-4" aria-hidden />
-                              Nutrición
-                            </Link>
-                          </DropdownMenuItem>
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md gp-text-muted hover:gp-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--gp-phosphor)]"
+                          aria-label={`Acciones de ${athlete.name}`}
+                        >
+                          <MoreHorizontal className="h-5 w-5" aria-hidden />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link href={`${nutritionBasePath}/${athlete.id}/nutrition`}>
+                            <UtensilsCrossed className="mr-2 h-4 w-4" aria-hidden />
+                            Nutrición
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onViewPerformance(athlete)}>
+                          {mode === 'trainer' ? (
+                            <Dumbbell className="mr-2 h-4 w-4" aria-hidden />
+                          ) : (
+                            <Eye className="mr-2 h-4 w-4" aria-hidden />
+                          )}
+                          Ver entrenamientos
+                        </DropdownMenuItem>
+                        {mode === 'admin' ? (
                           <DropdownMenuItem onClick={() => onViewPerformance(athlete)}>
-                            {mode === 'trainer' ? (
-                              <Dumbbell className="mr-2 h-4 w-4" aria-hidden />
-                            ) : (
-                              <Eye className="mr-2 h-4 w-4" aria-hidden />
-                            )}
-                            Ver entrenamientos
+                            <Dumbbell className="mr-2 h-4 w-4" aria-hidden />
+                            Rutina / desempeño
                           </DropdownMenuItem>
-                          {mode === 'admin' ? (
-                            <DropdownMenuItem onClick={() => onViewPerformance(athlete)}>
-                              <Dumbbell className="mr-2 h-4 w-4" aria-hidden />
-                              Rutina / desempeño
-                            </DropdownMenuItem>
-                          ) : null}
-                          {mode === 'admin' && onAssignTrainer ? (
-                            <DropdownMenuItem onClick={() => onAssignTrainer(athlete)}>
-                              <Link2 className="mr-2 h-4 w-4" aria-hidden />
-                              Asignar entrenador
-                            </DropdownMenuItem>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </button>
+                        ) : null}
+                        {mode === 'admin' && onAssignTrainer ? (
+                          <DropdownMenuItem onClick={() => onAssignTrainer(athlete)}>
+                            <Link2 className="mr-2 h-4 w-4" aria-hidden />
+                            Asignar entrenador
+                          </DropdownMenuItem>
+                        ) : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </li>
               );
             })}

@@ -12,7 +12,7 @@ import { PrimeAthletesTable } from '@/components/admin-v2/prime-athletes-table';
 import { PrimeFilterPills } from '@/components/admin-v2/prime-filter-pills';
 import { PrimeModule } from '@/components/admin-v2/prime-module';
 import { useAdmin, type AthleteProfile } from '@/hooks/use-admin';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsBelowXl } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -28,7 +28,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 export default function AdminV2AthletesPage() {
   const searchParams = useSearchParams();
-  const isMobile = useIsMobile();
+  const isBelowXl = useIsBelowXl();
   const initialAthleteId = searchParams.get('athlete');
   const {
     athletes,
@@ -186,7 +186,7 @@ export default function AdminV2AthletesPage() {
       </div>
 
       <Sheet
-        open={isMobile && Boolean(selectedAthlete)}
+        open={isBelowXl && Boolean(selectedAthlete)}
         onOpenChange={(open) => {
           if (!open) setSelectedId(null);
         }}
