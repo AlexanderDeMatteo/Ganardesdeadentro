@@ -1,17 +1,51 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PrimeScrollableModal } from '@/components/admin-v2/prime-scrollable-modal';
 import { ExerciseAnimationPlayer } from '@/components/exercises/exercise-animation-player';
 import { ExerciseFormModal } from '@/components/exercises/exercise-form-modal';
 import { ExercisePickerPanel } from '@/components/exercises/exercise-picker-panel';
+import { SeriesPullExerciseForm } from '@/components/admin/routine-forms/series-pull-exercise-form';
+import { StandardExerciseForm } from '@/components/admin/routine-forms/standard-exercise-form';
+import { SupersetExerciseForm } from '@/components/admin/routine-forms/superset-exercise-form';
 import { cn } from '@/lib/utils';
 import type { Routine, RoutineExercise, RoutineStructureType } from '@/lib/data/types';
-import { X, Plus, Trash2 } from 'lucide-react';
+import {
+  buildSeriesPullBlockConfig,
+  buildSupersetBlockConfig,
+  createDefaultSeriesPullDraft,
+  createDefaultStandardDraft,
+  createDefaultSupersetDraft,
+  formatExerciseSummary,
+  parseStandardWeights,
+  parseSuggestedWeightKg,
+  romDraftToRange,
+  seriesPullDraftFromExercise,
+  standardDraftFromExercise,
+  supersetDraftFromExercise,
+  validateSeriesPullDraft,
+  validateStandardDraft,
+  validateSupersetDraft,
+  type SeriesPullExerciseDraft,
+  type StandardExerciseDraft,
+  type SupersetExerciseDraft,
+} from '@/lib/routines/exercise-block-config';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import type { Exercise } from '@/lib/data/types';
+
+function routineExerciseToPickerStub(ex: RoutineExercise): Exercise {
+  return {
+    id: ex.exerciseId,
+    name: ex.exerciseName,
+    targetMuscle: 'general',
+    difficulty: 'intermediate',
+    equipment: 'body weight',
+  };
+}
 
 interface RoutineBuilderProps {
   exercises: Exercise[];
@@ -30,13 +64,6 @@ interface RoutineBuilderProps {
   prime?: boolean;
 }
 
-function buildWeightArray(count: number, base: number, step: number): number[] {
-  return Array.from({ length: count }, (_, i) => {
-    const w = base + i * step;
-    return Number.isInteger(w) ? w : Math.round(w * 10) / 10;
-  });
-}
-
 export function RoutineBuilder({
   exercises,
   mode = 'create',
@@ -53,22 +80,21 @@ export function RoutineBuilder({
   const [structureType, setStructureType] = useState<RoutineStructureType>('standard');
   const [supersetSubtype, setSupersetSubtype] = useState<'progressive' | 'regressive'>('progressive');
   const [selectedExercises, setSelectedExercises] = useState<RoutineExercise[]>([]);
-  const [selectedExerciseId, setSelectedExerciseId] = useState('');
-  const [sets, setSets] = useState(3);
-  const [reps, setReps] = useState(10);
-  const [rest, setRest] = useState(60);
-  const [technique, setTechnique] = useState('');
-  const [baseWeight, setBaseWeight] = useState('20');
-  const [weightStep, setWeightStep] = useState('2.5');
-  const [setWeights, setSetWeights] = useState<string[]>(['20', '22.5', '25']);
+  const [selectedPickerExercise, setSelectedPickerExercise] = useState<Exercise | null>(null);
+  const [standardDraft, setStandardDraft] = useState<StandardExerciseDraft>(createDefaultStandardDraft);
+  const [seriesPullDraft, setSeriesPullDraft] = useState<SeriesPullExerciseDraft>(
+    createDefaultSeriesPullDraft(),
+  );
+  const [supersetDraft, setSupersetDraft] = useState<SupersetExerciseDraft>(
+    createDefaultSupersetDraft('progressive'),
+  );
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isExerciseFormOpen, setIsExerciseFormOpen] = useState(false);
 
-  const pickerExercises = useMemo(() => exercises, [exercises]);
+  const selectedExerciseId = selectedPickerExercise?.id ?? '';
 
-  const selectedExercise = useMemo(
-    () => pickerExercises.find((exercise) => exercise.id === selectedExerciseId) ?? null,
-    [pickerExercises, selectedExerciseId],
-  );
+  const selectedExercise = selectedPickerExercise;
 
   useEffect(() => {
     if (!initialRoutine) return;
@@ -76,88 +102,143 @@ export function RoutineBuilder({
     setDescription(initialRoutine.description);
     setDifficulty(initialRoutine.difficulty);
     setDuration(initialRoutine.duration);
-    setStructureType(initialRoutine.structureType ?? 'standard');
+    const st = initialRoutine.structureType ?? 'standard';
+    setStructureType(st);
     setSelectedExercises(initialRoutine.exercises);
+    const firstSuperset = initialRoutine.exercises.find((ex) => ex.blockConfig?.supersetSubtype);
+    if (firstSuperset?.blockConfig?.supersetSubtype) {
+      setSupersetSubtype(firstSuperset.blockConfig.supersetSubtype);
+    }
   }, [initialRoutine]);
 
-  const syncSetWeights = (count: number, weights?: string[]) => {
-    if (weights && weights.length === count) {
-      setSetWeights(weights);
-      return;
-    }
-    const base = parseFloat(baseWeight.replace(',', '.')) || 20;
-    const step = parseFloat(weightStep.replace(',', '.')) || 2.5;
-    setSetWeights(buildWeightArray(count, base, step).map(String));
+  const resetFormDrafts = () => {
+    setStandardDraft(createDefaultStandardDraft());
+    setSeriesPullDraft(createDefaultSeriesPullDraft());
+    setSupersetDraft(createDefaultSupersetDraft(supersetSubtype));
+    setEditingIndex(null);
+    setFormError(null);
   };
 
-  const handleSetsChange = (value: number) => {
-    const next = Math.max(1, Math.min(10, value));
-    setSets(next);
-    syncSetWeights(next);
+  const resetDrafts = () => {
+    resetFormDrafts();
+    setSelectedPickerExercise(null);
   };
 
-  const applyProgression = () => {
-    syncSetWeights(sets);
-  };
-
-  const handleAddExercise = () => {
-    if (!selectedExerciseId) return;
-    const exercise = pickerExercises.find((e) => e.id === selectedExerciseId);
-    if (!exercise) return;
-
-    const suggestedWeightsKg = setWeights
-      .map((w) => parseFloat(w.replace(',', '.')))
-      .filter((n) => Number.isFinite(n) && n >= 0);
-
-    const blockConfig =
-      structureType === 'series_pull'
-        ? {
-            romRanges: [
-              { from: 'P1', to: 'P2', repsMin: 5, repsMax: 10 },
-              { from: 'P2', to: 'P3', repsMin: 5, repsMax: 10 },
-              { from: 'P1', to: 'P3', repsMin: 5, repsMax: 10 },
-            ],
-          }
-        : structureType === 'superset'
-          ? {
-              supersetSubtype,
-              steps: [
-                { weightKg: parseFloat(baseWeight.replace(',', '.')) || 5, repsTarget: String(reps) },
-                { weightKg: (parseFloat(baseWeight.replace(',', '.')) || 5) + 5, repsTarget: String(Math.max(4, reps - 2)) },
-              ],
-              finisher:
-                supersetSubtype === 'progressive'
-                  ? { weightKg: parseFloat(baseWeight.replace(',', '.')) || 5, repsTarget: '20' }
-                  : undefined,
-              maxTransitionRestSec: 30,
-            }
-          : undefined;
-
-    setSelectedExercises([
-      ...selectedExercises,
-      {
+  const buildExerciseEntry = (exercise: Exercise): RoutineExercise | null => {
+    if (structureType === 'standard') {
+      const validation = validateStandardDraft(standardDraft);
+      if (!validation.ok) {
+        setFormError(validation.error);
+        toast.error(validation.error);
+        return null;
+      }
+      return {
         exerciseId: exercise.id,
         exerciseName: exercise.name,
-        sets: structureType === 'standard' ? sets : 1,
-        reps,
-        rest,
-        suggestedWeightsKg:
-          suggestedWeightsKg.length === sets ? suggestedWeightsKg : undefined,
-        technique: technique.trim() || undefined,
-        blockConfig,
-      },
-    ]);
+        sets: standardDraft.sets,
+        reps: standardDraft.reps,
+        rest: standardDraft.rest,
+        suggestedWeightsKg: parseStandardWeights(standardDraft),
+        technique: standardDraft.technique.trim() || undefined,
+      };
+    }
 
-    setSelectedExerciseId('');
-    setSets(3);
-    setReps(10);
-    setRest(60);
-    setTechnique('');
-    syncSetWeights(3);
+    if (structureType === 'series_pull') {
+      const validation = validateSeriesPullDraft(seriesPullDraft);
+      if (!validation.ok) {
+        setFormError(validation.error);
+        toast.error(validation.error);
+        return null;
+      }
+      const romRanges = seriesPullDraft.romRanges.map(romDraftToRange);
+      const lastRange = romRanges[romRanges.length - 1];
+      const weight = parseSuggestedWeightKg(seriesPullDraft.suggestedWeightKg);
+      return {
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        sets: 1,
+        reps: lastRange?.repsMax ?? 10,
+        rest: seriesPullDraft.rest,
+        suggestedWeightsKg: weight != null ? [weight] : undefined,
+        technique: seriesPullDraft.technique.trim() || undefined,
+        blockConfig: buildSeriesPullBlockConfig(seriesPullDraft),
+      };
+    }
+
+    const validation = validateSupersetDraft(supersetDraft, supersetSubtype);
+    if (!validation.ok) {
+      setFormError(validation.error);
+      toast.error(validation.error);
+      return null;
+    }
+    const firstStep = supersetDraft.steps[0];
+    return {
+      exerciseId: exercise.id,
+      exerciseName: exercise.name,
+      sets: 1,
+      reps: parseInt(firstStep.repsTarget, 10) || 10,
+      rest: supersetDraft.rest,
+      suggestedWeightsKg: firstStep.weightKg ?
+        [parseFloat(firstStep.weightKg.replace(',', '.')) || 0]
+      : undefined,
+      technique: supersetDraft.technique.trim() || undefined,
+      blockConfig: buildSupersetBlockConfig(supersetDraft, supersetSubtype),
+    };
+  };
+
+  const handleAddOrUpdateExercise = () => {
+    const exercise =
+      selectedPickerExercise ??
+      (selectedExerciseId ? exercises.find((e) => e.id === selectedExerciseId) : undefined);
+    if (!exercise) {
+      toast.error('Selecciona un ejercicio de la lista antes de agregar.');
+      return;
+    }
+
+    const entry = buildExerciseEntry(exercise);
+    if (!entry) return;
+
+    setFormError(null);
+
+    if (editingIndex != null) {
+      const next = [...selectedExercises];
+      next[editingIndex] = entry;
+      setSelectedExercises(next);
+    } else {
+      setSelectedExercises([...selectedExercises, entry]);
+    }
+
+    resetDrafts();
+  };
+
+  const handleEditExercise = (index: number) => {
+    const ex = selectedExercises[index];
+    if (!ex) return;
+    setEditingIndex(index);
+    const picked =
+      exercises.find((e) => e.id === ex.exerciseId) ?? routineExerciseToPickerStub(ex);
+    setSelectedPickerExercise(picked);
+    setFormError(null);
+
+    if (structureType === 'standard') {
+      setStandardDraft(standardDraftFromExercise(ex));
+    } else if (structureType === 'series_pull') {
+      setSeriesPullDraft(seriesPullDraftFromExercise(ex));
+    } else {
+      const subtype = ex.blockConfig?.supersetSubtype ?? supersetSubtype;
+      if (subtype !== supersetSubtype) setSupersetSubtype(subtype);
+      setSupersetDraft(supersetDraftFromExercise(ex));
+    }
   };
 
   const handleRemoveExercise = (index: number) => {
     setSelectedExercises(selectedExercises.filter((_, i) => i !== index));
+    if (editingIndex === index) resetDrafts();
+    else if (editingIndex != null && index < editingIndex) setEditingIndex(editingIndex - 1);
+  };
+
+  const handleCancelEdit = () => {
+    resetDrafts();
   };
 
   const handleSave = () => {
@@ -167,11 +248,6 @@ export function RoutineBuilder({
     }
     onSave({ name, description, difficulty, duration, structureType, exercises: selectedExercises });
   };
-
-  const weightPreview = useMemo(
-    () => setWeights.map((w, i) => `S${i + 1}: ${w || '—'} kg`).join(' · '),
-    [setWeights],
-  );
 
   const labelClass = prime
     ? 'gp-mono mb-1.5 block text-xs uppercase gp-text-dim'
@@ -202,7 +278,29 @@ export function RoutineBuilder({
     'space-y-3 rounded-lg p-4',
     prime ? 'gp-form-subpanel' : 'border border-border bg-background/50',
   );
-  const weightInputClass = prime ? inputClass : 'h-9';
+
+  const formStyles = {
+    prime,
+    labelClass,
+    inputClass,
+    selectClass,
+    progressionPanelClass,
+    weightInputClass: prime ? inputClass : 'h-9',
+  };
+
+  const structureForm =
+    structureType === 'standard' ? (
+      <StandardExerciseForm draft={standardDraft} onChange={setStandardDraft} {...formStyles} />
+    ) : structureType === 'series_pull' ? (
+      <SeriesPullExerciseForm draft={seriesPullDraft} onChange={setSeriesPullDraft} {...formStyles} />
+    ) : (
+      <SupersetExerciseForm
+        draft={supersetDraft}
+        subtype={supersetSubtype}
+        onChange={setSupersetDraft}
+        {...formStyles}
+      />
+    );
 
   const basicInfoSection = (
     <div>
@@ -240,7 +338,10 @@ export function RoutineBuilder({
               <button
                 key={value}
                 type="button"
-                onClick={() => setStructureType(value)}
+                onClick={() => {
+                  setStructureType(value);
+                  resetFormDrafts();
+                }}
                 className={cn(
                   'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
                   structureType === value
@@ -260,7 +361,10 @@ export function RoutineBuilder({
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setSupersetSubtype('progressive')}
+                onClick={() => {
+                  setSupersetSubtype('progressive');
+                  if (editingIndex == null) setSupersetDraft(createDefaultSupersetDraft('progressive'));
+                }}
                 className={cn(
                   'rounded-lg px-3 py-1 text-xs',
                   supersetSubtype === 'progressive' ? 'bg-primary/20 text-primary' : 'text-muted-foreground',
@@ -270,7 +374,10 @@ export function RoutineBuilder({
               </button>
               <button
                 type="button"
-                onClick={() => setSupersetSubtype('regressive')}
+                onClick={() => {
+                  setSupersetSubtype('regressive');
+                  if (editingIndex == null) setSupersetDraft(createDefaultSupersetDraft('regressive'));
+                }}
                 className={cn(
                   'rounded-lg px-3 py-1 text-xs',
                   supersetSubtype === 'regressive' ? 'bg-primary/20 text-primary' : 'text-muted-foreground',
@@ -281,7 +388,7 @@ export function RoutineBuilder({
             </div>
           ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={labelClass}>Dificultad</label>
             <select
@@ -314,231 +421,148 @@ export function RoutineBuilder({
     <div>
       <h3 className={sectionTitle}>Agregar Ejercicios</h3>
       <div className={panelClass}>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-3">
-            <ExercisePickerPanel
-              selectedExerciseId={selectedExerciseId}
-              onSelectExerciseId={setSelectedExerciseId}
-              fallbackExercises={exercises}
-              prime={prime}
-              labelClass={labelClass}
-              selectClass={selectClass}
-              inputClass={inputClass}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className={prime ? 'gp-mono shrink-0' : 'shrink-0'}
-              onClick={() => setIsExerciseFormOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              Crear ejercicio
-            </Button>
-            {selectedExercise ? (
-              <div className="mt-3">
-                <ExerciseAnimationPlayer
-                  name={selectedExercise.name}
-                  animationUrl={selectedExercise.animationUrl}
-                  animationType={selectedExercise.animationType}
-                  compact
-                />
-              </div>
-            ) : null}
-          </div>
-          <div>
-            <label className={labelClass}>Series</label>
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              value={sets}
-              onChange={(e) => handleSetsChange(parseInt(e.target.value, 10))}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Repeticiones</label>
-            <Input
-              type="number"
-              min={1}
-              max={50}
-              value={reps}
-              onChange={(e) => setReps(parseInt(e.target.value, 10))}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Descanso (seg)</label>
-            <Input
-              type="number"
-              min={30}
-              max={300}
-              step={30}
-              value={rest}
-              onChange={(e) => setRest(parseInt(e.target.value, 10))}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Técnica (opcional)</label>
-            <Input
-              placeholder="Puntos clave de ejecución"
-              value={technique}
-              onChange={(e) => setTechnique(e.target.value)}
-              className={inputClass}
-            />
-          </div>
+        <div className="space-y-3">
+          <ExercisePickerPanel
+            selectedExerciseId={selectedExerciseId}
+            onSelectExercise={setSelectedPickerExercise}
+            fallbackExercises={exercises}
+            prime={prime}
+            labelClass={labelClass}
+            selectClass={selectClass}
+            inputClass={inputClass}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            className={prime ? 'gp-mono shrink-0' : 'shrink-0'}
+            onClick={() => setIsExerciseFormOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Crear ejercicio
+          </Button>
+          {selectedExercise ? (
+            <div className="space-y-1">
+              <ExerciseAnimationPlayer
+                name={selectedExercise.name}
+                animationUrl={selectedExercise.animationUrl}
+                animationType={selectedExercise.animationType}
+                compact
+              />
+              {!selectedExercise.animationUrl || selectedExercise.animationType === 'none' ? (
+                <p className={cn('text-xs', prime ? 'gp-mono gp-text-dim' : 'text-muted-foreground')}>
+                  Puedes agregar este ejercicio aunque no tenga animación.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
-        <div className={progressionPanelClass}>
-          <p className={cn('text-xs', prime ? 'gp-label gp-text-phosphor' : 'font-medium')}>
-            Progresión de peso
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-            <div>
-              <label className={labelClass}>Peso base (kg)</label>
-              <Input
-                value={baseWeight}
-                onChange={(e) => setBaseWeight(e.target.value)}
-                className={weightInputClass}
-                inputMode="decimal"
-              />
-            </div>
-            <div>
-              <label className={labelClass}>Progresión (+kg/serie)</label>
-              <Input
-                value={weightStep}
-                onChange={(e) => setWeightStep(e.target.value)}
-                className={weightInputClass}
-                inputMode="decimal"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={applyProgression}
-              className={prime ? 'gp-btn-ghost gp-mono h-9 px-3 text-xs uppercase' : undefined}
-            >
-              Aplicar progresión
-            </Button>
-          </div>
-          <p className={cn('text-xs', prime ? 'gp-mono gp-text-dim' : 'text-muted-foreground')}>
-            Peso sugerido por serie
-          </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {setWeights.map((w, i) => (
-              <div key={i}>
-                <label className={cn('text-xs', prime ? 'gp-mono gp-text-dim' : 'text-muted-foreground')}>
-                  Serie {i + 1}
-                </label>
-                <Input
-                  value={w}
-                  onChange={(e) => {
-                    const next = [...setWeights];
-                    next[i] = e.target.value;
-                    setSetWeights(next);
-                  }}
-                  className={cn(weightInputClass, 'mt-1')}
-                  inputMode="decimal"
-                />
-              </div>
-            ))}
-          </div>
-          <p className={cn('text-xs', prime ? 'gp-mono gp-text-phosphor' : 'text-cyan-600 dark:text-cyan-400')}>
-            {weightPreview}
-          </p>
-        </div>
+        {structureForm}
 
-        <Button
-          onClick={handleAddExercise}
-          disabled={!selectedExerciseId}
-          className={
-            prime
-              ? 'gp-btn-phosphor gp-mono h-10 w-full text-xs uppercase'
-              : 'w-full bg-gradient-to-r from-primary to-secondary'
-          }
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Ejercicio
-        </Button>
+        {formError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {formError}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={handleAddOrUpdateExercise}
+            disabled={!selectedExerciseId}
+            className={
+              prime
+                ? 'gp-btn-phosphor gp-mono h-10 flex-1 text-xs uppercase'
+                : 'flex-1 bg-gradient-to-r from-primary to-secondary'
+            }
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {editingIndex != null ? 'Actualizar ejercicio' : 'Agregar ejercicio'}
+          </Button>
+          {editingIndex != null ? (
+            <Button type="button" variant="outline" onClick={handleCancelEdit}>
+              Cancelar edición
+            </Button>
+          ) : null}
+        </div>
       </div>
     </div>
   );
 
-  const selectedExercisesSection = prime ? (
+  const renderExerciseItem = (ex: RoutineExercise, idx: number) => {
+    const summary = formatExerciseSummary(ex, structureType);
+    return (
+      <div key={`${ex.exerciseId}-${idx}`} className={itemClass}>
+        <div className="min-w-0 flex-1">
+          <p className={cn('truncate font-medium', prime ? 'gp-mono gp-text-primary' : '')}>
+            {ex.exerciseName}
+          </p>
+          <p className={cn('text-sm', prime ? 'gp-mono gp-text-muted' : 'text-muted-foreground')}>
+            {summary.primary}
+          </p>
+          {summary.secondary ? (
+            <p className={cn('mt-1 text-xs', prime ? 'gp-mono gp-text-dim' : 'text-muted-foreground')}>
+              {summary.secondary}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleEditExercise(idx)}
+            className={prime ? 'gp-btn-ghost h-8 w-8 p-0' : 'h-8 w-8 p-0'}
+            aria-label={`Editar ${ex.exerciseName}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleRemoveExercise(idx)}
+            className={
+              prime
+                ? 'gp-btn-ghost h-8 w-8 p-0 text-[#ffb4ab] hover:border-[#ffb4ab]/50'
+                : 'h-8 w-8 p-0 border-destructive/30 text-destructive'
+            }
+            aria-label={`Quitar ${ex.exerciseName}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
+  const selectedExercisesSection = (
     <div>
       <h3 className={sectionTitle}>
         Ejercicios seleccionados
-        <span className="gp-mono ml-2 text-xs gp-text-dim">({selectedExercises.length})</span>
+        {prime ? (
+          <span className="gp-mono ml-2 text-xs gp-text-dim">({selectedExercises.length})</span>
+        ) : (
+          <span className="text-base font-normal text-muted-foreground">
+            {' '}
+            ({selectedExercises.length})
+          </span>
+        )}
       </h3>
       {selectedExercises.length > 0 ? (
-        <div className="gp-scroll-thin max-h-[min(24dvh,12rem)] space-y-2 overflow-y-auto pr-1">
-          {selectedExercises.map((ex, idx) => (
-            <div key={idx} className={itemClass}>
-              <div className="min-w-0">
-                <p className="gp-mono truncate gp-text-primary">{ex.exerciseName}</p>
-                <p className="gp-mono text-sm gp-text-muted">
-                  {ex.sets} x {ex.reps} · {ex.rest}s descanso
-                </p>
-                {ex.suggestedWeightsKg?.length ? (
-                  <p className="gp-mono mt-1 text-xs gp-text-phosphor">
-                    Pesos: {ex.suggestedWeightsKg.map((w, i) => `S${i + 1} ${w}kg`).join(' · ')}
-                  </p>
-                ) : null}
-                {ex.technique ? (
-                  <p className="gp-mono mt-1 text-xs gp-text-dim">{ex.technique}</p>
-                ) : null}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRemoveExercise(idx)}
-                className="gp-btn-ghost h-8 w-8 shrink-0 p-0 text-[#ffb4ab] hover:border-[#ffb4ab]/50"
-                aria-label={`Quitar ${ex.exerciseName}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+        <div
+          className={
+            prime ?
+              'gp-scroll-thin max-h-[min(24dvh,12rem)] space-y-2 overflow-y-auto pr-1'
+            : 'space-y-2'
+          }
+        >
+          {selectedExercises.map(renderExerciseItem)}
         </div>
       ) : (
-        <p className="gp-empty-slot">Agrega al menos un ejercicio para crear la rutina.</p>
+        <p className={prime ? 'gp-empty-slot' : 'text-sm text-muted-foreground'}>
+          Agrega al menos un ejercicio para crear la rutina.
+        </p>
       )}
     </div>
-  ) : selectedExercises.length > 0 ? (
-    <div>
-      <h3 className={sectionTitle}>Ejercicios Seleccionados ({selectedExercises.length})</h3>
-      <div className="space-y-2">
-        {selectedExercises.map((ex, idx) => (
-          <div key={idx} className={itemClass}>
-            <div>
-              <p className="font-medium">{ex.exerciseName}</p>
-              <p className="text-sm text-muted-foreground">
-                {ex.sets} x {ex.reps} · {ex.rest}s descanso
-              </p>
-              {ex.suggestedWeightsKg?.length ? (
-                <p className="text-xs mt-1 text-cyan-600 dark:text-cyan-400">
-                  Pesos: {ex.suggestedWeightsKg.map((w, i) => `S${i + 1} ${w}kg`).join(' · ')}
-                </p>
-              ) : null}
-              {ex.technique ? (
-                <p className="text-xs mt-1 text-muted-foreground">{ex.technique}</p>
-              ) : null}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleRemoveExercise(idx)}
-              className="h-8 w-8 p-0 border-destructive/30 text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
-      </div>
-    </div>
-  ) : null;
+  );
 
   const body = prime ? (
     <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
@@ -607,7 +631,7 @@ export function RoutineBuilder({
           prime
           onSaved={async (exercise) => {
             await onExercisesChanged?.();
-            setSelectedExerciseId(exercise.id);
+            setSelectedPickerExercise(exercise);
             setIsExerciseFormOpen(false);
           }}
         />
@@ -619,8 +643,8 @@ export function RoutineBuilder({
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <div className="w-full max-w-4xl rounded-2xl border border-secondary/20 bg-card shadow-2xl max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between border-b border-secondary/20 sticky top-0 bg-card px-8 py-6">
-            <h2 className="text-2xl font-bold">
+          <div className="flex items-center justify-between border-b border-secondary/20 sticky top-0 bg-card px-4 py-4 sm:px-6 sm:py-6 md:px-8">
+            <h2 className="text-xl font-bold sm:text-2xl">
               {mode === 'edit' ? 'Editar Rutina' : 'Crear Nueva Rutina'}
             </h2>
             <Button variant="outline" size="sm" onClick={onClose} className="h-8 w-8 p-0 border-secondary/30">
@@ -628,9 +652,9 @@ export function RoutineBuilder({
             </Button>
           </div>
 
-          <div className="px-8 py-8">{body}</div>
+          <div className="px-4 py-6 sm:px-6 sm:py-8 md:px-8">{body}</div>
 
-          <div className="border-t border-secondary/20 sticky bottom-0 bg-card px-8 py-4">{footer}</div>
+          <div className="border-t border-secondary/20 sticky bottom-0 bg-card px-4 py-4 sm:px-6 md:px-8">{footer}</div>
         </div>
       </div>
       <ExerciseFormModal
@@ -638,7 +662,7 @@ export function RoutineBuilder({
         onClose={() => setIsExerciseFormOpen(false)}
         onSaved={async (exercise) => {
           await onExercisesChanged?.();
-          setSelectedExerciseId(exercise.id);
+          setSelectedPickerExercise(exercise);
           setIsExerciseFormOpen(false);
         }}
       />
