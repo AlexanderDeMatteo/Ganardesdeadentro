@@ -2,8 +2,8 @@ import { AuthPageShell } from '@/components/auth/auth-page-shell';
 import { RegisterForm } from '@/components/auth/register-form';
 
 export const metadata = {
-  title: 'Regístrate - FitTrack',
-  description: 'Crea tu cuenta de FitTrack',
+  title: 'Regístrate - Be a Gainer',
+  description: 'Crea tu cuenta de Be a Gainer',
 };
 
 export default function RegisterPage() {

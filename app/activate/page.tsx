@@ -4,8 +4,8 @@ import { Navbar } from '@/components/layout/navbar';
 import { Loader2 } from 'lucide-react';
 
 export const metadata = {
-  title: 'Activar cuenta - FitTrack',
-  description: 'Activa tu cuenta de entrenador en FitTrack',
+  title: 'Activar cuenta - Be a Gainer',
+  description: 'Activa tu cuenta de entrenador en Be a Gainer',
 };
 
 function ActivateFallback() {

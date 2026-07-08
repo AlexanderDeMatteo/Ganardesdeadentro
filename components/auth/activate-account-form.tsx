@@ -6,6 +6,7 @@ import { getAuthClient } from '@/lib/auth/auth-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
+import Image from 'next/image';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 export function ActivateAccountForm() {
@@ -86,10 +87,16 @@ export function ActivateAccountForm() {
     <div className="brand-card w-full max-w-md rounded-2xl p-6 sm:p-8">
       <div className="space-y-8">
         <div className="space-y-3 text-center">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-accent to-secondary brand-glow-primary">
-            <span className="text-2xl font-black text-primary-foreground">FT</span>
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-accent to-secondary brand-glow-primary overflow-hidden">
+            <Image
+              src="/brand/be-a-gainer-logo.png"
+              alt="Be a Gainer"
+              width={48}
+              height={48}
+              className="h-12 w-12 object-contain"
+            />
           </div>
-          <p className="brand-kicker">Entrenador FitTrack</p>
+          <p className="brand-kicker">Entrenador Be a Gainer</p>
           <h1 className="brand-title text-4xl font-black brand-text-gradient">Activar cuenta</h1>
           <p className="text-base text-muted-foreground">
             Define tu contraseña para acceder a la plataforma

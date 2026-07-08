@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 
 const STAGGER = {
   hidden: {},
@@ -73,7 +73,9 @@ function Reveal({ animate, as = 'div', className, children, onSubmit }: RevealPr
 export function LoginForm() {
   const router = useRouter();
   const reducedMotion = useReducedMotion();
-  const animate = !reducedMotion;
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => setHasMounted(true), []);
+  const animate = !reducedMotion && hasMounted;
   const { login, isLoading, error, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

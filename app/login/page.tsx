@@ -2,8 +2,8 @@ import { AuthPageShell } from '@/components/auth/auth-page-shell';
 import { LoginForm } from '@/components/auth/login-form';
 
 export const metadata = {
-  title: 'Iniciar Sesión - FitTrack',
-  description: 'Accede a tu cuenta de FitTrack',
+  title: 'Iniciar Sesión - Be a Gainer',
+  description: 'Accede a tu cuenta de Be a Gainer',
 };
 
 export default function LoginPage() {
