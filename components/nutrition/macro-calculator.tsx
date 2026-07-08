@@ -29,24 +29,26 @@ export function MacroCalculator({ defaultCalories }: { defaultCalories: number }
   const preset = MACRO_PRESETS.find((p) => p.id === presetId) ?? MACRO_PRESETS[0];
   const split = presetId === 'custom' ? customSplit : preset.split;
   const valid = isValidMacroSplit(split);
-  const preview = valid ? macrosFromCalories(calories, split, preset.label) : null;
+  const preview = macrosFromCalories(calories, split, preset.label);
+  const splitSum = split.protein + split.carbs + split.fat;
+
+  const confirmSaveWithInvalidSplit = (): boolean => {
+    if (valid) return true;
+    return window.confirm(
+      `La suma de porcentajes es ${splitSum}% (recomendado 100%). ¿Guardar estos macros de todos modos?`,
+    );
+  };
 
   const handleApply = () => {
     if (!canEdit) return;
-    if (!preview || !valid) {
-      toast.error('Revisa los porcentajes: deben sumar 100% y estar entre 5% y 70%.');
-      return;
-    }
+    if (!confirmSaveWithInvalidSplit()) return;
     setMacroTargets(preview);
     toast.success('Objetivo de macros guardado en el borrador.');
   };
 
   const handleSaveForAthlete = async () => {
     if (!canEdit) return;
-    if (!preview || !valid) {
-      toast.error('Revisa los porcentajes: deben sumar 100% y estar entre 5% y 70%.');
-      return;
-    }
+    if (!confirmSaveWithInvalidSplit()) return;
 
     setIsPublishing(true);
     try {
@@ -60,7 +62,7 @@ export function MacroCalculator({ defaultCalories }: { defaultCalories: number }
   };
 
   return (
-    <div className="brand-card space-y-6 rounded-2xl p-6">
+    <div className="brand-card space-y-6 rounded-2xl p-4 sm:p-6">
       <div>
         <h2 className="text-xl font-black uppercase tracking-tight text-foreground">Calculadora de macros</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -125,14 +127,22 @@ export function MacroCalculator({ defaultCalories }: { defaultCalories: number }
               />
             </div>
           ))}
-          <p className="text-xs text-muted-foreground">
-            Suma actual: {customSplit.protein + customSplit.carbs + customSplit.fat}% (debe ser 100%)
+          <p
+            className={
+              valid
+                ? 'text-xs text-muted-foreground'
+                : 'text-xs font-medium text-amber-600 dark:text-amber-400'
+            }
+            role={valid ? undefined : 'status'}
+          >
+            Suma actual: {splitSum}% — {valid ? 'listo para guardar' : 'fuera del 100% recomendado; se pedirá confirmación al guardar'}
           </p>
         </div>
       )}
 
-      {preview && (
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <dl
+        className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${!valid ? 'rounded-lg border border-amber-500/40 p-2' : ''}`}
+      >
           <div className="rounded-lg bg-muted/30 p-3 text-center">
             <dt className="text-xs text-muted-foreground">kcal</dt>
             <dd className="text-xl font-black">{preview.calories}</dd>
@@ -150,17 +160,16 @@ export function MacroCalculator({ defaultCalories }: { defaultCalories: number }
             <dd className="text-xl font-black">{preview.fatG} g</dd>
           </div>
         </dl>
-      )}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={handleApply} disabled={!valid || !canEdit}>
+        <Button type="button" onClick={handleApply} disabled={!canEdit}>
           Guardar objetivo en borrador
         </Button>
         <Button
           type="button"
           variant="secondary"
           onClick={() => void handleSaveForAthlete()}
-          disabled={!valid || !canEdit || isPublishing}
+          disabled={!canEdit || isPublishing}
         >
           {isPublishing ? 'Guardando…' : 'Guardar macros para el atleta'}
         </Button>

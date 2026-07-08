@@ -67,10 +67,10 @@ export function NutritionPageContent() {
       </p>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 gp-bg-surface-variant">
-          <TabsTrigger value="macros" className="gp-mono text-xs">Macros</TabsTrigger>
-          <TabsTrigger value="plan" className="gp-mono text-xs">Plan</TabsTrigger>
-          <TabsTrigger value="diary" className="gp-mono text-xs">Diario</TabsTrigger>
+        <TabsList className="mb-6 flex h-auto w-full flex-wrap justify-start gap-1 gp-bg-surface-variant p-1">
+          <TabsTrigger value="macros" className="gp-mono min-w-[4.5rem] flex-1 text-xs sm:flex-none">Macros</TabsTrigger>
+          <TabsTrigger value="plan" className="gp-mono min-w-[4.5rem] flex-1 text-xs sm:flex-none">Plan</TabsTrigger>
+          <TabsTrigger value="diary" className="gp-mono min-w-[4.5rem] flex-1 text-xs sm:flex-none">Diario</TabsTrigger>
         </TabsList>
 
         <TabsContent value="macros" className="space-y-6">

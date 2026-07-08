@@ -18,6 +18,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { LoadingState } from '@/components/ui/loading-state';
+import { SectionErrorBoundary } from '@/components/ui/section-error-boundary';
 
 function CoachEditorInner({
   athlete,
@@ -105,23 +106,28 @@ function CoachEditorInner({
               : 'Última versión guardada para el atleta.'}
           </p>
           <AssignedMacrosView targets={state.macroTargets ?? assigned?.macroTargets ?? null} />
-          <AssignedMealPlanView
-            mealPlan={
-              state.mealPlans.find((p) => p.id === state.activeMealPlanId) ??
-              state.mealPlans[0] ??
-              assigned?.mealPlan ??
-              null
-            }
-            slotTimes={slotTimes ?? assigned?.slotTimes ?? null}
-            subtitle={
-              state.mealPlans.length > 0
-                ? 'Borrador actual del plan del atleta'
-                : assigned
-                  ? 'Último plan guardado para el atleta'
-                  : 'Aún no hay plan guardado para este atleta'
-            }
-            emptyMessage="Aún no has creado un plan en borrador para este atleta."
-          />
+          <SectionErrorBoundary
+            fallbackTitle="No se pudo cargar la vista previa del plan"
+            fallbackMessage="El plan tiene un formato incompatible. Revisa el editor de comidas o guarda de nuevo."
+          >
+            <AssignedMealPlanView
+              mealPlan={
+                state.mealPlans.find((p) => p.id === state.activeMealPlanId) ??
+                state.mealPlans[0] ??
+                assigned?.mealPlan ??
+                null
+              }
+              slotTimes={slotTimes ?? assigned?.slotTimes ?? null}
+              subtitle={
+                state.mealPlans.length > 0
+                  ? 'Borrador actual del plan del atleta'
+                  : assigned
+                    ? 'Último plan guardado para el atleta'
+                    : 'Aún no hay plan guardado para este atleta'
+              }
+              emptyMessage="Aún no has creado un plan en borrador para este atleta."
+            />
+          </SectionErrorBoundary>
         </TabsContent>
       </Tabs>
     </div>
