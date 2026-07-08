@@ -62,7 +62,8 @@ export function WeeklyPlanStrip({
       <p className="mb-4 text-xs gp-text-muted">
         Toca un día para entrenar o revisar tu registro.
       </p>
-      <div className="grid grid-cols-7 gap-2">
+      <div className="-mx-1 overflow-x-auto gp-scroll-thin px-1 pb-1">
+        <div className="grid min-w-[28rem] grid-cols-7 gap-2 sm:min-w-full">
         {weeklyPlan.days.map((day) => {
           const status = statusForDay(day.dayIndex, weeklyPlan, weekSessionLogs);
           const isSelected = selectedDayIndex === day.dayIndex;
@@ -83,13 +84,14 @@ export function WeeklyPlanStrip({
                 status === 'pending' && !isRest && 'gp-border-outline',
               )}
             >
-              <span className="gp-mono text-xs font-bold gp-text-primary">{day.label}</span>
-              <span className="mt-1 line-clamp-2 text-[10px] gp-text-muted">
+              <span className="gp-mono text-xs font-bold gp-text-primary sm:text-sm">{day.label}</span>
+              <span className="mt-1 line-clamp-2 text-[9px] gp-text-muted sm:text-[10px]">
                 {dayLabel(day, routineNamesById)}
               </span>
             </button>
           );
         })}
+        </div>
       </div>
     </div>
   );

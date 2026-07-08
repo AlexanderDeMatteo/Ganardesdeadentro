@@ -10,6 +10,8 @@ import { PrimeFilterPills } from '@/components/admin-v2/prime-filter-pills';
 import { PrimeModule } from '@/components/admin-v2/prime-module';
 import { useTrainer } from '@/hooks/use-trainer';
 import type { AthleteProfile } from '@/hooks/use-admin';
+import { useIsBelowXl } from '@/hooks/use-mobile';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { getAthleteRoutineSummary } from '@/lib/workout/athlete-routine-label';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -25,6 +27,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 export default function TrainerV2AthletesPageClient() {
   const searchParams = useSearchParams();
+  const isBelowXl = useIsBelowXl();
   const initialAthleteId = searchParams.get('athlete');
   const {
     myAthletes,
@@ -130,7 +133,7 @@ export default function TrainerV2AthletesPageClient() {
           onViewPerformance={handleViewPerformance}
         />
 
-        <aside className="min-w-0 xl:w-full">
+        <aside className="hidden min-w-0 xl:block xl:w-full">
           {selectedAthlete ? (
             <PrimeAthleteInspector
               mode="trainer"
@@ -149,6 +152,27 @@ export default function TrainerV2AthletesPageClient() {
           )}
         </aside>
       </div>
+
+      <Sheet
+        open={isBelowXl && Boolean(selectedAthlete)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedId(null);
+        }}
+      >
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto gp-bg-surface p-0">
+          <SheetTitle className="sr-only">Detalle del atleta</SheetTitle>
+          {selectedAthlete ? (
+            <PrimeAthleteInspector
+              mode="trainer"
+              athlete={selectedAthlete}
+              getRoutineLabel={getRoutineLabel}
+              nutritionBasePath="/trainer-v2/athletes"
+              onViewProfile={() => handleViewDetails(selectedAthlete)}
+              onViewPerformance={() => handleViewPerformance(selectedAthlete)}
+            />
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
       <PrimeAthletePerformanceModal
         athlete={isPerformanceOpen ? modalAthlete : null}

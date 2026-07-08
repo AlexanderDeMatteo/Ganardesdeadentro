@@ -15,7 +15,7 @@ export type ExercisePickerTab = 'catalog' | 'platform' | 'mine';
 
 type ExercisePickerPanelProps = {
   selectedExerciseId: string;
-  onSelectExerciseId: (id: string) => void;
+  onSelectExercise: (exercise: Exercise | null) => void;
   fallbackExercises?: Exercise[];
   prime?: boolean;
   labelClass?: string;
@@ -25,7 +25,7 @@ type ExercisePickerPanelProps = {
 
 export function ExercisePickerPanel({
   selectedExerciseId,
-  onSelectExerciseId,
+  onSelectExercise,
   fallbackExercises = [],
   prime = false,
   labelClass = 'block text-sm font-medium mb-2',
@@ -194,7 +194,11 @@ export function ExercisePickerPanel({
         <select
           id="routine-exercise-select"
           value={selectedExerciseId}
-          onChange={(e) => onSelectExerciseId(e.target.value)}
+          onChange={(e) => {
+            const id = e.target.value;
+            const exercise = id ? (pickerExercises.find((ex) => ex.id === id) ?? null) : null;
+            onSelectExercise(exercise);
+          }}
           className={selectClass}
           disabled={isLoading && visibleExercises.length === 0}
         >

@@ -107,7 +107,7 @@ export function PrimeTrainerProgress({ athletes }: PrimeTrainerProgressProps) {
           )}
 
           <PrimeModule modId="TRN-43" title="COMPARATIVA_EQUIPO">
-            <div className="overflow-x-auto p-4 sm:p-5">
+            <div className="hidden overflow-x-auto p-4 sm:p-5 lg:block">
               <table className="w-full text-sm" aria-label="Comparativa del equipo">
                 <caption className="sr-only">Métricas comparativas de atletas asignados</caption>
                 <thead>
@@ -133,6 +133,34 @@ export function PrimeTrainerProgress({ athletes }: PrimeTrainerProgressProps) {
                 </tbody>
               </table>
             </div>
+
+            <ul className="space-y-3 p-4 sm:p-5 lg:hidden" aria-label="Comparativa del equipo">
+              {athletes.map((a) => {
+                const m = displayMetric(a);
+                return (
+                  <li
+                    key={a.id}
+                    className="rounded-lg border gp-border-outline/40 p-4"
+                  >
+                    <p className="gp-mono text-sm font-medium gp-text-primary">{a.name}</p>
+                    <dl className="gp-mono mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                      <div>
+                        <dt className="gp-text-muted">Peso</dt>
+                        <dd className="gp-metric mt-1 gp-text-primary">{m?.weight ?? '—'} kg</dd>
+                      </div>
+                      <div>
+                        <dt className="gp-text-muted">Grasa</dt>
+                        <dd className="gp-metric mt-1 gp-text-primary">{m?.bodyFat ?? '—'}%</dd>
+                      </div>
+                      <div>
+                        <dt className="gp-text-muted">Músculo</dt>
+                        <dd className="gp-metric mt-1 gp-text-primary">{m?.muscleMass ?? '—'} kg</dd>
+                      </div>
+                    </dl>
+                  </li>
+                );
+              })}
+            </ul>
           </PrimeModule>
         </>
       )}

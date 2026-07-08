@@ -25,7 +25,7 @@ export function getSocket(): Socket | null {
   }
 
   socket = io(getApiBaseUrl(), {
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
     autoConnect: true,
     reconnection: true,
     reconnectionAttempts: 10,

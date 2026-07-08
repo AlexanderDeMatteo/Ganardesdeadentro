@@ -405,7 +405,7 @@ export function MetricsOptionOneDesignReplica() {
               <h3 className="mb-3 text-xs font-black uppercase tracking-[0.18em] text-foreground">Historial biométrico</h3>
 
               {/* Mobile cards */}
-              <div className="space-y-3 sm:hidden">
+              <div className="space-y-3 lg:hidden">
                 <div className="rounded-lg border border-border bg-surface p-4">
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Quick add</p>
                   <div className="grid grid-cols-1 gap-3">
@@ -492,7 +492,7 @@ export function MetricsOptionOneDesignReplica() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden sm:block">
+              <div className="hidden lg:block">
                 <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="min-w-[620px] w-full text-left text-xs">
                     <thead>
@@ -654,7 +654,7 @@ export function MetricsOptionOneDesignReplica() {
         {/* Footer réplica */}
         <footer className="flex flex-col items-center justify-between gap-4 border-t border-white/[0.08] pt-6 text-[10px] uppercase tracking-[0.16em] text-white/40 sm:flex-row">
           <span className="font-bold text-white/55">
-            Be a winner — <span style={{ color: LIME }}>FitTrack</span>
+            Be a winner — <span style={{ color: LIME }}>Be a Gainer</span>
           </span>
           <div className="flex flex-wrap justify-center gap-4">
             <span className="cursor-default hover:text-white/70">Privacidad</span>

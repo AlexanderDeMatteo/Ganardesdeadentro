@@ -1,7 +1,7 @@
 import PageClient from './page-client';
 
 export const metadata = {
-  title: 'Rutinas - FitTrack Entrenador',
+  title: 'Rutinas - Be a Gainer Entrenador',
 };
 
 export default function TrainerRoutinesPage() {

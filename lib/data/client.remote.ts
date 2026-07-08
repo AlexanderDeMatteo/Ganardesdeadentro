@@ -202,7 +202,7 @@ function mapApiSetLog(raw: ApiSetLogPayload): SetLogEntry {
     weightKg: nullToUndefined(raw.weightKg),
     suggestedWeightKg: nullToUndefined(raw.suggestedWeightKg),
     result: raw.result,
-    executionVideoUrl: nullToUndefined(raw.executionVideoUrl),
+    executionVideoUrl: resolveApiUrl(raw.executionVideoUrl),
     executionVideoUploadedAt: nullToUndefined(raw.executionVideoUploadedAt),
   };
 }
@@ -339,11 +339,15 @@ function normalizeDifficulty(value: unknown): Difficulty {
   return 'beginner';
 }
 
-function resolveAnimationUrl(url?: string | null): string | undefined {
+function resolveApiUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
   if (url.startsWith('/api/')) return `${getApiBaseUrl()}${url}`;
   return url;
+}
+
+function resolveAnimationUrl(url?: string | null): string | undefined {
+  return resolveApiUrl(url);
 }
 
 function mapApiExercise(raw: ApiExercisePayload): Exercise {
@@ -1350,7 +1354,10 @@ export async function uploadSessionExecutionVideo(
       body: formData,
     },
   );
-  return response;
+  return {
+    ...response,
+    url: resolveApiUrl(response.url) ?? response.url,
+  };
 }
 
 export type ExerciseMusclesSource = 'api' | 'catalog';

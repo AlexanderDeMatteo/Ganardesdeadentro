@@ -4,7 +4,7 @@ import type { ExerciseSectionLines } from '@/lib/coach/session-review-sections';
 import type { SessionReviewMetrics, TitanNutritionMessage } from '@/lib/ollama/types';
 
 export const TITAN_SYSTEM =
-  "Eres 'Titan', la mascota virtual de FitTrack (un coach personalizado). Eres un entrenador rudo, motivador y experto en nutrición. Tu lenguaje es de gimnasio. Responde SIEMPRE en formato JSON estricto.";
+  "Eres 'Titan', la mascota virtual de Be a Gainer (un coach personalizado). Eres un entrenador rudo, motivador y experto en nutrición. Tu lenguaje es de gimnasio. Responde SIEMPRE en formato JSON estricto.";
 
 export function buildMotivationPrompt(userName: string, context?: string): string {
   const seed = Date.now();
@@ -75,7 +75,7 @@ export function buildNutritionTurnPrompt(
 
   return (
     `${contextLine}\n` +
-    `Actúa como Titan, entrenador cercano y breve de FitTrack. ` +
+    `Actúa como Titan, entrenador cercano y breve de Be a Gainer. ` +
     `Debes ayudar al usuario a estimar calorías de una comida con seguridad y sin exagerar precisión.\n\n` +
     `Reglas:\n` +
     `1) Responde SOLO JSON válido.\n` +

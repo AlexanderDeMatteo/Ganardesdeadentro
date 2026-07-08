@@ -1,7 +1,7 @@
 import PageClient from './page-client';
 
 export const metadata = {
-  title: 'Panel Entrenador - FitTrack',
+  title: 'Panel Entrenador - Be a Gainer',
   description: 'Gestiona tus atletas, rutinas y progreso',
 };
 

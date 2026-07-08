@@ -1,7 +1,7 @@
 import PageClient from './page-client';
 
 export const metadata = {
-  title: 'Panel Entrenador V2 - FitTrack',
+  title: 'Panel Entrenador V2 - Be a Gainer',
   description: 'Gestiona tus atletas, rutinas y progreso con Gainer Prime',
 };
 

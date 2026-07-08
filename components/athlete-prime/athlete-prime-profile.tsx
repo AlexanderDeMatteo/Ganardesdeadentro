@@ -249,7 +249,7 @@ export function AthletePrimeProfile() {
             <p className="gp-label gp-text-muted">Datos para estimaciones</p>
           </div>
           <p className="text-sm gp-text-muted leading-relaxed">
-            FitTrack puede estimar un porcentaje orientativo de grasa corporal a partir de tu peso y estos
+            Be a Gainer puede estimar un porcentaje orientativo de grasa corporal a partir de tu peso y estos
             datos. <strong className="gp-text-primary">No sustituye</strong> una medición profesional.
           </p>
           <div className="grid gap-6 md:grid-cols-2">
