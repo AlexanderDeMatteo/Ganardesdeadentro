@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.utils.validation import ACTIVITY_LEVELS, NUTRITION_GOALS, SESSION_OUTCOMES, SET_RESULTS
+from app.utils.meal_plan_validation import validate_meal_plan_shape
 
 
 class MacroTargetsSchema(BaseModel):
@@ -34,6 +35,12 @@ class PublishPlanSchema(BaseModel):
     def validate_goal(cls, value: str) -> str:
         if value not in NUTRITION_GOALS:
             raise ValueError('goal inválido')
+        return value
+
+    @field_validator('mealPlan')
+    @classmethod
+    def validate_meal_plan(cls, value: dict) -> dict:
+        validate_meal_plan_shape(value)
         return value
 
 
