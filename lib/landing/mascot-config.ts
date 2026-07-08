@@ -24,7 +24,7 @@ const KICKER_LOGO = OFFICIAL_BRAND_LOGO;
 export const LANDING_MASCOT_V1: LandingMascotConfig = {
   id: 'v1',
   src: '/coach-trainer.png',
-  alt: 'Entrenador mascota de FitTrack con mancuernas',
+  alt: 'Entrenador mascota de Be a Gainer con mancuernas',
   width: 400,
   height: 460,
   imageClassName:

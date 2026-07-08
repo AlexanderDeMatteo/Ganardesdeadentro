@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { BRAND_NAME, SUPPORT_EMAIL } from '@/lib/landing/brand-logo';
 
 export function LandingFooterV4() {
   return (
@@ -21,7 +22,7 @@ export function LandingFooterV4() {
             <Link href="/register" className="transition-colors hover:text-[var(--landing-green)]">
               Términos
             </Link>
-            <a href="mailto:soporte@fittrack.app" className="transition-colors hover:text-[var(--landing-green)]">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="transition-colors hover:text-[var(--landing-green)]">
               Soporte
             </a>
             <span className="text-white/25" aria-hidden>
@@ -46,7 +47,7 @@ export function LandingFooterV4() {
           </nav>
         </div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40 lg:text-right">
-          © {new Date().getFullYear()} Proyecto Ganar desde Adentro · FitTrack. Todos los derechos reservados.
+          © {new Date().getFullYear()} Proyecto Ganar desde Adentro · {BRAND_NAME}. Todos los derechos reservados.
         </p>
       </div>
     </footer>

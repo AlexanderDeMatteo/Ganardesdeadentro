@@ -78,7 +78,7 @@ function HeroInner({
           className="w-full max-w-xl border-l-2 border-[var(--landing-green-pastel)] pl-5 text-left sm:border-l-[3px] sm:pl-6"
         >
           <p className="text-[15px] font-medium leading-relaxed text-[var(--landing-green-pastel)] sm:text-lg sm:leading-relaxed">
-            Ganar desde adentro es alinear hábitos, descanso y cabeza con lo que haces en el gimnasio. FitTrack te da
+            Ganar desde adentro es alinear hábitos, descanso y cabeza con lo que haces en el gimnasio. Be a Gainer te da
             rutinas claras y métricas honestas para que cada semana refuerce disciplina real, no solo motivación
             pasajera.
           </p>

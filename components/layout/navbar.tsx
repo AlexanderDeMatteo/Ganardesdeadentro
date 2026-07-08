@@ -84,7 +84,7 @@ export function Navbar() {
                 >
                   <SheetHeader className="border-b border-border px-4 py-4 text-left pt-[max(1rem,env(safe-area-inset-top))]">
                     <SheetTitle className="font-black uppercase tracking-wider">Menú</SheetTitle>
-                    <p className="text-xs font-medium text-muted-foreground">FitTrack</p>
+                    <p className="text-xs font-medium text-muted-foreground">Be a Gainer</p>
                   </SheetHeader>
                   <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-2 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
                     {(isTrainer ? trainerNav : mainNav).map(({ href, label, icon: Icon }) => {
@@ -147,7 +147,7 @@ export function Navbar() {
                 <Dumbbell className="h-5 w-5 text-primary-foreground" />
               </div>
               <span className="brand-title hidden truncate text-xl font-black brand-text-gradient sm:inline">
-                FitTrack
+                Be a Gainer
               </span>
             </Link>
           </div>

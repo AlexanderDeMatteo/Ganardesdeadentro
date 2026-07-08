@@ -60,7 +60,7 @@ export function CoachMascot() {
         'coach-dialog fixed bottom-3 right-3 z-40 sm:bottom-5 sm:right-5',
         `coach-dialog--${coachMood}`,
       )}
-      aria-label="Coach visual de FitTrack"
+      aria-label="Coach visual de Be a Gainer"
     >
       <div className="coach-dialog__inner">
         <div className="coach-dialog__bubbleWrap">

@@ -12,7 +12,7 @@ const TITAN_FALLBACK_PHRASES = [
   'Si fuera fácil, todos lo harían. Tú no viniste a ser todos.',
   'Levántate, calienta y demuestra por qué estás aquí.',
   'La racha se construye hoy, no el lunes.',
-  'Menos excusas, más acción. Eso es FitTrack.',
+  'Menos excusas, más acción. Eso es Be a Gainer.',
   'El dolor del esfuerzo se va; el orgullo se queda.',
   'Come con cabeza, entrena con hambre, descansa con inteligencia.',
 ] as const;

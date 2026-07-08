@@ -169,7 +169,7 @@ export function CoachTitanVisualV4({ className }: CoachTitanVisualV4Props) {
             >
               <motion.img
                 src={TITAN.src}
-                alt="Titan — coach de élite de FitTrack"
+                alt="Titan — coach de élite de Be a Gainer"
                 width={TITAN.width}
                 height={TITAN.height}
                 className={cn(

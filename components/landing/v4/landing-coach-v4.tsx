@@ -37,7 +37,7 @@ export function LandingCoachV4() {
               construimos disciplina que sobrevive a los imprevistos del día a día.
             </p>
             <p className="text-base leading-relaxed text-white/80 sm:text-lg">
-              Cada plan en FitTrack nace de la idea de ganar desde adentro: datos accionables, rutinas que puedes
+              Cada plan en Be a Gainer nace de la idea de ganar desde adentro: datos accionables, rutinas que puedes
               sostener y un estándar claro de excelencia.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
